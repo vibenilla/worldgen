@@ -95,8 +95,8 @@ public final class OverworldBiomeBuilder {
    };
 
    public List<Climate.ParameterPoint> spawnTarget() {
-      Climate.Parameter parameter = Climate.Parameter.point(0.0F);
-      float f = 0.16F;
+       var parameter = Climate.Parameter.point(0.0F);
+       var f = 0.16F;
       return List.of(
          new Climate.ParameterPoint(
             this.FULL_RANGE,

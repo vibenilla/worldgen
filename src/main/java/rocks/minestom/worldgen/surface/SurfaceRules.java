@@ -25,8 +25,8 @@ public final class SurfaceRules {
     public static final Codec<RuleSource> CODEC = createRuleCodec();
 
     public static Block constantBlock(RuleSource rule) {
-        if (rule instanceof BlockRuleSource blockRule) {
-            return blockRule.block();
+        if (rule instanceof BlockRuleSource(Block block)) {
+            return block;
         }
         return null;
     }
@@ -383,7 +383,7 @@ public final class SurfaceRules {
             }
 
             var chance = map((double) y, (double) trueY, (double) falseY, 1.0D, 0.0D);
-            PositionalRandomFactory randomFactory = context.randomState().getOrCreateRandomFactory(this.randomName);
+            var randomFactory = context.randomState().getOrCreateRandomFactory(this.randomName);
             var randomSource = randomFactory.at(context.blockX(), y, context.blockZ());
             return (double) randomSource.nextFloat() < chance;
         }

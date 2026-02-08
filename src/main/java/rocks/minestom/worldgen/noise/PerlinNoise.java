@@ -41,7 +41,7 @@ public final class PerlinNoise {
         this.noiseLevels = new ImprovedNoise[octaveCount];
 
         if (usePositionalFactory) {
-            PositionalRandomFactory positionalRandomFactory = randomSource.forkPositional();
+            var positionalRandomFactory = randomSource.forkPositional();
             for (var octaveIndex = 0; octaveIndex < octaveCount; octaveIndex++) {
                 if (amplitudes[octaveIndex] != 0.0) {
                     var octave = firstOctave + octaveIndex;

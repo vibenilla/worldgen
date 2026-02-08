@@ -21,11 +21,11 @@ public record RotatedBlockProvider(Block state) implements BlockStateProvider {
 
     @Override
     public Block getState(RandomSource random, BlockVec position) {
-        var axis = state.getProperty("axis");
+        var axis = this.state.getProperty("axis");
         if (axis != null) {
             // Randomly rotate to one of the three axes
             var newAxis = AXES[random.nextInt(AXES.length)];
-            return state.withProperty("axis", newAxis);
+            return this.state.withProperty("axis", newAxis);
         }
         return this.state;
     }

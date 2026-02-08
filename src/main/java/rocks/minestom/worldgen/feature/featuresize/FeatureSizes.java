@@ -18,11 +18,10 @@ public final class FeatureSizes {
         @Override
         public <D> Result<FeatureSize> decode(Transcoder<D> coder, D value) {
             var mapResult = coder.getMap(value);
-            if (!(mapResult instanceof Result.Ok<Transcoder.MapLike<D>> okMap)) {
+            if (!(mapResult instanceof Result.Ok<Transcoder.MapLike<D>>(Transcoder.MapLike<D> map))) {
                 return new Result.Error<>("FeatureSize must be a map/object");
             }
 
-            var map = okMap.value();
             if (!map.hasValue("type")) {
                 return new Result.Error<>("FeatureSize missing type");
             }

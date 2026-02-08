@@ -22,34 +22,8 @@ import rocks.minestom.worldgen.structure.StructurePlacement;
  *
  * @see RandomSpreadType for offset distribution options
  */
-public final class RandomSpreadPlacement implements StructurePlacement {
-    private final int spacing;
-    private final int separation;
-    private final int salt;
-    private final RandomSpreadType spreadType;
-
-    public RandomSpreadPlacement(int spacing, int separation, int salt, RandomSpreadType spreadType) {
-        this.spacing = spacing;
-        this.separation = separation;
-        this.salt = salt;
-        this.spreadType = spreadType;
-    }
-
-    public int spacing() {
-        return this.spacing;
-    }
-
-    public int separation() {
-        return this.separation;
-    }
-
-    public int salt() {
-        return this.salt;
-    }
-
-    public RandomSpreadType spreadType() {
-        return this.spreadType;
-    }
+public record RandomSpreadPlacement(int spacing, int separation, int salt,
+                                    RandomSpreadType spreadType) implements StructurePlacement {
 
     @Override
     public boolean isStartChunk(int chunkX, int chunkZ, long seed, boolean legacyRandomSource) {
