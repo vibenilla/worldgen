@@ -102,20 +102,22 @@ public final class JigsawAssembler {
             return AssemblyResult.empty();
         }
 
-        if (!(initialElement.element() instanceof LegacySinglePoolElement legacyElement)) {
+        if (!(initialElement.element() instanceof LegacySinglePoolElement(
+                Key location, StructureProcessorList processors, String projection
+        ))) {
             LOGGER.warn("Initial element is not LegacySinglePoolElement: {}",
                     initialElement.element().getClass().getSimpleName());
             return AssemblyResult.empty();
         }
 
-        var template = this.context.structureLoader().getTemplate(legacyElement.location());
+        var template = this.context.structureLoader().getTemplate(location);
         if (template == null) {
-            LOGGER.warn("Template not found: {}", legacyElement.location());
+            LOGGER.warn("Template not found: {}", location);
             return AssemblyResult.empty();
         }
 
         LOGGER.info("Placing village structure at {}, start template: {}", this.context.start(),
-                legacyElement.location());
+                location);
 
         var rotation = Rotation.getRandom(random);
         var origin = this.context.start();
@@ -127,7 +129,7 @@ public final class JigsawAssembler {
             LOGGER.info("  - pool={}, name={}, target={}", jigsaw.pool(), jigsaw.name(), jigsaw.target());
         }
 
-        var terrainMatching = "terrain_matching".equals(legacyElement.projection());
+        var terrainMatching = "terrain_matching".equals(projection);
         var projectionOffset = this.resolveProjectionOffset(terrainMatching);
         if (terrainMatching) {
             var baseBounds = template.getBoundingBox(BlockVec.ZERO, rotation);
@@ -138,11 +140,11 @@ public final class JigsawAssembler {
         var bounds = template.getBoundingBox(origin, rotation);
         var initialPiece = new PlacedPiece(
                 template,
-                legacyElement.location(),
+                location,
                 origin,
                 rotation,
                 bounds,
-                legacyElement.processors(),
+                processors,
                 0,
                 terrainMatching,
                 projectionOffset);
@@ -241,7 +243,7 @@ public final class JigsawAssembler {
                     continue;
                 }
 
-                var firstElement = legacyElements.get(0);
+                var firstElement = legacyElements.getFirst();
                 candidateTried++;
                 var candidateTemplate = this.context.structureLoader().getTemplate(firstElement.location());
                 if (candidateTemplate == null) {

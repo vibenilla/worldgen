@@ -152,7 +152,7 @@ public final class StructurePlacer {
             return null;
         }
 
-        var firstBounds = pieces.get(0).bounds();
+        var firstBounds = pieces.getFirst().bounds();
         var bounds = new BoundingBox(
                 firstBounds.minX(),
                 firstBounds.minY(),
@@ -299,7 +299,7 @@ public final class StructurePlacer {
             }
         }
 
-        return structureSet.structures().get(0).structure();
+        return structureSet.structures().getFirst().structure();
     }
 
     private int resolveStartY(Structure structure, int surfaceY, NoiseGeneratorSettingsRuntime settings) {

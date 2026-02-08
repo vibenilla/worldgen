@@ -56,17 +56,17 @@ public final class TerrainGenerator {
 
         // --- The Noise Loop ---
         // Iterate over 'Cells' (the optimization unit)
-        for (int cellOffsetX = 0; cellOffsetX < cellCountXZ; cellOffsetX++) {
+        for (var cellOffsetX = 0; cellOffsetX < cellCountXZ; cellOffsetX++) {
             noiseChunk.advanceCellX(cellOffsetX);
 
-            for (int cellOffsetZ = 0; cellOffsetZ < cellCountXZ; cellOffsetZ++) {
+            for (var cellOffsetZ = 0; cellOffsetZ < cellCountXZ; cellOffsetZ++) {
 
                 // Iterate cells top-to-bottom for heightmap tracking
-                for (int cellOffsetY = cellCountY - 1; cellOffsetY >= 0; cellOffsetY--) {
+                for (var cellOffsetY = cellCountY - 1; cellOffsetY >= 0; cellOffsetY--) {
                     noiseChunk.selectCellYZ(cellOffsetY, cellOffsetZ);
 
                     // Iterate blocks WITHIN the cell
-                    for (int inCellY = cellHeight - 1; inCellY >= 0; inCellY--) {
+                    for (var inCellY = cellHeight - 1; inCellY >= 0; inCellY--) {
                         var blockY = (minCellY + cellOffsetY) * cellHeight + inCellY;
                         if (blockY < minY || blockY > maxY) {
                             continue;
@@ -75,13 +75,13 @@ public final class TerrainGenerator {
                         var deltaY = (double) inCellY / (double) cellHeight;
                         noiseChunk.updateForY(blockY, deltaY);
 
-                        for (int inCellX = 0; inCellX < cellWidth; inCellX++) {
+                        for (var inCellX = 0; inCellX < cellWidth; inCellX++) {
                             var blockX = startX + cellOffsetX * cellWidth + inCellX;
                             var localX = blockX - startX;
                             var deltaX = (double) inCellX / (double) cellWidth;
                             noiseChunk.updateForX(blockX, deltaX);
 
-                            for (int inCellZ = 0; inCellZ < cellWidth; inCellZ++) {
+                            for (var inCellZ = 0; inCellZ < cellWidth; inCellZ++) {
                                 var blockZ = startZ + cellOffsetZ * cellWidth + inCellZ;
                                 var localZ = blockZ - startZ;
                                 var deltaZ = (double) inCellZ / (double) cellWidth;

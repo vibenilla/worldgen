@@ -42,7 +42,7 @@ public record TemplatePool(List<PoolElementEntry> elements, Key fallback) {
             }
         }
 
-        return this.elements.get(0);
+        return this.elements.getFirst();
     }
 
     public record PoolElementEntry(PoolElement element, int weight) {

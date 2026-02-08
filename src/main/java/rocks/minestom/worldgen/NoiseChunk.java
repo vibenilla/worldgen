@@ -110,77 +110,86 @@ public final class NoiseChunk implements DensityFunction.Context {
     }
 
     private DensityFunction wrapNew(DensityFunction function) {
-        if (function instanceof DensityFunctions.Interpolated interpolated) {
-            return new NoiseInterpolator(interpolated.argument());
+        if (function instanceof DensityFunctions.Interpolated(DensityFunction argument4)) {
+            return new NoiseInterpolator(argument4);
         }
 
-        if (function instanceof DensityFunctions.CacheOnce cacheOnce) {
-            return new CacheOnce(this.wrap(cacheOnce.argument()));
+        if (function instanceof DensityFunctions.CacheOnce(DensityFunction argument3)) {
+            return new CacheOnce(this.wrap(argument3));
         }
 
-        if (function instanceof DensityFunctions.Cache2D cache2D) {
-            return new Cache2D(this.wrap(cache2D.argument()));
+        if (function instanceof DensityFunctions.Cache2D(DensityFunction argument2)) {
+            return new Cache2D(this.wrap(argument2));
         }
 
-        if (function instanceof DensityFunctions.FlatCache flatCache) {
-            return new FlatCache(this.wrap(flatCache.argument()));
+        if (function instanceof DensityFunctions.FlatCache(DensityFunction argument1)) {
+            return new FlatCache(this.wrap(argument1));
         }
 
-        if (function instanceof DensityFunctions.CacheAllInCell cacheAllInCell) {
-            return new CacheAllInCell(this.wrap(cacheAllInCell.argument()));
+        if (function instanceof DensityFunctions.CacheAllInCell(DensityFunction argument)) {
+            return new CacheAllInCell(this.wrap(argument));
         }
 
         // Recursively wrap child functions
-        return wrapChildren(function);
+        return this.wrapChildren(function);
     }
 
     private DensityFunction wrapChildren(DensityFunction function) {
-        if (function instanceof DensityFunctions.Add add) {
-            return new DensityFunctions.Add(this.wrap(add.argument1()), this.wrap(add.argument2()));
+        if (function instanceof DensityFunctions.Add(DensityFunction argument7, DensityFunction argument8)) {
+            return new DensityFunctions.Add(this.wrap(argument7), this.wrap(argument8));
         }
-        if (function instanceof DensityFunctions.Mul mul) {
-            return new DensityFunctions.Mul(this.wrap(mul.argument1()), this.wrap(mul.argument2()));
+        if (function instanceof DensityFunctions.Mul(DensityFunction argument5, DensityFunction argument6)) {
+            return new DensityFunctions.Mul(this.wrap(argument5), this.wrap(argument6));
         }
-        if (function instanceof DensityFunctions.Min min) {
-            return new DensityFunctions.Min(this.wrap(min.argument1()), this.wrap(min.argument2()));
+        if (function instanceof DensityFunctions.Min(DensityFunction argument3, DensityFunction argument4)) {
+            return new DensityFunctions.Min(this.wrap(argument3), this.wrap(argument4));
         }
-        if (function instanceof DensityFunctions.Max max) {
-            return new DensityFunctions.Max(this.wrap(max.argument1()), this.wrap(max.argument2()));
+        if (function instanceof DensityFunctions.Max(DensityFunction argument1, DensityFunction argument2)) {
+            return new DensityFunctions.Max(this.wrap(argument1), this.wrap(argument2));
         }
-        if (function instanceof DensityFunctions.Clamp clamp) {
-            return new DensityFunctions.Clamp(this.wrap(clamp.input()), clamp.min(), clamp.max());
+        if (function instanceof DensityFunctions.Clamp(DensityFunction input3, double min, double max)) {
+            return new DensityFunctions.Clamp(this.wrap(input3), min, max);
         }
-        if (function instanceof DensityFunctions.Mapped mapped) {
-            return new DensityFunctions.Mapped(mapped.type(), this.wrap(mapped.input()));
+        if (function instanceof DensityFunctions.Mapped(DensityFunctions.Mapped.Type type, DensityFunction input2)) {
+            return new DensityFunctions.Mapped(type, this.wrap(input2));
         }
-        if (function instanceof DensityFunctions.RangeChoice rangeChoice) {
+        if (function instanceof DensityFunctions.RangeChoice(
+                DensityFunction input1, double minInclusive, double maxExclusive, DensityFunction whenInRange,
+                DensityFunction whenOutOfRange
+        )) {
             return new DensityFunctions.RangeChoice(
-                    this.wrap(rangeChoice.input()),
-                    rangeChoice.minInclusive(),
-                    rangeChoice.maxExclusive(),
-                    this.wrap(rangeChoice.whenInRange()),
-                    this.wrap(rangeChoice.whenOutOfRange()));
+                    this.wrap(input1),
+                    minInclusive,
+                    maxExclusive,
+                    this.wrap(whenInRange),
+                    this.wrap(whenOutOfRange));
         }
-        if (function instanceof DensityFunctions.ShiftedNoise shiftedNoise) {
+        if (function instanceof DensityFunctions.ShiftedNoise(
+                DensityFunction shiftX, DensityFunction shiftY, DensityFunction shiftZ, double xzScale, double yScale,
+                rocks.minestom.worldgen.noise.NormalNoise noise1
+        )) {
             return new DensityFunctions.ShiftedNoise(
-                    this.wrap(shiftedNoise.shiftX()),
-                    this.wrap(shiftedNoise.shiftY()),
-                    this.wrap(shiftedNoise.shiftZ()),
-                    shiftedNoise.xzScale(),
-                    shiftedNoise.yScale(),
-                    shiftedNoise.noise());
+                    this.wrap(shiftX),
+                    this.wrap(shiftY),
+                    this.wrap(shiftZ),
+                    xzScale,
+                    yScale,
+                    noise1);
         }
-        if (function instanceof DensityFunctions.BlendDensity blendDensity) {
-            return new DensityFunctions.BlendDensity(this.wrap(blendDensity.argument()));
+        if (function instanceof DensityFunctions.BlendDensity(DensityFunction argument)) {
+            return new DensityFunctions.BlendDensity(this.wrap(argument));
         }
-        if (function instanceof DensityFunctions.Spline spline) {
-            return new DensityFunctions.Spline(wrapSplineNode(spline.spline()));
+        if (function instanceof DensityFunctions.Spline(DensityFunctions.SplineNode spline1)) {
+            return new DensityFunctions.Spline(this.wrapSplineNode(spline1));
         }
-        if (function instanceof DensityFunctions.WeirdScaledSampler weirdScaledSampler) {
+        if (function instanceof DensityFunctions.WeirdScaledSampler(
+                DensityFunction input, rocks.minestom.worldgen.noise.NormalNoise noise,
+                DensityFunctions.WeirdScaledSampler.RarityValueMapper rarityValueMapper
+        )) {
             return new DensityFunctions.WeirdScaledSampler(
-                    this.wrap(weirdScaledSampler.input()),
-                    weirdScaledSampler.noise(),
-                    weirdScaledSampler.rarityValueMapper());
+                    this.wrap(input),
+                    noise,
+                    rarityValueMapper);
         }
 
         // Leaf nodes that don't need wrapping
@@ -191,16 +200,19 @@ public final class NoiseChunk implements DensityFunction.Context {
         if (node instanceof DensityFunctions.SplineConstant) {
             return node;
         }
-        if (node instanceof DensityFunctions.SplineMultipoint multipoint) {
-            var wrappedValues = new ArrayList<DensityFunctions.SplineNode>(multipoint.values().size());
-            for (var value : multipoint.values()) {
-                wrappedValues.add(wrapSplineNode(value));
+        if (node instanceof DensityFunctions.SplineMultipoint(
+                DensityFunction coordinate, float[] locations, List<DensityFunctions.SplineNode> values,
+                float[] derivatives
+        )) {
+            var wrappedValues = new ArrayList<DensityFunctions.SplineNode>(values.size());
+            for (var value : values) {
+                wrappedValues.add(this.wrapSplineNode(value));
             }
             return new DensityFunctions.SplineMultipoint(
-                    this.wrap(multipoint.coordinate()),
-                    multipoint.locations(),
+                    this.wrap(coordinate),
+                    locations,
                     wrappedValues,
-                    multipoint.derivatives());
+                    derivatives);
         }
         return node;
     }
@@ -233,7 +245,7 @@ public final class NoiseChunk implements DensityFunction.Context {
         this.cellStartBlockX = cellX * this.cellWidth;
         this.inCellX = 0;
 
-        for (int cellZ = 0; cellZ <= this.cellCountXZ; cellZ++) {
+        for (var cellZ = 0; cellZ <= this.cellCountXZ; cellZ++) {
             var actualCellZ = this.firstCellZ + cellZ;
             this.cellStartBlockZ = actualCellZ * this.cellWidth;
             this.inCellZ = 0;
@@ -241,7 +253,7 @@ public final class NoiseChunk implements DensityFunction.Context {
             for (var interpolator : this.interpolators) {
                 var slice = useSlice0 ? interpolator.slice0 : interpolator.slice1;
 
-                for (int cellY = 0; cellY <= this.cellCountY; cellY++) {
+                for (var cellY = 0; cellY <= this.cellCountY; cellY++) {
                     this.cellStartBlockY = (this.cellNoiseMinY + cellY) * this.cellHeight;
                     this.inCellY = 0;
                     this.interpolationCounter++;
@@ -341,8 +353,8 @@ public final class NoiseChunk implements DensityFunction.Context {
 
         NoiseInterpolator(DensityFunction noiseFiller) {
             this.noiseFiller = NoiseChunk.this.wrap(noiseFiller);
-            this.slice0 = allocateSlice();
-            this.slice1 = allocateSlice();
+            this.slice0 = this.allocateSlice();
+            this.slice1 = this.allocateSlice();
             NoiseChunk.this.interpolators.add(this);
         }
 
@@ -473,9 +485,9 @@ public final class NoiseChunk implements DensityFunction.Context {
             this.firstNoiseZ = NoiseChunk.this.firstCellZ * NoiseChunk.this.cellWidth / 4;
 
             // Pre-compute values at quart positions
-            for (int quartX = 0; quartX < this.sizeXZ; quartX++) {
+            for (var quartX = 0; quartX < this.sizeXZ; quartX++) {
                 var blockX = (this.firstNoiseX + quartX) * 4;
-                for (int quartZ = 0; quartZ < this.sizeXZ; quartZ++) {
+                for (var quartZ = 0; quartZ < this.sizeXZ; quartZ++) {
                     var blockZ = (this.firstNoiseZ + quartZ) * 4;
                     this.values[quartX + quartZ * this.sizeXZ] = function
                             .compute(new SinglePointContext(blockX, 0, blockZ));
@@ -521,10 +533,10 @@ public final class NoiseChunk implements DensityFunction.Context {
             if (cellY != this.lastCellY || cellZ != this.lastCellZ) {
                 this.lastCellY = cellY;
                 this.lastCellZ = cellZ;
-                fillCell();
+                this.fillCell();
             }
 
-            var index = getIndex(NoiseChunk.this.inCellX, NoiseChunk.this.inCellY, NoiseChunk.this.inCellZ);
+            var index = this.getIndex(NoiseChunk.this.inCellX, NoiseChunk.this.inCellY, NoiseChunk.this.inCellZ);
             return this.values[index];
         }
 
@@ -533,13 +545,13 @@ public final class NoiseChunk implements DensityFunction.Context {
             var savedInCellY = NoiseChunk.this.inCellY;
             var savedInCellZ = NoiseChunk.this.inCellZ;
 
-            for (int y = 0; y < NoiseChunk.this.cellHeight; y++) {
+            for (var y = 0; y < NoiseChunk.this.cellHeight; y++) {
                 NoiseChunk.this.inCellY = y;
-                for (int x = 0; x < NoiseChunk.this.cellWidth; x++) {
+                for (var x = 0; x < NoiseChunk.this.cellWidth; x++) {
                     NoiseChunk.this.inCellX = x;
-                    for (int z = 0; z < NoiseChunk.this.cellWidth; z++) {
+                    for (var z = 0; z < NoiseChunk.this.cellWidth; z++) {
                         NoiseChunk.this.inCellZ = z;
-                        this.values[getIndex(x, y, z)] = this.function.compute(NoiseChunk.this);
+                        this.values[this.getIndex(x, y, z)] = this.function.compute(NoiseChunk.this);
                     }
                 }
             }

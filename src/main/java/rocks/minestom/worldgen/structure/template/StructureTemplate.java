@@ -140,7 +140,7 @@ public final class StructureTemplate {
         var originLocalX = origin.blockX() - chunkStartX;
         var originLocalZ = origin.blockZ() - chunkStartZ;
 
-        int referenceSurfaceY = origin.blockY();
+        var referenceSurfaceY = origin.blockY();
         if (originLocalX >= 0 && originLocalX < chunkSizeX && originLocalZ >= 0 && originLocalZ < chunkSizeZ) {
             var surfaceIndex = originLocalX * chunkSizeZ + originLocalZ;
             var surfaceY = surfaceHeights[surfaceIndex];

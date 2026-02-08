@@ -345,7 +345,7 @@ public final class DensityFunctions {
             var intervalStart = findIntervalStart(this.locations, coordinateValue);
             var lastIndex = this.locations.length - 1;
             if (intervalStart < 0) {
-                return linearExtend(coordinateValue, this.locations, this.values.get(0).compute(context), this.derivatives, 0);
+                return linearExtend(coordinateValue, this.locations, this.values.getFirst().compute(context), this.derivatives, 0);
             }
             if (intervalStart == lastIndex) {
                 return linearExtend(coordinateValue, this.locations, this.values.get(lastIndex).compute(context), this.derivatives, lastIndex);

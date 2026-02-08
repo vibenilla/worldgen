@@ -37,14 +37,14 @@ public final class DensityFunctionResolver {
 
     private Codec<DensityFunction> createCodec() {
         return Codec.Recursive(self -> {
-            Codec<DensityFunction> constantCodec = Codec.DOUBLE.transform(
+            var constantCodec = Codec.DOUBLE.transform(
                     value -> (DensityFunction) new DensityFunctions.Constant(value),
                     function -> {
                         throw new UnsupportedOperationException("Encoding is not supported");
                     }
             );
 
-            Codec<DensityFunction> referenceCodec = Codec.KEY.transform(
+            var referenceCodec = Codec.KEY.transform(
                     this::resolveReference,
                     function -> {
                         throw new UnsupportedOperationException("Encoding is not supported");
@@ -108,7 +108,7 @@ public final class DensityFunctionResolver {
             this.densityFunctionCache.put(key, densityFunction);
             return densityFunction;
         } finally {
-            stack.remove(stack.size() - 1);
+            stack.removeLast();
         }
     }
 
@@ -373,14 +373,14 @@ public final class DensityFunctionResolver {
 
     private static StructCodec<DensityFunction> splineStruct(Codec<DensityFunction> self) {
         Codec<DensityFunctions.SplineNode> nodeCodec = Codec.Recursive(nodeSelf -> {
-            Codec<DensityFunctions.SplineNode> constant = Codec.FLOAT.transform(
+            var constant = Codec.FLOAT.transform(
                     value -> (DensityFunctions.SplineNode) new DensityFunctions.SplineConstant(value),
                     node -> {
                         throw new UnsupportedOperationException("Encoding is not supported");
                     }
             );
 
-            StructCodec<SplinePoint> pointCodec = StructCodec.struct(
+            var pointCodec = StructCodec.struct(
                     "location", Codec.FLOAT, point -> {
                         throw new UnsupportedOperationException("Encoding is not supported");
                     },
