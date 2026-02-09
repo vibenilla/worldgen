@@ -1,14 +1,46 @@
 plugins {
-    java
+    `java-library`
+    id("com.vanniktech.maven.publish") version "0.36.0"
 }
 
+description = "A library for Minestom worldgen"
 group = "rocks.minestom"
 version = "0.1.0"
 
-java {
-    toolchain.languageVersion = JavaLanguageVersion.of(25)
-    withSourcesJar()
-    withJavadocJar()
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+
+mavenPublishing {
+    coordinates(group.toString(), project.name, version.toString())
+    publishToMavenCentral()
+    signAllPublications()
+
+    pom {
+        name = project.name
+        description = project.description
+        url = "https://github.com/vibenilla/worldgen"
+
+        licenses {
+            license {
+                name = "Apache-2.0"
+                url = "https://www.apache.org/licenses/LICENSE-2.0.txt"
+            }
+        }
+
+        developers {
+            developer {
+                name = "mudkip"
+                id = "mudkipdev"
+                email = "mudkip@mudkip.dev"
+                url = "https://mudkip.dev"
+            }
+        }
+
+        scm {
+            url = "https://github.com/vibenilla/worldgen"
+            connection = "scm:git:git://github.com/vibenilla/worldgen.git"
+            developerConnection = "scm:git:ssh://git@github.com/vibenilla/worldgen.git"
+        }
+    }
 }
 
 repositories {
