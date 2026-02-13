@@ -9,12 +9,8 @@ import rocks.minestom.worldgen.feature.foliageplacers.FoliagePlacer;
 import rocks.minestom.worldgen.feature.foliageplacers.FoliagePlacers;
 import rocks.minestom.worldgen.feature.stateproviders.BlockStateProvider;
 import rocks.minestom.worldgen.feature.stateproviders.BlockStateProviders;
-import rocks.minestom.worldgen.feature.treedecorators.TreeDecorator;
-import rocks.minestom.worldgen.feature.treedecorators.TreeDecorators;
 import rocks.minestom.worldgen.feature.trunkplacers.TrunkPlacer;
 import rocks.minestom.worldgen.feature.trunkplacers.TrunkPlacers;
-
-import java.util.List;
 
 public record TreeConfiguration(
         BlockStateProvider trunkProvider,
@@ -23,7 +19,6 @@ public record TreeConfiguration(
         FoliagePlacer foliagePlacer,
         BlockStateProvider dirtProvider,
         FeatureSize minimumSize,
-        List<TreeDecorator> decorators,
         boolean ignoreVines,
         boolean forceDirt
 ) implements FeatureConfiguration {
@@ -34,7 +29,6 @@ public record TreeConfiguration(
             "foliage_placer", FoliagePlacers.CODEC, TreeConfiguration::foliagePlacer,
             "dirt_provider", BlockStateProviders.CODEC, TreeConfiguration::dirtProvider,
             "minimum_size", FeatureSizes.CODEC, TreeConfiguration::minimumSize,
-            "decorators", TreeDecorators.CODEC.list().optional(List.of()), TreeConfiguration::decorators,
             "ignore_vines", Codec.BOOLEAN.optional(false), TreeConfiguration::ignoreVines,
             "force_dirt", Codec.BOOLEAN.optional(false), TreeConfiguration::forceDirt,
             TreeConfiguration::new
