@@ -59,7 +59,6 @@ public final class TreeFeature implements Feature<TreeConfiguration> {
 
         // Execute tree decorators (e.g., place leaf litter on ground)
         if (!config.decorators().isEmpty()) {
-            var parsedDecorators = config.parsedDecorators();
             var decoratorContext = new rocks.minestom.worldgen.feature.treedecorators.TreeDecorator.Context(
                     level,
                     level::setBlock,
@@ -68,7 +67,7 @@ public final class TreeFeature implements Feature<TreeConfiguration> {
                     logs,
                     leaves
             );
-            for (var decorator : parsedDecorators) {
+            for (var decorator : config.decorators()) {
                 decorator.place(decoratorContext);
             }
         }

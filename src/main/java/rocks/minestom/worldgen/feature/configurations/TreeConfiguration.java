@@ -2,7 +2,6 @@ package rocks.minestom.worldgen.feature.configurations;
 
 import net.minestom.server.codec.Codec;
 import net.minestom.server.codec.StructCodec;
-import net.minestom.server.codec.Transcoder;
 import rocks.minestom.worldgen.feature.FeatureConfiguration;
 import rocks.minestom.worldgen.feature.featuresize.FeatureSize;
 import rocks.minestom.worldgen.feature.featuresize.FeatureSizes;
@@ -15,7 +14,6 @@ import rocks.minestom.worldgen.feature.treedecorators.TreeDecorators;
 import rocks.minestom.worldgen.feature.trunkplacers.TrunkPlacer;
 import rocks.minestom.worldgen.feature.trunkplacers.TrunkPlacers;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public record TreeConfiguration(
@@ -25,7 +23,7 @@ public record TreeConfiguration(
         FoliagePlacer foliagePlacer,
         BlockStateProvider dirtProvider,
         FeatureSize minimumSize,
-        List<Codec.RawValue> decorators,
+        List<TreeDecorator> decorators,
         boolean ignoreVines,
         boolean forceDirt
 ) implements FeatureConfiguration {
@@ -36,19 +34,9 @@ public record TreeConfiguration(
             "foliage_placer", FoliagePlacers.CODEC, TreeConfiguration::foliagePlacer,
             "dirt_provider", BlockStateProviders.CODEC, TreeConfiguration::dirtProvider,
             "minimum_size", FeatureSizes.CODEC, TreeConfiguration::minimumSize,
-            "decorators", Codec.RAW_VALUE.list().optional(List.of()), TreeConfiguration::decorators,
+            "decorators", TreeDecorators.CODEC.list().optional(List.of()), TreeConfiguration::decorators,
             "ignore_vines", Codec.BOOLEAN.optional(false), TreeConfiguration::ignoreVines,
             "force_dirt", Codec.BOOLEAN.optional(false), TreeConfiguration::forceDirt,
             TreeConfiguration::new
     );
-
-    public List<TreeDecorator> parsedDecorators() {
-        var result = new ArrayList<TreeDecorator>();
-        for (var rawDecorator : decorators) {
-            var json = rawDecorator.convertTo(Transcoder.JSON).orElseThrow();
-            var decorator = TreeDecorators.CODEC.decode(Transcoder.JSON, json).orElseThrow();
-            result.add(decorator);
-        }
-        return result;
-    }
 }
