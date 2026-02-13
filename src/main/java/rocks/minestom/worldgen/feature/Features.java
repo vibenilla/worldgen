@@ -21,6 +21,7 @@ public final class Features {
     public static final FlowerFeature FLOWER = new FlowerFeature();
     public static final SimpleBlockFeature SIMPLE_BLOCK = new SimpleBlockFeature();
     public static final RandomPatchFeature RANDOM_PATCH = new RandomPatchFeature();
+    public static final SimpleRandomSelectorFeature SIMPLE_RANDOM_SELECTOR = new SimpleRandomSelectorFeature();
     public static final NoOpFeature NO_OP = new NoOpFeature();
 
     private static final Codec<TreeConfiguredFeature> TREE_CONFIGURED_FEATURE_CODEC = StructCodec.struct(
@@ -51,6 +52,10 @@ public final class Features {
     private static final Codec<RandomPatchConfiguredFeature> RANDOM_PATCH_CONFIGURED_FEATURE_CODEC = StructCodec.struct(
             "config", RandomPatchConfiguration.CODEC, RandomPatchConfiguredFeature::config,
             RandomPatchConfiguredFeature::new);
+
+    private static final Codec<SimpleRandomSelectorConfiguredFeature> SIMPLE_RANDOM_SELECTOR_CONFIGURED_FEATURE_CODEC = StructCodec.struct(
+            "config", SimpleRandomSelectorConfiguration.CODEC, SimpleRandomSelectorConfiguredFeature::config,
+            SimpleRandomSelectorConfiguredFeature::new);
 
     public static ConfiguredFeature<?> parseConfiguredFeature(JsonElement json) {
         if (!json.isJsonObject()) {
@@ -99,6 +104,10 @@ public final class Features {
                 var config = RANDOM_PATCH_CONFIGURED_FEATURE_CODEC.decode(Transcoder.JSON, obj).orElseThrow().config();
                 yield new ConfiguredFeature<>(RANDOM_PATCH, config);
             }
+            case "minecraft:simple_random_selector" -> {
+                var config = SIMPLE_RANDOM_SELECTOR_CONFIGURED_FEATURE_CODEC.decode(Transcoder.JSON, obj).orElseThrow().config();
+                yield new ConfiguredFeature<>(SIMPLE_RANDOM_SELECTOR, config);
+            }
             case "minecraft:bamboo", "minecraft:basalt_pillar", "minecraft:block_column", "minecraft:blue_ice",
                     "minecraft:bonus_chest", "minecraft:coral_claw", "minecraft:coral_mushroom",
                     "minecraft:coral_tree", "minecraft:delta_feature", "minecraft:desert_well",
@@ -135,6 +144,9 @@ public final class Features {
     }
 
     private record RandomPatchConfiguredFeature(RandomPatchConfiguration config) {
+    }
+
+    private record SimpleRandomSelectorConfiguredFeature(SimpleRandomSelectorConfiguration config) {
     }
 
     private record RandomSelectorConfiguredFeatureConfig(Key defaultFeature,
