@@ -5,14 +5,17 @@ plugins {
 
 description = "A library for Minestom worldgen"
 group = "rocks.minestom"
-version = "0.1.0"
+version = "0.2.0"
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(25)
 
 mavenPublishing {
     coordinates(group.toString(), project.name, version.toString())
     publishToMavenCentral()
-    signAllPublications()
+
+    if (!gradle.startParameter.taskNames.any { it.contains("publishToMavenLocal") }) {
+        signAllPublications()
+    }
 
     pom {
         name = project.name
