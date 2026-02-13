@@ -9,10 +9,6 @@ import java.util.HashSet;
 import java.util.function.BiConsumer;
 
 public final class TreeFeature implements Feature<TreeConfiguration> {
-
-    public TreeFeature() {
-    }
-
     @Override
     public <T extends Block.Getter & Block.Setter> boolean place(FeaturePlaceContext<TreeConfiguration, T> context) {
         var level = context.accessor();
