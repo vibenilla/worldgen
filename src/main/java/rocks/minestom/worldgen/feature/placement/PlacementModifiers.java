@@ -482,9 +482,8 @@ public final class PlacementModifiers {
 
     private record WouldSurvivePredicate(Block state, BlockVec offset) implements BlockPredicate {
             private WouldSurvivePredicate(JsonObject state, BlockVec offset) {
-                this.state = state == null ? Block.AIR : BlockCodec.CODEC.decode(Transcoder.JSON, state)
-                        .orElse(Block.AIR);
-                this.offset = offset;
+                this(state == null ? Block.AIR : BlockCodec.CODEC.decode(Transcoder.JSON, state).orElse(Block.AIR),
+                        offset);
             }
 
             @Override
