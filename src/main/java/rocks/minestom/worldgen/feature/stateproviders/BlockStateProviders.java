@@ -36,6 +36,12 @@ public final class BlockStateProviders {
                         .mapResult(provider -> (BlockStateProvider) provider);
                 case "minecraft:rotated_block_provider" -> RotatedBlockProvider.CODEC.decode(coder, value)
                         .mapResult(provider -> (BlockStateProvider) provider);
+                case "minecraft:noise_provider" -> NoiseProvider.CODEC.decode(coder, value)
+                        .mapResult(provider -> (BlockStateProvider) provider);
+                case "minecraft:noise_threshold_provider" -> NoiseThresholdProvider.CODEC.decode(coder, value)
+                        .mapResult(provider -> (BlockStateProvider) provider);
+                case "minecraft:dual_noise_provider" -> DualNoiseProvider.CODEC.decode(coder, value)
+                        .mapResult(provider -> (BlockStateProvider) provider);
                 default -> new Result.Error<>("Unknown block state provider type: " + type);
             };
         }

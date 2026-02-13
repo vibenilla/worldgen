@@ -31,6 +31,9 @@ public interface IntProvider {
                 return switch (typeKey.asString()) {
                     case "minecraft:uniform" -> UniformIntProvider.CODEC.decode(coder, value).mapResult(provider -> (IntProvider) provider);
                     case "minecraft:weighted_list" -> WeightedListIntProvider.CODEC.decode(coder, value).mapResult(provider -> (IntProvider) provider);
+                    case "minecraft:biased_to_bottom" -> BiasedToBottomIntProvider.CODEC.decode(coder, value).mapResult(provider -> (IntProvider) provider);
+                    case "minecraft:clamped" -> ClampedIntProvider.CODEC.decode(coder, value).mapResult(provider -> (IntProvider) provider);
+                    case "minecraft:clamped_normal" -> ClampedNormalIntProvider.CODEC.decode(coder, value).mapResult(provider -> (IntProvider) provider);
                     default -> new Result.Error<>("Unknown int provider type: " + typeKey.asString());
                 };
             }
