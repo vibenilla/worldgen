@@ -57,6 +57,22 @@ public final class TreeFeature implements Feature<TreeConfiguration> {
             config.foliagePlacer().createFoliage(level, leafSetter, random, config, maxFreeTreeHeight, attachment, foliageHeight, foliageRadius);
         }
 
+        // Execute tree decorators (e.g., place leaf litter on ground)
+        if (!config.decorators().isEmpty()) {
+            var parsedDecorators = config.parsedDecorators();
+            var decoratorContext = new rocks.minestom.worldgen.feature.treedecorators.TreeDecorator.Context(
+                    level,
+                    level::setBlock,
+                    random,
+                    new HashSet<>(), // roots (not tracked yet)
+                    logs,
+                    leaves
+            );
+            for (var decorator : parsedDecorators) {
+                decorator.place(decoratorContext);
+            }
+        }
+
         return !logs.isEmpty() || !leaves.isEmpty();
     }
 
