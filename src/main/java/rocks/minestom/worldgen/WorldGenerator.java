@@ -9,6 +9,7 @@ import net.minestom.server.world.biome.Biome;
 import rocks.minestom.worldgen.biome.BiomeSource;
 import rocks.minestom.worldgen.biome.BiomeZoomer;
 import rocks.minestom.worldgen.feature.*;
+import rocks.minestom.worldgen.feature.placement.PlacementContext;
 import rocks.minestom.worldgen.structure.placement.StructurePlacer;
 import rocks.minestom.worldgen.surface.BiomeResolver;
 import rocks.minestom.worldgen.surface.SurfaceRules;
@@ -153,11 +154,11 @@ public final class WorldGenerator implements Generator {
             this.placeEndPodium(unit, surfaceHeights);
         }
 
-        this.placeFeatures(unit, surfaceHeights);
+        this.placeFeatures(unit, surfaceHeights, waterHeights);
     }
 
     @SuppressWarnings("unchecked")
-    private void placeFeatures(GenerationUnit unit, int[] surfaceHeights) {
+    private void placeFeatures(GenerationUnit unit, int[] surfaceHeights, int[] waterHeights) {
         var startX = unit.absoluteStart().blockX();
         var startZ = unit.absoluteStart().blockZ();
         var sizeX = unit.size().blockX();
@@ -181,6 +182,20 @@ public final class WorldGenerator implements Generator {
         var levelAdapter = new GenerationUnitAdapter(featureUnit);
         var randomFactory = this.settings.randomState().getOrCreateRandomFactory(Key.key("minecraft:feature"));
 
+        var placementContext = new PlacementContext(
+                levelAdapter,
+                startX,
+                startZ,
+                sizeX,
+                sizeZ,
+                surfaceHeights,
+                waterHeights,
+                this.settings.minY(),
+                this.settings.maxYInclusive(),
+                this.settings.seaLevel(),
+                this.biomeZoomer,
+                biomeKey);
+
         for (var stepIndex = 0; stepIndex < biomeFeatures.size(); stepIndex++) {
             var step = biomeFeatures.get(stepIndex);
 
@@ -191,37 +206,25 @@ public final class WorldGenerator implements Generator {
                     continue;
                 }
 
-                for (var attemptIndex = 0; attemptIndex < 5; attemptIndex++) {
-                    var attemptRandom = randomFactory
-                            .fromHashOf(placedFeatureKey.asString() + ":" + stepIndex + ":" + featureIndex + ":"
-                                    + attemptIndex)
-                            .forkPositional()
-                            .at(startX, 0, startZ);
+                var placementRandom = randomFactory
+                        .fromHashOf(placedFeatureKey.asString() + ":" + stepIndex + ":" + featureIndex)
+                        .forkPositional()
+                        .at(startX, 0, startZ);
 
-                    var localX = attemptRandom.nextInt(sizeX);
-                    var localZ = attemptRandom.nextInt(sizeZ);
-                    var surfaceY = surfaceHeights[localX * sizeZ + localZ];
+                var origin = new BlockVec(startX, 0, startZ);
+                var placementPositions = placedFeature.getPositions(placementContext, placementRandom, origin);
 
-                    if (surfaceY == Integer.MIN_VALUE || surfaceY < this.settings.seaLevel()) {
-                        if (isEndFeature(placedFeatureKey)) {
-                            surfaceY = this.settings.seaLevel();
-                        } else {
-                            continue;
-                        }
+                for (var position : placementPositions) {
+                    if (position.blockY() < this.settings.minY() || position.blockY() > this.settings.maxYInclusive()) {
+                        continue;
                     }
-
-                    var position = new BlockVec(
-                            startX + localX,
-                            surfaceY + 1,
-                            startZ + localZ);
 
                     var featureRandom = randomFactory
                             .fromHashOf(placedFeatureKey.asString() + ":" + stepIndex + ":" + featureIndex)
                             .forkPositional()
                             .at(position.blockX(), position.blockY(), position.blockZ());
 
-                    var configuredFeature = this.featureLoader.getConfiguredFeature(placedFeature.feature());
-
+                    var configuredFeature = placedFeature.configuredFeature(this.featureLoader);
                     if (configuredFeature == null) {
                         continue;
                     }
@@ -236,7 +239,6 @@ public final class WorldGenerator implements Generator {
                             this.settings.maxYInclusive());
 
                     var featureImpl = configuredFeature.feature();
-
                     if (featureImpl instanceof RandomSelectorFeature randomSelector) {
                         randomSelector.place(context, this.featureLoader);
                     } else {

@@ -46,7 +46,7 @@ public final class RandomSelectorFeature implements Feature<FeatureConfiguration
             FeatureLoader loader,
             PlacedFeature placedFeature
     ) {
-        var configuredFeature = loader.getConfiguredFeature(placedFeature.feature());
+        var configuredFeature = placedFeature.configuredFeature(loader);
         if (configuredFeature == null) {
             return false;
         }

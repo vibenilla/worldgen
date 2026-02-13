@@ -52,7 +52,7 @@ public final class FeatureLoader {
     private PlacedFeature loadPlacedFeature(Key id) {
         try {
             var json = this.dataPack.readPlacedFeature(id);
-            return PlacedFeature.CODEC.decode(Transcoder.JSON, json).orElseThrow();
+            return PlacedFeature.fromJson(json);
         } catch (Exception exception) {
             return null;
         }
