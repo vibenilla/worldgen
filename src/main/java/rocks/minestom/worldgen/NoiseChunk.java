@@ -110,23 +110,23 @@ public final class NoiseChunk implements DensityFunction.Context {
     }
 
     private DensityFunction wrapNew(DensityFunction function) {
-        if (function instanceof DensityFunctions.Interpolated(DensityFunction argument4)) {
+        if (function instanceof DensityFunctions.Interpolated(var argument4)) {
             return new NoiseInterpolator(argument4);
         }
 
-        if (function instanceof DensityFunctions.CacheOnce(DensityFunction argument3)) {
+        if (function instanceof DensityFunctions.CacheOnce(var argument3)) {
             return new CacheOnce(this.wrap(argument3));
         }
 
-        if (function instanceof DensityFunctions.Cache2D(DensityFunction argument2)) {
+        if (function instanceof DensityFunctions.Cache2D(var argument2)) {
             return new Cache2D(this.wrap(argument2));
         }
 
-        if (function instanceof DensityFunctions.FlatCache(DensityFunction argument1)) {
+        if (function instanceof DensityFunctions.FlatCache(var argument1)) {
             return new FlatCache(this.wrap(argument1));
         }
 
-        if (function instanceof DensityFunctions.CacheAllInCell(DensityFunction argument)) {
+        if (function instanceof DensityFunctions.CacheAllInCell(var argument)) {
             return new CacheAllInCell(this.wrap(argument));
         }
 
@@ -135,27 +135,27 @@ public final class NoiseChunk implements DensityFunction.Context {
     }
 
     private DensityFunction wrapChildren(DensityFunction function) {
-        if (function instanceof DensityFunctions.Add(DensityFunction argument7, DensityFunction argument8)) {
+        if (function instanceof DensityFunctions.Add(var argument7, var argument8)) {
             return new DensityFunctions.Add(this.wrap(argument7), this.wrap(argument8));
         }
-        if (function instanceof DensityFunctions.Mul(DensityFunction argument5, DensityFunction argument6)) {
+        if (function instanceof DensityFunctions.Mul(var argument5, var argument6)) {
             return new DensityFunctions.Mul(this.wrap(argument5), this.wrap(argument6));
         }
-        if (function instanceof DensityFunctions.Min(DensityFunction argument3, DensityFunction argument4)) {
+        if (function instanceof DensityFunctions.Min(var argument3, var argument4)) {
             return new DensityFunctions.Min(this.wrap(argument3), this.wrap(argument4));
         }
-        if (function instanceof DensityFunctions.Max(DensityFunction argument1, DensityFunction argument2)) {
+        if (function instanceof DensityFunctions.Max(var argument1, var argument2)) {
             return new DensityFunctions.Max(this.wrap(argument1), this.wrap(argument2));
         }
-        if (function instanceof DensityFunctions.Clamp(DensityFunction input3, double min, double max)) {
+        if (function instanceof DensityFunctions.Clamp(var input3, var min, var max)) {
             return new DensityFunctions.Clamp(this.wrap(input3), min, max);
         }
-        if (function instanceof DensityFunctions.Mapped(DensityFunctions.Mapped.Type type, DensityFunction input2)) {
+        if (function instanceof DensityFunctions.Mapped(var type, var input2)) {
             return new DensityFunctions.Mapped(type, this.wrap(input2));
         }
         if (function instanceof DensityFunctions.RangeChoice(
-                DensityFunction input1, double minInclusive, double maxExclusive, DensityFunction whenInRange,
-                DensityFunction whenOutOfRange
+                var input1, var minInclusive, var maxExclusive, var whenInRange,
+                var whenOutOfRange
         )) {
             return new DensityFunctions.RangeChoice(
                     this.wrap(input1),
@@ -165,8 +165,8 @@ public final class NoiseChunk implements DensityFunction.Context {
                     this.wrap(whenOutOfRange));
         }
         if (function instanceof DensityFunctions.ShiftedNoise(
-                DensityFunction shiftX, DensityFunction shiftY, DensityFunction shiftZ, double xzScale, double yScale,
-                rocks.minestom.worldgen.noise.NormalNoise noise1
+                var shiftX, var shiftY, var shiftZ, var xzScale, var yScale,
+                var noise1
         )) {
             return new DensityFunctions.ShiftedNoise(
                     this.wrap(shiftX),
@@ -176,15 +176,15 @@ public final class NoiseChunk implements DensityFunction.Context {
                     yScale,
                     noise1);
         }
-        if (function instanceof DensityFunctions.BlendDensity(DensityFunction argument)) {
+        if (function instanceof DensityFunctions.BlendDensity(var argument)) {
             return new DensityFunctions.BlendDensity(this.wrap(argument));
         }
-        if (function instanceof DensityFunctions.Spline(DensityFunctions.SplineNode spline1)) {
+        if (function instanceof DensityFunctions.Spline(var spline1)) {
             return new DensityFunctions.Spline(this.wrapSplineNode(spline1));
         }
         if (function instanceof DensityFunctions.WeirdScaledSampler(
-                DensityFunction input, rocks.minestom.worldgen.noise.NormalNoise noise,
-                DensityFunctions.WeirdScaledSampler.RarityValueMapper rarityValueMapper
+                var input, var noise,
+                var rarityValueMapper
         )) {
             return new DensityFunctions.WeirdScaledSampler(
                     this.wrap(input),
@@ -201,8 +201,8 @@ public final class NoiseChunk implements DensityFunction.Context {
             return node;
         }
         if (node instanceof DensityFunctions.SplineMultipoint(
-                DensityFunction coordinate, float[] locations, List<DensityFunctions.SplineNode> values,
-                float[] derivatives
+                var coordinate, var locations, var values,
+                var derivatives
         )) {
             var wrappedValues = new ArrayList<DensityFunctions.SplineNode>(values.size());
             for (var value : values) {
@@ -440,7 +440,7 @@ public final class NoiseChunk implements DensityFunction.Context {
     /**
      * Cache that only cares about X,Z position (ignores Y).
      */
-    private final class Cache2D implements DensityFunction {
+    private static final class Cache2D implements DensityFunction {
         private final DensityFunction function;
         private long lastPos2D = Long.MIN_VALUE;
         private double lastValue;

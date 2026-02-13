@@ -126,7 +126,6 @@ public record JigsawBlockInfo(
             case "up" -> Direction.UP;
             case "down" -> Direction.DOWN;
             case "north" -> Direction.NORTH;
-            case "south" -> Direction.SOUTH;
             case "east" -> Direction.EAST;
             case "west" -> Direction.WEST;
             default -> Direction.SOUTH;

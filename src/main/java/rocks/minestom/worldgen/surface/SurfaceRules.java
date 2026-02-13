@@ -9,7 +9,6 @@ import net.minestom.server.instance.block.Block;
 import rocks.minestom.worldgen.BlockCodec;
 import rocks.minestom.worldgen.RandomState;
 import rocks.minestom.worldgen.biome.BiomeZoomer;
-import rocks.minestom.worldgen.random.PositionalRandomFactory;
 
 import java.util.List;
 
@@ -25,7 +24,7 @@ public final class SurfaceRules {
     public static final Codec<RuleSource> CODEC = createRuleCodec();
 
     public static Block constantBlock(RuleSource rule) {
-        if (rule instanceof BlockRuleSource(Block block)) {
+        if (rule instanceof BlockRuleSource(var block)) {
             return block;
         }
         return null;

@@ -18,7 +18,7 @@ public final class TrunkPlacers {
         @Override
         public <D> Result<TrunkPlacer> decode(Transcoder<D> coder, D value) {
             var mapResult = coder.getMap(value);
-            if (!(mapResult instanceof Result.Ok<Transcoder.MapLike<D>>(Transcoder.MapLike<D> map))) {
+            if (!(mapResult instanceof Result.Ok<Transcoder.MapLike<D>>(var map))) {
                 return new Result.Error<>("TrunkPlacer must be a map/object");
             }
 

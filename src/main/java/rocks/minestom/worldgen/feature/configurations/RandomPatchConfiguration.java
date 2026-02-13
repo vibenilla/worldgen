@@ -1,7 +1,6 @@
 package rocks.minestom.worldgen.feature.configurations;
 
 import net.minestom.server.codec.Codec;
-import net.minestom.server.codec.Result;
 import net.minestom.server.codec.StructCodec;
 import net.minestom.server.codec.Transcoder;
 import rocks.minestom.worldgen.feature.FeatureConfiguration;

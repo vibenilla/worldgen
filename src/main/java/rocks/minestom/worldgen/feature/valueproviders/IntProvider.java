@@ -17,12 +17,12 @@ public interface IntProvider {
         @Override
         public <D> Result<IntProvider> decode(Transcoder<D> coder, D value) {
             var constantResult = coder.getInt(value);
-            if (constantResult instanceof Result.Ok<Integer>(Integer value1)) {
+            if (constantResult instanceof Result.Ok<Integer>(var value1)) {
                 return new Result.Ok<>(new ConstantIntProvider(value1));
             }
 
             var mapResult = coder.getMap(value);
-            if (!(mapResult instanceof Result.Ok<Transcoder.MapLike<D>>(Transcoder.MapLike<D> map))) {
+            if (!(mapResult instanceof Result.Ok<Transcoder.MapLike<D>>(var map))) {
                 return new Result.Error<>("Not an int provider: " + value);
             }
 

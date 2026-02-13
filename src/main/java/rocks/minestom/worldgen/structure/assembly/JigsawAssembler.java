@@ -103,7 +103,7 @@ public final class JigsawAssembler {
         }
 
         if (!(initialElement.element() instanceof LegacySinglePoolElement(
-                Key location, StructureProcessorList processors, String projection
+                var location, var processors, var projection
         ))) {
             LOGGER.warn("Initial element is not LegacySinglePoolElement: {}",
                     initialElement.element().getClass().getSimpleName());

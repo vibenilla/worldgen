@@ -18,7 +18,7 @@ public final class BlockStateProviders {
         @Override
         public <D> Result<BlockStateProvider> decode(Transcoder<D> coder, D value) {
             var mapResult = coder.getMap(value);
-            if (!(mapResult instanceof Result.Ok<Transcoder.MapLike<D>>(Transcoder.MapLike<D> map))) {
+            if (!(mapResult instanceof Result.Ok<Transcoder.MapLike<D>>(var map))) {
                 return new Result.Error<>("BlockStateProvider must be a map/object");
             }
 

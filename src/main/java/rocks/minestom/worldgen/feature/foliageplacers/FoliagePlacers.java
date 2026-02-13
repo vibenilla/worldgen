@@ -18,7 +18,7 @@ public final class FoliagePlacers {
         @Override
         public <D> Result<FoliagePlacer> decode(Transcoder<D> coder, D value) {
             var mapResult = coder.getMap(value);
-            if (!(mapResult instanceof Result.Ok<Transcoder.MapLike<D>>(Transcoder.MapLike<D> map))) {
+            if (!(mapResult instanceof Result.Ok<Transcoder.MapLike<D>>(var map))) {
                 return new Result.Error<>("FoliagePlacer must be a map/object");
             }
 

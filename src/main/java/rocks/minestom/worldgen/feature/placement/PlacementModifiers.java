@@ -4,11 +4,14 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.kyori.adventure.key.Key;
+import net.minestom.server.codec.Transcoder;
 import net.minestom.server.coordinate.BlockVec;
 import net.minestom.server.instance.block.Block;
+import rocks.minestom.worldgen.BlockCodec;
 import rocks.minestom.worldgen.VMath;
 import rocks.minestom.worldgen.feature.valueproviders.IntProvider;
 import rocks.minestom.worldgen.noise.SimplexNoise;
+import rocks.minestom.worldgen.random.RandomSource;
 import rocks.minestom.worldgen.random.XoroshiroRandomSource;
 import rocks.minestom.worldgen.surface.VerticalAnchor;
 
@@ -192,45 +195,35 @@ public final class PlacementModifiers {
         return new BlockVec(offset.get(0).getAsInt(), offset.get(1).getAsInt(), offset.get(2).getAsInt());
     }
 
-    private static final class CountModifier implements PlacementModifier {
-        private final IntProvider count;
-
-        private CountModifier(IntProvider count) {
-            this.count = count;
-        }
+    private record CountModifier(IntProvider count) implements PlacementModifier {
 
         @Override
-        public List<BlockVec> apply(PlacementContext context, rocks.minestom.worldgen.random.RandomSource random, BlockVec position) {
-            var countValue = this.count.sample(random);
-            if (countValue <= 0) {
-                return List.of();
+            public List<BlockVec> apply(PlacementContext context, RandomSource random, BlockVec position) {
+                var countValue = this.count.sample(random);
+                if (countValue <= 0) {
+                    return List.of();
+                }
+
+                var results = new ArrayList<BlockVec>(countValue);
+                for (var countIndex = 0; countIndex < countValue; countIndex++) {
+                    results.add(position);
+                }
+                return results;
             }
-
-            var results = new ArrayList<BlockVec>(countValue);
-            for (var countIndex = 0; countIndex < countValue; countIndex++) {
-                results.add(position);
-            }
-            return results;
         }
-    }
 
-    private static final class HeightmapModifier implements PlacementModifier {
-        private final PlacementContext.HeightmapType type;
-
-        private HeightmapModifier(PlacementContext.HeightmapType type) {
-            this.type = type;
-        }
+    private record HeightmapModifier(PlacementContext.HeightmapType type) implements PlacementModifier {
 
         @Override
-        public List<BlockVec> apply(PlacementContext context, rocks.minestom.worldgen.random.RandomSource random, BlockVec position) {
-            var y = context.getHeight(this.type, position.blockX(), position.blockZ());
-            if (y <= context.minY()) {
-                return List.of();
-            }
+            public List<BlockVec> apply(PlacementContext context, RandomSource random, BlockVec position) {
+                var y = context.getHeight(this.type, position.blockX(), position.blockZ());
+                if (y <= context.minY()) {
+                    return List.of();
+                }
 
-            return List.of(new BlockVec(position.blockX(), y, position.blockZ()));
+                return List.of(new BlockVec(position.blockX(), y, position.blockZ()));
+            }
         }
-    }
 
     private static final class InSquareModifier implements PlacementModifier {
         @Override
@@ -255,258 +248,195 @@ public final class PlacementModifiers {
         }
     }
 
-    private static final class RarityFilterModifier implements PlacementModifier {
-        private final int chance;
-
-        private RarityFilterModifier(int chance) {
-            this.chance = Math.max(1, chance);
-        }
-
-        @Override
-        public List<BlockVec> apply(PlacementContext context, rocks.minestom.worldgen.random.RandomSource random, BlockVec position) {
-            return random.nextFloat() < 1.0F / (float) this.chance ? List.of(position) : List.of();
-        }
-    }
-
-    private static final class HeightRangeModifier implements PlacementModifier {
-        private final HeightProvider provider;
-
-        private HeightRangeModifier(HeightProvider provider) {
-            this.provider = provider;
-        }
-
-        @Override
-        public List<BlockVec> apply(PlacementContext context, rocks.minestom.worldgen.random.RandomSource random, BlockVec position) {
-            return List.of(new BlockVec(position.blockX(), this.provider.sample(random, context), position.blockZ()));
-        }
-    }
-
-    private static final class RandomOffsetModifier implements PlacementModifier {
-        private final IntProvider xzSpread;
-        private final IntProvider ySpread;
-
-        private RandomOffsetModifier(IntProvider xzSpread, IntProvider ySpread) {
-            this.xzSpread = xzSpread;
-            this.ySpread = ySpread;
-        }
-
-        @Override
-        public List<BlockVec> apply(PlacementContext context, rocks.minestom.worldgen.random.RandomSource random, BlockVec position) {
-            var x = position.blockX() + this.xzSpread.sample(random);
-            var y = position.blockY() + this.ySpread.sample(random);
-            var z = position.blockZ() + this.xzSpread.sample(random);
-            return List.of(new BlockVec(x, y, z));
-        }
-    }
-
-    private static final class FixedPlacementModifier implements PlacementModifier {
-        private final List<BlockVec> positions;
-
-        private FixedPlacementModifier(List<BlockVec> positions) {
-            this.positions = List.copyOf(positions);
-        }
-
-        @Override
-        public List<BlockVec> apply(PlacementContext context, rocks.minestom.worldgen.random.RandomSource random, BlockVec position) {
-            var chunkX = Math.floorDiv(position.blockX(), 16);
-            var chunkZ = Math.floorDiv(position.blockZ(), 16);
-            var results = new ArrayList<BlockVec>();
-
-            for (var fixedPosition : this.positions) {
-                if (Math.floorDiv(fixedPosition.blockX(), 16) == chunkX && Math.floorDiv(fixedPosition.blockZ(), 16) == chunkZ) {
-                    results.add(fixedPosition);
-                }
+    private record RarityFilterModifier(int chance) implements PlacementModifier {
+            private RarityFilterModifier(int chance) {
+                this.chance = Math.max(1, chance);
             }
 
-            return results;
+            @Override
+            public List<BlockVec> apply(PlacementContext context, RandomSource random, BlockVec position) {
+                return random.nextFloat() < 1.0F / (float) this.chance ? List.of(position) : List.of();
+            }
         }
-    }
 
-    private static final class NoiseBasedCountModifier implements PlacementModifier {
-        private final int noiseToCountRatio;
-        private final double noiseFactor;
-        private final double noiseOffset;
-
-        private NoiseBasedCountModifier(int noiseToCountRatio, double noiseFactor, double noiseOffset) {
-            this.noiseToCountRatio = noiseToCountRatio;
-            this.noiseFactor = noiseFactor;
-            this.noiseOffset = noiseOffset;
-        }
+    private record HeightRangeModifier(HeightProvider provider) implements PlacementModifier {
 
         @Override
-        public List<BlockVec> apply(PlacementContext context, rocks.minestom.worldgen.random.RandomSource random, BlockVec position) {
-            var noiseValue = BIOME_INFO_NOISE.getValue(
-                    (double) position.blockX() / this.noiseFactor,
-                    (double) position.blockZ() / this.noiseFactor);
-            var count = (int) Math.ceil((noiseValue + this.noiseOffset) * (double) this.noiseToCountRatio);
-            if (count <= 0) {
-                return List.of();
+            public List<BlockVec> apply(PlacementContext context, RandomSource random, BlockVec position) {
+                return List.of(new BlockVec(position.blockX(), this.provider.sample(random, context), position.blockZ()));
             }
-
-            var results = new ArrayList<BlockVec>(count);
-            for (var countIndex = 0; countIndex < count; countIndex++) {
-                results.add(position);
-            }
-            return results;
         }
-    }
 
-    private static final class NoiseThresholdCountModifier implements PlacementModifier {
-        private final double noiseLevel;
-        private final int belowNoise;
-        private final int aboveNoise;
-
-        private NoiseThresholdCountModifier(double noiseLevel, int belowNoise, int aboveNoise) {
-            this.noiseLevel = noiseLevel;
-            this.belowNoise = belowNoise;
-            this.aboveNoise = aboveNoise;
-        }
+    private record RandomOffsetModifier(IntProvider xzSpread, IntProvider ySpread) implements PlacementModifier {
 
         @Override
-        public List<BlockVec> apply(PlacementContext context, rocks.minestom.worldgen.random.RandomSource random, BlockVec position) {
-            var noiseValue = BIOME_INFO_NOISE.getValue((double) position.blockX() / 200.0D, (double) position.blockZ() / 200.0D);
-            var count = noiseValue < this.noiseLevel ? this.belowNoise : this.aboveNoise;
-            if (count <= 0) {
-                return List.of();
+            public List<BlockVec> apply(PlacementContext context, RandomSource random, BlockVec position) {
+                var x = position.blockX() + this.xzSpread.sample(random);
+                var y = position.blockY() + this.ySpread.sample(random);
+                var z = position.blockZ() + this.xzSpread.sample(random);
+                return List.of(new BlockVec(x, y, z));
             }
-
-            var results = new ArrayList<BlockVec>(count);
-            for (var countIndex = 0; countIndex < count; countIndex++) {
-                results.add(position);
-            }
-            return results;
-        }
-    }
-
-    private static final class CountOnEveryLayerModifier implements PlacementModifier {
-        private final IntProvider count;
-
-        private CountOnEveryLayerModifier(IntProvider count) {
-            this.count = count;
         }
 
-        @Override
-        public List<BlockVec> apply(PlacementContext context, rocks.minestom.worldgen.random.RandomSource random, BlockVec position) {
-            var results = new ArrayList<BlockVec>();
-            var layer = 0;
-            var found = false;
+    private record FixedPlacementModifier(List<BlockVec> positions) implements PlacementModifier {
+            private FixedPlacementModifier(List<BlockVec> positions) {
+                this.positions = List.copyOf(positions);
+            }
 
-            do {
-                found = false;
-                var countValue = this.count.sample(random);
-                for (var countIndex = 0; countIndex < countValue; countIndex++) {
-                    var x = position.blockX() + random.nextInt(16);
-                    var z = position.blockZ() + random.nextInt(16);
-                    var topY = context.getHeight(PlacementContext.HeightmapType.MOTION_BLOCKING, x, z);
-                    var y = topY - 1 - layer;
-                    if (y <= context.minY()) {
-                        continue;
-                    }
+            @Override
+            public List<BlockVec> apply(PlacementContext context, RandomSource random, BlockVec position) {
+                var chunkX = Math.floorDiv(position.blockX(), 16);
+                var chunkZ = Math.floorDiv(position.blockZ(), 16);
+                var results = new ArrayList<BlockVec>();
 
-                    var targetPosition = new BlockVec(x, y + 1, z);
-                    if (context.inWorldBounds(targetPosition)) {
-                        results.add(targetPosition);
-                        found = true;
+                for (var fixedPosition : this.positions) {
+                    if (Math.floorDiv(fixedPosition.blockX(), 16) == chunkX && Math.floorDiv(fixedPosition.blockZ(), 16) == chunkZ) {
+                        results.add(fixedPosition);
                     }
                 }
 
-                layer++;
-            } while (found);
-
-            return results;
+                return results;
+            }
         }
-    }
 
-    private static final class EnvironmentScanModifier implements PlacementModifier {
-        private final Direction direction;
-        private final BlockPredicate targetCondition;
-        private final BlockPredicate allowedSearchCondition;
-        private final int maxSteps;
-
-        private EnvironmentScanModifier(Direction direction, BlockPredicate targetCondition, BlockPredicate allowedSearchCondition, int maxSteps) {
-            this.direction = direction;
-            this.targetCondition = targetCondition;
-            this.allowedSearchCondition = allowedSearchCondition;
-            this.maxSteps = maxSteps;
-        }
+    private record NoiseBasedCountModifier(int noiseToCountRatio, double noiseFactor,
+                                           double noiseOffset) implements PlacementModifier {
 
         @Override
-        public List<BlockVec> apply(PlacementContext context, rocks.minestom.worldgen.random.RandomSource random, BlockVec position) {
-            var mutablePosition = position;
-            if (!this.allowedSearchCondition.test(context, mutablePosition)) {
-                return List.of();
-            }
-
-            for (var step = 0; step < this.maxSteps; step++) {
-                if (this.targetCondition.test(context, mutablePosition)) {
-                    return List.of(mutablePosition);
-                }
-
-                mutablePosition = mutablePosition.add(this.direction.stepX, this.direction.stepY, this.direction.stepZ);
-                if (!context.inWorldBounds(mutablePosition)) {
+            public List<BlockVec> apply(PlacementContext context, RandomSource random, BlockVec position) {
+                var noiseValue = BIOME_INFO_NOISE.getValue(
+                        (double) position.blockX() / this.noiseFactor,
+                        (double) position.blockZ() / this.noiseFactor);
+                var count = (int) Math.ceil((noiseValue + this.noiseOffset) * (double) this.noiseToCountRatio);
+                if (count <= 0) {
                     return List.of();
                 }
 
-                if (!this.allowedSearchCondition.test(context, mutablePosition)) {
-                    break;
+                var results = new ArrayList<BlockVec>(count);
+                for (var countIndex = 0; countIndex < count; countIndex++) {
+                    results.add(position);
                 }
+                return results;
             }
-
-            return this.targetCondition.test(context, mutablePosition) ? List.of(mutablePosition) : List.of();
         }
-    }
 
-    private static final class SurfaceRelativeThresholdFilterModifier implements PlacementModifier {
-        private final PlacementContext.HeightmapType heightmapType;
-        private final int minInclusive;
-        private final int maxInclusive;
-
-        private SurfaceRelativeThresholdFilterModifier(PlacementContext.HeightmapType heightmapType, int minInclusive, int maxInclusive) {
-            this.heightmapType = heightmapType;
-            this.minInclusive = minInclusive;
-            this.maxInclusive = maxInclusive;
-        }
+    private record NoiseThresholdCountModifier(double noiseLevel, int belowNoise,
+                                               int aboveNoise) implements PlacementModifier {
 
         @Override
-        public List<BlockVec> apply(PlacementContext context, rocks.minestom.worldgen.random.RandomSource random, BlockVec position) {
-            var surfaceY = context.getHeight(this.heightmapType, position.blockX(), position.blockZ());
-            var minY = surfaceY + this.minInclusive;
-            var maxY = surfaceY + this.maxInclusive;
-            if (position.blockY() >= minY && position.blockY() <= maxY) {
-                return List.of(position);
+            public List<BlockVec> apply(PlacementContext context, RandomSource random, BlockVec position) {
+                var noiseValue = BIOME_INFO_NOISE.getValue((double) position.blockX() / 200.0D, (double) position.blockZ() / 200.0D);
+                var count = noiseValue < this.noiseLevel ? this.belowNoise : this.aboveNoise;
+                if (count <= 0) {
+                    return List.of();
+                }
+
+                var results = new ArrayList<BlockVec>(count);
+                for (var countIndex = 0; countIndex < count; countIndex++) {
+                    results.add(position);
+                }
+                return results;
             }
-
-            return List.of();
         }
-    }
 
-    private static final class SurfaceWaterDepthFilterModifier implements PlacementModifier {
-        private final int maxWaterDepth;
-
-        private SurfaceWaterDepthFilterModifier(int maxWaterDepth) {
-            this.maxWaterDepth = maxWaterDepth;
-        }
+    private record CountOnEveryLayerModifier(IntProvider count) implements PlacementModifier {
 
         @Override
-        public List<BlockVec> apply(PlacementContext context, rocks.minestom.worldgen.random.RandomSource random, BlockVec position) {
-            var oceanFloor = context.getHeight(PlacementContext.HeightmapType.OCEAN_FLOOR, position.blockX(), position.blockZ());
-            var worldSurface = context.getHeight(PlacementContext.HeightmapType.WORLD_SURFACE, position.blockX(), position.blockZ());
-            return worldSurface - oceanFloor <= this.maxWaterDepth ? List.of(position) : List.of();
-        }
-    }
+            public List<BlockVec> apply(PlacementContext context, RandomSource random, BlockVec position) {
+                var results = new ArrayList<BlockVec>();
+                var layer = 0;
+                var found = false;
 
-    private static final class BlockPredicateFilterModifier implements PlacementModifier {
-        private final BlockPredicate predicate;
+                do {
+                    found = false;
+                    var countValue = this.count.sample(random);
+                    for (var countIndex = 0; countIndex < countValue; countIndex++) {
+                        var x = position.blockX() + random.nextInt(16);
+                        var z = position.blockZ() + random.nextInt(16);
+                        var topY = context.getHeight(PlacementContext.HeightmapType.MOTION_BLOCKING, x, z);
+                        var y = topY - 1 - layer;
+                        if (y <= context.minY()) {
+                            continue;
+                        }
 
-        private BlockPredicateFilterModifier(BlockPredicate predicate) {
-            this.predicate = predicate;
+                        var targetPosition = new BlockVec(x, y + 1, z);
+                        if (context.inWorldBounds(targetPosition)) {
+                            results.add(targetPosition);
+                            found = true;
+                        }
+                    }
+
+                    layer++;
+                } while (found);
+
+                return results;
+            }
         }
+
+    private record EnvironmentScanModifier(Direction direction, BlockPredicate targetCondition,
+                                           BlockPredicate allowedSearchCondition,
+                                           int maxSteps) implements PlacementModifier {
 
         @Override
-        public List<BlockVec> apply(PlacementContext context, rocks.minestom.worldgen.random.RandomSource random, BlockVec position) {
-            return this.predicate.test(context, position) ? List.of(position) : List.of();
+            public List<BlockVec> apply(PlacementContext context, RandomSource random, BlockVec position) {
+                var mutablePosition = position;
+                if (!this.allowedSearchCondition.test(context, mutablePosition)) {
+                    return List.of();
+                }
+
+                for (var step = 0; step < this.maxSteps; step++) {
+                    if (this.targetCondition.test(context, mutablePosition)) {
+                        return List.of(mutablePosition);
+                    }
+
+                    mutablePosition = mutablePosition.add(this.direction.stepX, this.direction.stepY, this.direction.stepZ);
+                    if (!context.inWorldBounds(mutablePosition)) {
+                        return List.of();
+                    }
+
+                    if (!this.allowedSearchCondition.test(context, mutablePosition)) {
+                        break;
+                    }
+                }
+
+                return this.targetCondition.test(context, mutablePosition) ? List.of(mutablePosition) : List.of();
+            }
         }
-    }
+
+    private record SurfaceRelativeThresholdFilterModifier(PlacementContext.HeightmapType heightmapType,
+                                                          int minInclusive,
+                                                          int maxInclusive) implements PlacementModifier {
+
+        @Override
+            public List<BlockVec> apply(PlacementContext context, RandomSource random, BlockVec position) {
+                var surfaceY = context.getHeight(this.heightmapType, position.blockX(), position.blockZ());
+                var minY = surfaceY + this.minInclusive;
+                var maxY = surfaceY + this.maxInclusive;
+                if (position.blockY() >= minY && position.blockY() <= maxY) {
+                    return List.of(position);
+                }
+
+                return List.of();
+            }
+        }
+
+    private record SurfaceWaterDepthFilterModifier(int maxWaterDepth) implements PlacementModifier {
+
+        @Override
+            public List<BlockVec> apply(PlacementContext context, RandomSource random, BlockVec position) {
+                var oceanFloor = context.getHeight(PlacementContext.HeightmapType.OCEAN_FLOOR, position.blockX(), position.blockZ());
+                var worldSurface = context.getHeight(PlacementContext.HeightmapType.WORLD_SURFACE, position.blockX(), position.blockZ());
+                return worldSurface - oceanFloor <= this.maxWaterDepth ? List.of(position) : List.of();
+            }
+        }
+
+    private record BlockPredicateFilterModifier(BlockPredicate predicate) implements PlacementModifier {
+
+        @Override
+            public List<BlockVec> apply(PlacementContext context, RandomSource random, BlockVec position) {
+                return this.predicate.test(context, position) ? List.of(position) : List.of();
+            }
+        }
 
     public interface BlockPredicate {
         boolean test(PlacementContext context, BlockVec position);
@@ -519,166 +449,131 @@ public final class PlacementModifiers {
         }
     }
 
-    private static final class MatchingBlocksPredicate implements BlockPredicate {
-        private final Set<Key> blocks;
-        private final BlockVec offset;
-
-        private MatchingBlocksPredicate(Set<Key> blocks, BlockVec offset) {
-            this.blocks = Set.copyOf(blocks);
-            this.offset = offset;
-        }
-
-        @Override
-        public boolean test(PlacementContext context, BlockVec position) {
-            var targetPosition = position.add(this.offset.blockX(), this.offset.blockY(), this.offset.blockZ());
-            var block = context.accessor().getBlock(targetPosition);
-            return this.blocks.contains(block.key());
-        }
-    }
-
-    private static final class MatchingFluidsPredicate implements BlockPredicate {
-        private final Set<Key> fluids;
-        private final BlockVec offset;
-
-        private MatchingFluidsPredicate(Set<Key> fluids, BlockVec offset) {
-            this.fluids = Set.copyOf(fluids);
-            this.offset = offset;
-        }
-
-        @Override
-        public boolean test(PlacementContext context, BlockVec position) {
-            var targetPosition = position.add(this.offset.blockX(), this.offset.blockY(), this.offset.blockZ());
-            var block = context.accessor().getBlock(targetPosition);
-            if (this.fluids.contains(Key.key("minecraft:water")) && block.compare(Block.WATER)) {
-                return true;
-            }
-            return this.fluids.contains(Key.key("minecraft:lava")) && block.compare(Block.LAVA);
-        }
-    }
-
-    private static final class WouldSurvivePredicate implements BlockPredicate {
-        private final Block state;
-        private final BlockVec offset;
-
-        private WouldSurvivePredicate(JsonObject stateObject, BlockVec offset) {
-            this.state = stateObject == null ? Block.AIR : rocks.minestom.worldgen.BlockCodec.CODEC.decode(net.minestom.server.codec.Transcoder.JSON, stateObject)
-                    .orElse(Block.AIR);
-            this.offset = offset;
-        }
-
-        @Override
-        public boolean test(PlacementContext context, BlockVec position) {
-            var targetPosition = position.add(this.offset.blockX(), this.offset.blockY(), this.offset.blockZ());
-            var targetBlock = context.accessor().getBlock(targetPosition);
-            if (!targetBlock.isAir()) {
-                return false;
+    private record MatchingBlocksPredicate(Set<Key> blocks, BlockVec offset) implements BlockPredicate {
+            private MatchingBlocksPredicate(Set<Key> blocks, BlockVec offset) {
+                this.blocks = Set.copyOf(blocks);
+                this.offset = offset;
             }
 
-            var below = context.accessor().getBlock(targetPosition.sub(0, 1, 0));
-            if (this.state.compare(Block.CACTUS)) {
-                return below.compare(Block.SAND) || below.compare(Block.RED_SAND) || below.compare(Block.CACTUS);
+            @Override
+            public boolean test(PlacementContext context, BlockVec position) {
+                var targetPosition = position.add(this.offset.blockX(), this.offset.blockY(), this.offset.blockZ());
+                var block = context.accessor().getBlock(targetPosition);
+                return this.blocks.contains(block.key());
+            }
+        }
+
+    private record MatchingFluidsPredicate(Set<Key> fluids, BlockVec offset) implements BlockPredicate {
+            private MatchingFluidsPredicate(Set<Key> fluids, BlockVec offset) {
+                this.fluids = Set.copyOf(fluids);
+                this.offset = offset;
             }
 
-            if (this.state.compare(Block.MANGROVE_PROPAGULE)) {
-                return below.compare(Block.MUD) || below.registry().isSolid();
-            }
-
-            return below.registry().isSolid();
-        }
-    }
-
-    private static final class AllOfPredicate implements BlockPredicate {
-        private final List<BlockPredicate> predicates;
-
-        private AllOfPredicate(List<BlockPredicate> predicates) {
-            this.predicates = List.copyOf(predicates);
-        }
-
-        @Override
-        public boolean test(PlacementContext context, BlockVec position) {
-            for (var predicate : this.predicates) {
-                if (!predicate.test(context, position)) {
-                    return false;
-                }
-            }
-            return true;
-        }
-    }
-
-    private static final class AnyOfPredicate implements BlockPredicate {
-        private final List<BlockPredicate> predicates;
-
-        private AnyOfPredicate(List<BlockPredicate> predicates) {
-            this.predicates = List.copyOf(predicates);
-        }
-
-        @Override
-        public boolean test(PlacementContext context, BlockVec position) {
-            for (var predicate : this.predicates) {
-                if (predicate.test(context, position)) {
+            @Override
+            public boolean test(PlacementContext context, BlockVec position) {
+                var targetPosition = position.add(this.offset.blockX(), this.offset.blockY(), this.offset.blockZ());
+                var block = context.accessor().getBlock(targetPosition);
+                if (this.fluids.contains(Key.key("minecraft:water")) && block.compare(Block.WATER)) {
                     return true;
                 }
+                return this.fluids.contains(Key.key("minecraft:lava")) && block.compare(Block.LAVA);
             }
-            return false;
         }
-    }
 
-    private static final class NotPredicate implements BlockPredicate {
-        private final BlockPredicate predicate;
+    private record WouldSurvivePredicate(Block state, BlockVec offset) implements BlockPredicate {
+            private WouldSurvivePredicate(JsonObject state, BlockVec offset) {
+                this.state = state == null ? Block.AIR : BlockCodec.CODEC.decode(Transcoder.JSON, state)
+                        .orElse(Block.AIR);
+                this.offset = offset;
+            }
 
-        private NotPredicate(BlockPredicate predicate) {
-            this.predicate = predicate;
+            @Override
+            public boolean test(PlacementContext context, BlockVec position) {
+                var targetPosition = position.add(this.offset.blockX(), this.offset.blockY(), this.offset.blockZ());
+                var targetBlock = context.accessor().getBlock(targetPosition);
+                if (!targetBlock.isAir()) {
+                    return false;
+                }
+
+                var below = context.accessor().getBlock(targetPosition.sub(0, 1, 0));
+                if (this.state.compare(Block.CACTUS)) {
+                    return below.compare(Block.SAND) || below.compare(Block.RED_SAND) || below.compare(Block.CACTUS);
+                }
+
+                if (this.state.compare(Block.MANGROVE_PROPAGULE)) {
+                    return below.compare(Block.MUD) || below.registry().isSolid();
+                }
+
+                return below.registry().isSolid();
+            }
         }
+
+    private record AllOfPredicate(List<BlockPredicate> predicates) implements BlockPredicate {
+            private AllOfPredicate(List<BlockPredicate> predicates) {
+                this.predicates = List.copyOf(predicates);
+            }
+
+            @Override
+            public boolean test(PlacementContext context, BlockVec position) {
+                for (var predicate : this.predicates) {
+                    if (!predicate.test(context, position)) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        }
+
+    private record AnyOfPredicate(List<BlockPredicate> predicates) implements BlockPredicate {
+            private AnyOfPredicate(List<BlockPredicate> predicates) {
+                this.predicates = List.copyOf(predicates);
+            }
+
+            @Override
+            public boolean test(PlacementContext context, BlockVec position) {
+                for (var predicate : this.predicates) {
+                    if (predicate.test(context, position)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+
+    private record NotPredicate(BlockPredicate predicate) implements BlockPredicate {
 
         @Override
-        public boolean test(PlacementContext context, BlockVec position) {
-            return !this.predicate.test(context, position);
+            public boolean test(PlacementContext context, BlockVec position) {
+                return !this.predicate.test(context, position);
+            }
         }
-    }
 
-    private static final class InsideWorldBoundsPredicate implements BlockPredicate {
-        private final BlockVec offset;
-
-        private InsideWorldBoundsPredicate(BlockVec offset) {
-            this.offset = offset;
-        }
+    private record InsideWorldBoundsPredicate(BlockVec offset) implements BlockPredicate {
 
         @Override
-        public boolean test(PlacementContext context, BlockVec position) {
-            return context.inWorldBounds(position.add(this.offset.blockX(), this.offset.blockY(), this.offset.blockZ()));
+            public boolean test(PlacementContext context, BlockVec position) {
+                return context.inWorldBounds(position.add(this.offset.blockX(), this.offset.blockY(), this.offset.blockZ()));
+            }
         }
-    }
 
-    private static final class SolidPredicate implements BlockPredicate {
-        private final BlockVec offset;
-
-        private SolidPredicate(BlockVec offset) {
-            this.offset = offset;
-        }
+    private record SolidPredicate(BlockVec offset) implements BlockPredicate {
 
         @Override
-        public boolean test(PlacementContext context, BlockVec position) {
-            var block = context.accessor().getBlock(position.add(this.offset.blockX(), this.offset.blockY(), this.offset.blockZ()));
-            return block.registry().isSolid();
+            public boolean test(PlacementContext context, BlockVec position) {
+                var block = context.accessor().getBlock(position.add(this.offset.blockX(), this.offset.blockY(), this.offset.blockZ()));
+                return block.registry().isSolid();
+            }
         }
-    }
 
-    private static final class HasSturdyFacePredicate implements BlockPredicate {
-        private final Direction direction;
-        private final BlockVec offset;
-
-        private HasSturdyFacePredicate(Direction direction, BlockVec offset) {
-            this.direction = direction;
-            this.offset = offset;
-        }
+    private record HasSturdyFacePredicate(Direction direction, BlockVec offset) implements BlockPredicate {
 
         @Override
-        public boolean test(PlacementContext context, BlockVec position) {
-            var targetPosition = position.add(this.offset.blockX(), this.offset.blockY(), this.offset.blockZ());
-            var supportPosition = targetPosition.add(-this.direction.stepX, -this.direction.stepY, -this.direction.stepZ);
-            return context.accessor().getBlock(supportPosition).registry().isSolid();
+            public boolean test(PlacementContext context, BlockVec position) {
+                var targetPosition = position.add(this.offset.blockX(), this.offset.blockY(), this.offset.blockZ());
+                var supportPosition = targetPosition.add(-this.direction.stepX, -this.direction.stepY, -this.direction.stepZ);
+                return context.accessor().getBlock(supportPosition).registry().isSolid();
+            }
         }
-    }
 
     private enum Direction {
         UP(0, 1, 0),
@@ -719,7 +614,7 @@ public final class PlacementModifiers {
                 case "minecraft:biased_to_bottom", "minecraft:very_biased_to_bottom" -> new BiasedToBottomHeightProvider(
                         VerticalAnchor.CODEC.decode(net.minestom.server.codec.Transcoder.JSON, object.get("min_inclusive")).orElseThrow(),
                         VerticalAnchor.CODEC.decode(net.minestom.server.codec.Transcoder.JSON, object.get("max_inclusive")).orElseThrow());
-                default -> new ConstantHeightProvider(context -> context.seaLevel());
+                default -> new ConstantHeightProvider(PlacementContext::seaLevel);
             };
         }
     }

@@ -5,12 +5,7 @@ import net.kyori.adventure.key.Key;
 import net.minestom.server.codec.Codec;
 import net.minestom.server.codec.StructCodec;
 import net.minestom.server.codec.Transcoder;
-import rocks.minestom.worldgen.feature.configurations.BlockPileConfiguration;
-import rocks.minestom.worldgen.feature.configurations.NoneFeatureConfiguration;
-import rocks.minestom.worldgen.feature.configurations.RandomPatchConfiguration;
-import rocks.minestom.worldgen.feature.configurations.SimpleBlockConfiguration;
-import rocks.minestom.worldgen.feature.configurations.SpikeConfiguration;
-import rocks.minestom.worldgen.feature.configurations.TreeConfiguration;
+import rocks.minestom.worldgen.feature.configurations.*;
 
 import java.util.List;
 
@@ -100,11 +95,7 @@ public final class Features {
                 var config = SIMPLE_BLOCK_CONFIGURED_FEATURE_CODEC.decode(Transcoder.JSON, obj).orElseThrow().config();
                 yield new ConfiguredFeature<>(SIMPLE_BLOCK, config);
             }
-            case "minecraft:random_patch" -> {
-                var config = RANDOM_PATCH_CONFIGURED_FEATURE_CODEC.decode(Transcoder.JSON, obj).orElseThrow().config();
-                yield new ConfiguredFeature<>(RANDOM_PATCH, config);
-            }
-            case "minecraft:no_bonemeal_flower" -> {
+            case "minecraft:random_patch", "minecraft:no_bonemeal_flower" -> {
                 var config = RANDOM_PATCH_CONFIGURED_FEATURE_CODEC.decode(Transcoder.JSON, obj).orElseThrow().config();
                 yield new ConfiguredFeature<>(RANDOM_PATCH, config);
             }

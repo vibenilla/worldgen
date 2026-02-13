@@ -1,8 +1,6 @@
 package rocks.minestom.worldgen.feature;
 
-import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 import net.kyori.adventure.key.Key;
 import net.minestom.server.coordinate.BlockVec;
 import rocks.minestom.worldgen.feature.placement.PlacementContext;

@@ -1,7 +1,6 @@
 package rocks.minestom.worldgen.noise;
 
 import rocks.minestom.worldgen.VMath;
-import rocks.minestom.worldgen.random.PositionalRandomFactory;
 import rocks.minestom.worldgen.random.RandomSource;
 
 import java.util.Arrays;
