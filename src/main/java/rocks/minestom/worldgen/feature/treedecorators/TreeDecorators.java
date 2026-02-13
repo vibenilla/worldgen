@@ -3,10 +3,7 @@ package rocks.minestom.worldgen.feature.treedecorators;
 import com.google.gson.JsonElement;
 import net.minestom.server.codec.Codec;
 import net.minestom.server.codec.Result;
-import net.minestom.server.codec.StructCodec;
 import net.minestom.server.codec.Transcoder;
-import rocks.minestom.worldgen.feature.stateproviders.BlockStateProvider;
-import rocks.minestom.worldgen.feature.stateproviders.BlockStateProviders;
 
 public final class TreeDecorators {
     private TreeDecorators() {
@@ -33,18 +30,17 @@ public final class TreeDecorators {
 
             return switch (type) {
                 case "minecraft:place_on_ground" -> PlaceOnGroundDecorator.CODEC.decode(coder, value).mapResult(decorator -> (TreeDecorator) decorator);
-                default -> new Result.Error<>("Unknown tree decorator type: " + type);
+                default -> {
+                    // consume the unknown decorator so parsing succeeds, but return a no-op
+                    // We need to fully decode/consume it to advance the stream if needed (though map access is random access usually)
+                    // If we just return NoOpDecorator without decoding the structure, it might leave unconsumed data in some formats,
+                    // but for JSON it's fine. However, to be safe and consistent, we could decode it as RAW_VALUE.
+                    // But here we can just return the NoOp decorator directly as we're in a map context.
+                    yield new Result.Ok<>(NoOpDecorator.INSTANCE);
+                }
             };
         }
     };
-
-    private static final Codec<PlaceOnGroundDecorator> PLACE_ON_GROUND_CODEC = StructCodec.struct(
-            "tries", Codec.INT.optional(128), PlaceOnGroundDecorator::tries,
-            "radius", Codec.INT.optional(2), PlaceOnGroundDecorator::radius,
-            "height", Codec.INT.optional(1), PlaceOnGroundDecorator::height,
-            "block_state_provider", BlockStateProviders.CODEC, PlaceOnGroundDecorator::blockStateProvider,
-            PlaceOnGroundDecorator::new
-    );
 
     public static TreeDecorator fromJson(JsonElement json) {
         return CODEC.decode(Transcoder.JSON, json).orElseThrow();
