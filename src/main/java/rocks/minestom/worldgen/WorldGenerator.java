@@ -179,7 +179,17 @@ public final class WorldGenerator implements Generator {
         var forkEnd = new BlockVec(startX + sizeX + forkPadding, this.settings.maxYInclusive() + 1,
                 startZ + sizeZ + forkPadding);
         var featureUnit = unit.fork(forkStart, forkEnd);
-        var levelAdapter = new GenerationUnitAdapter(featureUnit);
+        var levelAdapter = new GenerationUnitAdapter(
+                featureUnit,
+                startX,
+                startZ,
+                sizeX,
+                sizeZ,
+                this.settings.minY(),
+                surfaceHeights,
+                waterHeights,
+                this.settings.defaultBlock(),
+                this.settings.defaultFluid());
         var randomFactory = this.settings.randomState().getOrCreateRandomFactory(Key.key("minecraft:feature"));
 
         var placementContext = new PlacementContext(

@@ -78,14 +78,20 @@ public final class PlacementContext {
             }
 
             return switch (type) {
-                case WORLD_SURFACE_WG, WORLD_SURFACE, MOTION_BLOCKING, MOTION_BLOCKING_NO_LEAVES -> surfaceHeight + 1;
+                case WORLD_SURFACE_WG, WORLD_SURFACE, MOTION_BLOCKING, MOTION_BLOCKING_NO_LEAVES -> {
+                    var waterHeight = this.waterHeights[index];
+                    if (waterHeight != Integer.MIN_VALUE) {
+                        yield Math.max(surfaceHeight + 1, waterHeight);
+                    }
+                    yield surfaceHeight + 1;
+                }
                 case OCEAN_FLOOR_WG, OCEAN_FLOOR -> {
                     var waterHeight = this.waterHeights[index];
                     if (waterHeight == Integer.MIN_VALUE) {
                         yield surfaceHeight + 1;
                     }
 
-                    yield Math.min(waterHeight + 1, surfaceHeight + 1);
+                    yield surfaceHeight + 1;
                 }
             };
         }
