@@ -104,6 +104,10 @@ public final class Features {
                 var config = RANDOM_PATCH_CONFIGURED_FEATURE_CODEC.decode(Transcoder.JSON, obj).orElseThrow().config();
                 yield new ConfiguredFeature<>(RANDOM_PATCH, config);
             }
+            case "minecraft:no_bonemeal_flower" -> {
+                var config = RANDOM_PATCH_CONFIGURED_FEATURE_CODEC.decode(Transcoder.JSON, obj).orElseThrow().config();
+                yield new ConfiguredFeature<>(RANDOM_PATCH, config);
+            }
             case "minecraft:bamboo", "minecraft:basalt_pillar", "minecraft:block_column", "minecraft:blue_ice",
                     "minecraft:bonus_chest", "minecraft:coral_claw", "minecraft:coral_mushroom",
                     "minecraft:coral_tree", "minecraft:delta_feature", "minecraft:desert_well",

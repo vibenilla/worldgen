@@ -244,6 +244,10 @@ public final class PlacementModifiers {
     private static final class BiomeModifier implements PlacementModifier {
         @Override
         public List<BlockVec> apply(PlacementContext context, rocks.minestom.worldgen.random.RandomSource random, BlockVec position) {
+            if (context.sourceBiome() == null) {
+                return List.of(position);
+            }
+
             if (context.biomeAt(position).equals(context.sourceBiome())) {
                 return List.of(position);
             }

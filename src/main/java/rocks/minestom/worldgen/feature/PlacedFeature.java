@@ -47,6 +47,10 @@ public record PlacedFeature(Key feature, ConfiguredFeature<?> inlineFeature, Lis
             return null;
         }
 
+        if (loader == null) {
+            return null;
+        }
+
         return loader.getConfiguredFeature(this.feature);
     }
 
