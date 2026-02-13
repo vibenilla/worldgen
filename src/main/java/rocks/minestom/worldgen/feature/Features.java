@@ -7,6 +7,8 @@ import net.minestom.server.codec.StructCodec;
 import net.minestom.server.codec.Transcoder;
 import rocks.minestom.worldgen.feature.configurations.BlockPileConfiguration;
 import rocks.minestom.worldgen.feature.configurations.NoneFeatureConfiguration;
+import rocks.minestom.worldgen.feature.configurations.RandomPatchConfiguration;
+import rocks.minestom.worldgen.feature.configurations.SimpleBlockConfiguration;
 import rocks.minestom.worldgen.feature.configurations.SpikeConfiguration;
 import rocks.minestom.worldgen.feature.configurations.TreeConfiguration;
 
@@ -22,6 +24,9 @@ public final class Features {
     public static final EndPlatformFeature END_PLATFORM = new EndPlatformFeature();
     public static final EndSpikeFeature END_SPIKE = new EndSpikeFeature();
     public static final FlowerFeature FLOWER = new FlowerFeature();
+    public static final SimpleBlockFeature SIMPLE_BLOCK = new SimpleBlockFeature();
+    public static final RandomPatchFeature RANDOM_PATCH = new RandomPatchFeature();
+    public static final NoOpFeature NO_OP = new NoOpFeature();
 
     private static final Codec<TreeConfiguredFeature> TREE_CONFIGURED_FEATURE_CODEC = StructCodec.struct(
             "config", TreeConfiguration.CODEC, TreeConfiguredFeature::config,
@@ -43,6 +48,14 @@ public final class Features {
             .struct(
                     "config", RandomSelectorConfiguredFeatureConfig.CODEC, RandomSelectorConfiguredFeature::config,
                     RandomSelectorConfiguredFeature::new);
+
+    private static final Codec<SimpleBlockConfiguredFeature> SIMPLE_BLOCK_CONFIGURED_FEATURE_CODEC = StructCodec.struct(
+            "config", SimpleBlockConfiguration.CODEC, SimpleBlockConfiguredFeature::config,
+            SimpleBlockConfiguredFeature::new);
+
+    private static final Codec<RandomPatchConfiguredFeature> RANDOM_PATCH_CONFIGURED_FEATURE_CODEC = StructCodec.struct(
+            "config", RandomPatchConfiguration.CODEC, RandomPatchConfiguredFeature::config,
+            RandomPatchConfiguredFeature::new);
 
     public static ConfiguredFeature<?> parseConfiguredFeature(JsonElement json) {
         if (!json.isJsonObject()) {
@@ -80,10 +93,29 @@ public final class Features {
                 yield new ConfiguredFeature<>(END_SPIKE, config);
             }
             case "minecraft:flower" -> {
-                // Flower feature config is complex (uses nested placed_feature with noise
-                // providers)
-                // For now, we use a NoneFeatureConfiguration placeholder
-                yield new ConfiguredFeature<>(FLOWER, null);
+                var config = RANDOM_PATCH_CONFIGURED_FEATURE_CODEC.decode(Transcoder.JSON, obj).orElseThrow().config();
+                yield new ConfiguredFeature<>(FLOWER, config);
+            }
+            case "minecraft:simple_block" -> {
+                var config = SIMPLE_BLOCK_CONFIGURED_FEATURE_CODEC.decode(Transcoder.JSON, obj).orElseThrow().config();
+                yield new ConfiguredFeature<>(SIMPLE_BLOCK, config);
+            }
+            case "minecraft:random_patch" -> {
+                var config = RANDOM_PATCH_CONFIGURED_FEATURE_CODEC.decode(Transcoder.JSON, obj).orElseThrow().config();
+                yield new ConfiguredFeature<>(RANDOM_PATCH, config);
+            }
+            case "minecraft:bamboo", "minecraft:basalt_pillar", "minecraft:block_column", "minecraft:blue_ice",
+                    "minecraft:bonus_chest", "minecraft:coral_claw", "minecraft:coral_mushroom",
+                    "minecraft:coral_tree", "minecraft:delta_feature", "minecraft:desert_well",
+                    "minecraft:disk", "minecraft:end_gateway", "minecraft:end_island", "minecraft:fallen_tree",
+                    "minecraft:fill_layer", "minecraft:forest_rock", "minecraft:fossil", "minecraft:geode",
+                    "minecraft:glowstone_blob", "minecraft:huge_fungus", "minecraft:ice_spike",
+                    "minecraft:iceberg", "minecraft:kelp", "minecraft:lake", "minecraft:monster_room",
+                    "minecraft:no_op", "minecraft:ore", "minecraft:root_system", "minecraft:scattered_ore",
+                    "minecraft:sculk_patch", "minecraft:sea_pickle", "minecraft:seagrass",
+                    "minecraft:spring_feature", "minecraft:twisting_vines", "minecraft:vines",
+                    "minecraft:weeping_vines" -> {
+                yield new ConfiguredFeature<>(NO_OP, new NoneFeatureConfiguration());
             }
             default -> null;
         };
@@ -102,6 +134,12 @@ public final class Features {
     }
 
     private record RandomSelectorConfiguredFeature(RandomSelectorConfiguredFeatureConfig config) {
+    }
+
+    private record SimpleBlockConfiguredFeature(SimpleBlockConfiguration config) {
+    }
+
+    private record RandomPatchConfiguredFeature(RandomPatchConfiguration config) {
     }
 
     private record RandomSelectorConfiguredFeatureConfig(Key defaultFeature,
