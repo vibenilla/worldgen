@@ -581,14 +581,22 @@ public final class JigsawAssembler {
         if (element instanceof LegacySinglePoolElement legacy) {
             return List.of(legacy);
         }
-        if (element instanceof ListPoolElement list) {
+        if (element instanceof ListPoolElement) {
             var result = new ArrayList<LegacySinglePoolElement>();
-            for (var child : list.elements()) {
-                result.addAll(extractLegacyElements(child));
-            }
+            extractLegacyElementsHelper(element, result);
             return result;
         }
         return List.of();
+    }
+
+    private static void extractLegacyElementsHelper(PoolElement element, List<LegacySinglePoolElement> collector) {
+        if (element instanceof LegacySinglePoolElement legacy) {
+            collector.add(legacy);
+        } else if (element instanceof ListPoolElement list) {
+            for (var child : list.elements()) {
+                extractLegacyElementsHelper(child, collector);
+            }
+        }
     }
 
     public record AssemblyResult(List<PlacedPiece> pieces, List<PlacedFeature> features) {
