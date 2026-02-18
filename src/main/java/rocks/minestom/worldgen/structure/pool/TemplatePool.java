@@ -19,16 +19,17 @@ import java.util.List;
  * @see PoolElement for the elements contained in pools
  */
 public record TemplatePool(List<PoolElementEntry> elements, Key fallback, int totalWeight) {
-
     public TemplatePool(List<PoolElementEntry> elements, Key fallback) {
         this(elements, fallback, calculateTotalWeight(elements));
     }
 
     private static int calculateTotalWeight(List<PoolElementEntry> elements) {
-        int sum = 0;
+        var sum = 0;
+
         for (var entry : elements) {
             sum += entry.weight();
         }
+
         return sum;
     }
 
@@ -43,8 +44,10 @@ public record TemplatePool(List<PoolElementEntry> elements, Key fallback, int to
 
         var selectedWeight = random.nextInt(this.totalWeight);
         var runningWeight = 0;
+
         for (var entry : this.elements) {
             runningWeight += entry.weight();
+
             if (selectedWeight < runningWeight) {
                 return entry;
             }
