@@ -49,16 +49,4 @@ repositories {
 
 dependencies {
     compileOnly("net.minestom:minestom:2026.01.08-1.21.11")
-    testImplementation("net.minestom:minestom:2026.01.08-1.21.11")
-    testImplementation("org.junit.jupiter:junit-jupiter:5.9.2")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    testRuntimeOnly("org.slf4j:slf4j-simple:2.0.9")
-}
-
-tasks.test {
-    useJUnitPlatform()
-    testLogging {
-        showStandardStreams = true
-        events("passed", "skipped", "failed")
-    }
 }
