@@ -18,15 +18,23 @@ import java.util.List;
  * @see JigsawAssembler for the assembly algorithm
  * @see PoolElement for the elements contained in pools
  */
-public record TemplatePool(List<PoolElementEntry> elements, Key fallback) {
+public record TemplatePool(List<PoolElementEntry> elements, Key fallback, int totalWeight) {
+
+    public TemplatePool(List<PoolElementEntry> elements, Key fallback) {
+        this(elements, fallback, calculateTotalWeight(elements));
+    }
+
+    private static int calculateTotalWeight(List<PoolElementEntry> elements) {
+        int totalWeight = 0;
+        for (var entry : elements) {
+            totalWeight += entry.weight();
+        }
+        return totalWeight;
+    }
+
     public PoolElementEntry pick(RandomSource random) {
         if (this.elements.isEmpty()) {
             return null;
-        }
-
-        var totalWeight = 0;
-        for (var entry : this.elements) {
-            totalWeight += entry.weight();
         }
 
         if (totalWeight <= 0) {
