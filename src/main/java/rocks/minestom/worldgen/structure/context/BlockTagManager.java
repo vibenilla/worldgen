@@ -19,7 +19,7 @@ public final class BlockTagManager {
 
     public BlockTagManager(Path rootPath) {
         this.definitions = new LinkedHashMap<>();
-        this.resolved = new IdentityHashMap<>();
+        this.resolved = new HashMap<>();
         this.loadDefinitions(rootPath);
     }
 
@@ -93,7 +93,14 @@ public final class BlockTagManager {
     }
 
     public Set<Key> blocks(Key tagKey) {
-        return this.resolved.computeIfAbsent(tagKey, this::resolve);
+        var cached = this.resolved.get(tagKey);
+        if (cached != null) {
+            return cached;
+        }
+
+        var result = this.resolve(tagKey);
+        this.resolved.put(tagKey, result);
+        return result;
     }
 
     private Set<Key> resolve(Key tagKey) {
@@ -106,7 +113,7 @@ public final class BlockTagManager {
         for (var entry : tagDefinition.values()) {
             if (entry.startsWith("#")) {
                 var childKey = Key.key(entry.substring(1));
-                resolvedBlocks.addAll(this.resolve(childKey));
+                resolvedBlocks.addAll(this.blocks(childKey));
                 continue;
             }
 
