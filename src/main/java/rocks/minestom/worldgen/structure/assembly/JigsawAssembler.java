@@ -464,8 +464,7 @@ public final class JigsawAssembler {
             if (isStreetPiece && placed.isStreetPiece()) {
                 continue;
             }
-            var placedBounds = shrinkBounds(placed.bounds, 1);
-            if (placedBounds.intersects(adjustedBounds)) {
+            if (placed.shrunkenBounds().intersects(adjustedBounds)) {
                 return true;
             }
         }
@@ -612,10 +611,26 @@ public final class JigsawAssembler {
             BlockVec origin,
             Rotation rotation,
             BoundingBox bounds,
+            BoundingBox shrunkenBounds,
             StructureProcessorList processors,
             int depth,
             boolean terrainMatching,
             int projectionOffset) {
+
+        public PlacedPiece(
+                StructureTemplate template,
+                Key templateKey,
+                BlockVec origin,
+                Rotation rotation,
+                BoundingBox bounds,
+                StructureProcessorList processors,
+                int depth,
+                boolean terrainMatching,
+                int projectionOffset) {
+            this(template, templateKey, origin, rotation, bounds, JigsawAssembler.shrinkBounds(bounds, 1), processors,
+                    depth, terrainMatching, projectionOffset);
+        }
+
         private boolean isStreetPiece() {
             return JigsawAssembler.isStreetPiece(this.templateKey);
         }
