@@ -9,6 +9,7 @@ import net.minestom.server.instance.block.Block;
 import rocks.minestom.worldgen.BlockCodec;
 import rocks.minestom.worldgen.RandomState;
 import rocks.minestom.worldgen.VMath;
+import rocks.minestom.worldgen.biome.BiomeClimate;
 import rocks.minestom.worldgen.biome.BiomeZoomer;
 import rocks.minestom.worldgen.density.DensityFunction;
 
@@ -303,6 +304,10 @@ public final class SurfaceRules {
             return this.blockY;
         }
 
+        public int seaLevel() {
+            return this.system.seaLevel();
+        }
+
         public int surfaceDepth() {
             return this.surfaceDepth;
         }
@@ -502,7 +507,9 @@ public final class SurfaceRules {
     private record TemperatureConditionSource() implements ConditionSource {
         @Override
         public boolean test(Context context) {
-            return context.biomeResolver().temperature(context.biome()) < 0.15F;
+            return BiomeClimate.coldEnoughToSnow(
+                    context.biomeResolver(), context.biome(),
+                    context.blockX(), context.blockY(), context.blockZ(), context.seaLevel());
         }
     }
 

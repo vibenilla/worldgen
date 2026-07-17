@@ -36,6 +36,17 @@ public final class StructurePlacements {
                     decoded.frequency(), frequencyReduction);
         }
 
+        if (type.equals("minecraft:concentric_rings")) {
+            var preferredBiomes = obj.get("preferred_biomes").getAsString();
+            var tagKey = net.kyori.adventure.key.Key.key(
+                    preferredBiomes.startsWith("#") ? preferredBiomes.substring(1) : preferredBiomes);
+            return new ConcentricRingsPlacement(
+                    obj.get("count").getAsInt(),
+                    obj.get("distance").getAsInt(),
+                    obj.get("spread").getAsInt(),
+                    tagKey);
+        }
+
         return null;
     }
 

@@ -82,13 +82,36 @@ public final class StructureTemplate {
     }
 
     public BoundingBox getBoundingBox(BlockVec origin, Rotation rotation) {
+        return this.getBoundingBox(origin, rotation, Mirror.NONE);
+    }
+
+    public BoundingBox getBoundingBox(BlockVec origin, Rotation rotation, Mirror mirror) {
         var maxCorner = new BlockVec(
                 this.size.blockX() - 1,
                 this.size.blockY() - 1,
                 this.size.blockZ() - 1);
-        var corner1 = rotation.rotate(BlockVec.ZERO, this.size);
-        var corner2 = rotation.rotate(maxCorner, this.size);
+        var corner1 = rotation.rotate(mirror.mirror(BlockVec.ZERO), this.size);
+        var corner2 = rotation.rotate(mirror.mirror(maxCorner), this.size);
         return BoundingBox.fromCorners(corner1, corner2).moved(origin.blockX(), origin.blockY(), origin.blockZ());
+    }
+
+    /**
+     * Vanilla {@code StructureTemplate.getZeroPositionWithTransform}: the
+     * world offset of the template's local origin after mirroring across a
+     * {@code (sizeX, sizeZ)} footprint and rotating.
+     */
+    public static BlockVec getZeroPositionWithTransform(BlockVec zeroPos, Mirror mirror, Rotation rotation, int sizeX, int sizeZ) {
+        sizeX--;
+        sizeZ--;
+        var mirrorDeltaX = mirror == Mirror.FRONT_BACK ? sizeX : 0;
+        var mirrorDeltaZ = mirror == Mirror.LEFT_RIGHT ? sizeZ : 0;
+
+        return switch (rotation) {
+            case COUNTERCLOCKWISE_90 -> zeroPos.add(mirrorDeltaZ, 0, sizeX - mirrorDeltaX);
+            case CLOCKWISE_90 -> zeroPos.add(sizeZ - mirrorDeltaZ, 0, mirrorDeltaX);
+            case CLOCKWISE_180 -> zeroPos.add(sizeX - mirrorDeltaX, 0, sizeZ - mirrorDeltaZ);
+            case NONE -> zeroPos.add(mirrorDeltaX, 0, mirrorDeltaZ);
+        };
     }
 
     /**
@@ -134,6 +157,18 @@ public final class StructureTemplate {
             boolean legacy,
             boolean terrainMatching,
             LiquidSettings liquidSettings) {
+        this.place(context, position, rotation, Mirror.NONE, processors, legacy, terrainMatching, liquidSettings);
+    }
+
+    public void place(
+            PlacementContext context,
+            BlockVec position,
+            Rotation rotation,
+            Mirror mirror,
+            StructureProcessorList processors,
+            boolean legacy,
+            boolean terrainMatching,
+            LiquidSettings liquidSettings) {
         var palette = this.palettes.get(this.paletteIndex(position));
 
         // Vanilla processor chain order (SinglePoolElement.getSettings /
@@ -166,7 +201,7 @@ public final class StructureTemplate {
 
         for (var blockEntry : palette.blocks()) {
             var templatePos = blockEntry.position();
-            var rotatedPos = rotation.rotate(templatePos, this.size);
+            var rotatedPos = rotation.rotate(mirror.mirror(templatePos), this.size);
             var worldPos = new BlockVec(
                     position.blockX() + rotatedPos.blockX(),
                     position.blockY() + rotatedPos.blockY(),
@@ -202,7 +237,7 @@ public final class StructureTemplate {
                 continue;
             }
 
-            var state = rotateBlockState(blockInfo.state(), rotation);
+            var state = rotateBlockState(mirrorBlockState(blockInfo.state(), mirror), rotation);
             var blockKey = state.key().asString();
             if (blockKey.equals("minecraft:structure_void") || blockKey.equals("minecraft:jigsaw")) {
                 continue;
@@ -229,6 +264,67 @@ public final class StructureTemplate {
         }
         // Waterlogged blocks expose a source water fluid state.
         return "true".equals(block.getProperty("waterlogged"));
+    }
+
+    /**
+     * Vanilla {@code BlockState.mirror(Mirror)}: composed of a facing swap
+     * (including the stairs {@code shape} adjustment from
+     * {@code StairBlock.mirror}) and the four cardinal cross-collision
+     * properties, applied only when the block's facing axis matches the
+     * mirror's flip axis.
+     */
+    public static Block mirrorBlockState(Block block, Mirror mirror) {
+        if (mirror == Mirror.NONE) {
+            return block;
+        }
+
+        var facing = block.getProperty("facing");
+        if (facing != null) {
+            var direction = parseDirection(facing);
+            if (direction == null) {
+                return block;
+            }
+            var flips = (mirror == Mirror.LEFT_RIGHT && (direction == net.minestom.server.utils.Direction.NORTH || direction == net.minestom.server.utils.Direction.SOUTH))
+                    || (mirror == Mirror.FRONT_BACK && (direction == net.minestom.server.utils.Direction.EAST || direction == net.minestom.server.utils.Direction.WEST));
+            if (!flips) {
+                return block;
+            }
+
+            block = block.withProperty("facing", direction.opposite().name().toLowerCase());
+            var shape = block.getProperty("shape");
+            if (shape != null) {
+                block = block.withProperty("shape", mirrorStairsShape(shape));
+            }
+            return block;
+        }
+
+        return mirrorHorizontalConnections(block, mirror);
+    }
+
+    private static String mirrorStairsShape(String shape) {
+        return switch (shape) {
+            case "outer_left" -> "outer_right";
+            case "outer_right" -> "outer_left";
+            case "inner_left" -> "inner_right";
+            case "inner_right" -> "inner_left";
+            default -> shape;
+        };
+    }
+
+    private static Block mirrorHorizontalConnections(Block block, Mirror mirror) {
+        var northProperty = block.getProperty("north");
+        var eastProperty = block.getProperty("east");
+        var southProperty = block.getProperty("south");
+        var westProperty = block.getProperty("west");
+        if (northProperty == null || eastProperty == null || southProperty == null || westProperty == null) {
+            return block;
+        }
+
+        return switch (mirror) {
+            case LEFT_RIGHT -> block.withProperties(Map.of("north", southProperty, "south", northProperty));
+            case FRONT_BACK -> block.withProperties(Map.of("east", westProperty, "west", eastProperty));
+            case NONE -> block;
+        };
     }
 
     public static Block rotateBlockState(Block block, Rotation rotation) {

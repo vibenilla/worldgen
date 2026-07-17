@@ -64,7 +64,7 @@ public final class VMath {
     }
 
     public static long getSeed(int x, int y, int z) {
-        var seed = (long) (x * 3129871L) ^ (long) z * 116129781L ^ (long) y;
+        var seed = (long) (x * 3129871) ^ (long) z * 116129781L ^ (long) y;
         seed = seed * seed * 42317861L + seed * 11L;
         return seed >> 16;
     }

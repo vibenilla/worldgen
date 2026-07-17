@@ -58,6 +58,11 @@ public final class BoundingBox {
         );
     }
 
+    public boolean intersects(int otherMinX, int otherMinZ, int otherMaxX, int otherMaxZ) {
+        return this.maxX >= otherMinX && this.minX <= otherMaxX
+                && this.maxZ >= otherMinZ && this.minZ <= otherMaxZ;
+    }
+
     public boolean intersects(BoundingBox other) {
         return this.maxX >= other.minX
                 && this.minX <= other.maxX
@@ -82,6 +87,19 @@ public final class BoundingBox {
                 this.maxY + dy,
                 this.maxZ + dz
         );
+    }
+
+    public void move(int dx, int dy, int dz) {
+        this.minX += dx;
+        this.minY += dy;
+        this.minZ += dz;
+        this.maxX += dx;
+        this.maxY += dy;
+        this.maxZ += dz;
+    }
+
+    public void move(BlockVec offset) {
+        this.move(offset.blockX(), offset.blockY(), offset.blockZ());
     }
 
     public void encapsulate(BlockVec pos) {

@@ -358,6 +358,8 @@ public final class WorldGenerator implements Generator {
                     var featureImpl = configuredFeature.feature();
                     if (featureImpl instanceof RandomSelectorFeature randomSelector) {
                         randomSelector.place(context, this.featureLoader);
+                    } else if (featureImpl instanceof FreezeTopLayerFeature freezeTopLayer) {
+                        freezeTopLayer.place(context, placementContext, this.biomeResolver);
                     } else {
                         ((Feature) featureImpl).place(context);
                     }

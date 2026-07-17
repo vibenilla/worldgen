@@ -21,7 +21,7 @@ public interface RandomSource {
 
     default void consumeCount(int count) {
         for (var index = 0; index < count; index++) {
-            this.nextLong();
+            this.nextInt();
         }
     }
 }

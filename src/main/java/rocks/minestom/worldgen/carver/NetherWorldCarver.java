@@ -32,7 +32,7 @@ public final class NetherWorldCarver extends CaveWorldCarver {
             return false;
         }
 
-        var state = blockY <= context.minGenY() + 31 ? Block.LAVA : Block.AIR;
+        var state = blockY <= context.minGenY() + 31 ? Block.LAVA : Block.CAVE_AIR;
         context.setCarved(blockX, blockY, blockZ, state);
         return true;
     }

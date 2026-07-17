@@ -11,9 +11,16 @@ import rocks.minestom.worldgen.structure.JigsawStructure;
 import rocks.minestom.worldgen.structure.SimpleStructure;
 import rocks.minestom.worldgen.structure.Structure;
 import rocks.minestom.worldgen.structure.TerrainAdjustment;
+import rocks.minestom.worldgen.structure.endcity.EndCityStructure;
 import rocks.minestom.worldgen.structure.mineshaft.MineshaftStructure;
 import rocks.minestom.worldgen.structure.mineshaft.MineshaftType;
 import rocks.minestom.worldgen.structure.pool.PoolAliasBinding;
+import rocks.minestom.worldgen.structure.mansion.WoodlandMansionStructure;
+import rocks.minestom.worldgen.structure.monument.OceanMonumentStructure;
+import rocks.minestom.worldgen.structure.scattered.BuriedTreasureStructure;
+import rocks.minestom.worldgen.structure.stronghold.StrongholdStructure;
+import rocks.minestom.worldgen.structure.scattered.ScatteredFeatureKind;
+import rocks.minestom.worldgen.structure.scattered.ScatteredFeatureStructure;
 import rocks.minestom.worldgen.structure.template.LiquidSettings;
 
 import java.util.ArrayList;
@@ -50,7 +57,74 @@ public final class Structures {
             return parseMineshaftStructure(json);
         }
 
+        if (typeStr.equals("minecraft:stronghold")) {
+            return parseStrongholdStructure(json);
+        }
+
+        if (typeStr.equals("minecraft:desert_pyramid") || typeStr.equals("minecraft:jungle_temple")
+                || typeStr.equals("minecraft:swamp_hut")) {
+            return parseScatteredFeatureStructure(typeStr, json);
+        }
+
+        if (typeStr.equals("minecraft:buried_treasure")) {
+            return parseBuriedTreasureStructure(json);
+        }
+
+        if (typeStr.equals("minecraft:ocean_monument")) {
+            return parseOceanMonumentStructure(json);
+        }
+
+        if (typeStr.equals("minecraft:woodland_mansion")) {
+            return parseWoodlandMansionStructure(json);
+        }
+
+        if (typeStr.equals("minecraft:end_city")) {
+            return parseEndCityStructure(json);
+        }
+
         return parseSimpleStructure(typeStr, json);
+    }
+
+    private static Structure parseEndCityStructure(JsonElement json) {
+        var decoded = SIMPLE_CODEC.decode(Transcoder.JSON, json).orElseThrow();
+        var biomes = parseBiomes(decoded.biomes().convertTo(Transcoder.JSON).orElseThrow());
+        return new EndCityStructure(biomes);
+    }
+
+    private static Structure parseScatteredFeatureStructure(String typeStr, JsonElement json) {
+        var decoded = SIMPLE_CODEC.decode(Transcoder.JSON, json).orElseThrow();
+        var biomes = parseBiomes(decoded.biomes().convertTo(Transcoder.JSON).orElseThrow());
+        var kind = switch (typeStr) {
+            case "minecraft:desert_pyramid" -> ScatteredFeatureKind.DESERT_PYRAMID;
+            case "minecraft:jungle_temple" -> ScatteredFeatureKind.JUNGLE_TEMPLE;
+            case "minecraft:swamp_hut" -> ScatteredFeatureKind.SWAMP_HUT;
+            default -> throw new IllegalArgumentException("unexpected scattered feature type " + typeStr);
+        };
+        return new ScatteredFeatureStructure(kind, biomes);
+    }
+
+    private static Structure parseStrongholdStructure(JsonElement json) {
+        var decoded = SIMPLE_CODEC.decode(Transcoder.JSON, json).orElseThrow();
+        var biomes = parseBiomes(decoded.biomes().convertTo(Transcoder.JSON).orElseThrow());
+        return new StrongholdStructure(biomes);
+    }
+
+    private static Structure parseWoodlandMansionStructure(JsonElement json) {
+        var decoded = SIMPLE_CODEC.decode(Transcoder.JSON, json).orElseThrow();
+        var biomes = parseBiomes(decoded.biomes().convertTo(Transcoder.JSON).orElseThrow());
+        return new WoodlandMansionStructure(biomes);
+    }
+
+    private static Structure parseOceanMonumentStructure(JsonElement json) {
+        var decoded = SIMPLE_CODEC.decode(Transcoder.JSON, json).orElseThrow();
+        var biomes = parseBiomes(decoded.biomes().convertTo(Transcoder.JSON).orElseThrow());
+        return new OceanMonumentStructure(biomes);
+    }
+
+    private static Structure parseBuriedTreasureStructure(JsonElement json) {
+        var decoded = SIMPLE_CODEC.decode(Transcoder.JSON, json).orElseThrow();
+        var biomes = parseBiomes(decoded.biomes().convertTo(Transcoder.JSON).orElseThrow());
+        return new BuriedTreasureStructure(biomes);
     }
 
     private static Structure parseMineshaftStructure(JsonElement json) {

@@ -18,13 +18,15 @@ public record RandomizedIntStateProvider(String property, BlockStateProvider sou
     @Override
     public Block getState(RandomSource random, BlockVec position) {
         var base = this.source.getState(random, position);
-        var sampled = this.values.sample(random);
-
-        try {
-            return base.withProperty(this.property, Integer.toString(sampled));
-        } catch (IllegalArgumentException exception) {
+        // Vanilla only samples the values provider when the resolved state
+        // actually has the target property; if the property is absent it
+        // returns the unmodified state without consuming a random draw.
+        if (base.getProperty(this.property) == null) {
             return base;
         }
+
+        var sampled = this.values.sample(random);
+        return base.withProperty(this.property, Integer.toString(sampled));
     }
 }
 

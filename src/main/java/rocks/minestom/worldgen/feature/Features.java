@@ -56,6 +56,26 @@ public final class Features {
     public static final BasaltPillarFeature BASALT_PILLAR = new BasaltPillarFeature();
     public static final DeltaFeature DELTA_FEATURE = new DeltaFeature();
     public static final ReplaceBlobsFeature NETHERRACK_REPLACE_BLOBS = new ReplaceBlobsFeature();
+    public static final FreezeTopLayerFeature FREEZE_TOP_LAYER = new FreezeTopLayerFeature();
+    public static final GeodeFeature GEODE = new GeodeFeature();
+    public static final IcebergFeature ICEBERG = new IcebergFeature();
+    public static final BlueIceFeature BLUE_ICE = new BlueIceFeature();
+    public static final IceSpikeFeature ICE_SPIKE = new IceSpikeFeature();
+    public static final CoralTreeFeature CORAL_TREE = new CoralTreeFeature();
+    public static final CoralClawFeature CORAL_CLAW = new CoralClawFeature();
+    public static final CoralMushroomFeature CORAL_MUSHROOM = new CoralMushroomFeature();
+    public static final DesertWellFeature DESERT_WELL = new DesertWellFeature();
+    public static final SeaPickleFeature SEA_PICKLE = new SeaPickleFeature();
+    public static final BambooFeature BAMBOO = new BambooFeature();
+    public static final FillLayerFeature FILL_LAYER = new FillLayerFeature();
+    public static final BonusChestFeature BONUS_CHEST = new BonusChestFeature();
+    public static final FossilFeature FOSSIL = new FossilFeature();
+    public static final UnderwaterMagmaFeature UNDERWATER_MAGMA = new UnderwaterMagmaFeature();
+    public static final SculkPatchFeature SCULK_PATCH = new SculkPatchFeature();
+    public static final RootSystemFeature ROOT_SYSTEM = new RootSystemFeature();
+    public static final EndIslandFeature END_ISLAND = new EndIslandFeature();
+    public static final EndGatewayFeature END_GATEWAY = new EndGatewayFeature();
+    public static final VoidStartPlatformFeature VOID_START_PLATFORM = new VoidStartPlatformFeature();
 
     private static final Codec<TreeConfiguredFeature> TREE_CONFIGURED_FEATURE_CODEC = StructCodec.struct(
             "config", TreeConfiguration.CODEC, TreeConfiguredFeature::config,
@@ -322,19 +342,74 @@ public final class Features {
                 var config = DeltaFeatureConfiguration.fromJson(obj.get("config"));
                 yield new ConfiguredFeature<>(DELTA_FEATURE, config);
             }
+            case "minecraft:sculk_patch" -> {
+                var config = SculkPatchConfiguration.fromJson(obj.get("config"));
+                yield new ConfiguredFeature<>(SCULK_PATCH, config);
+            }
+            case "minecraft:root_system" -> {
+                var config = RootSystemConfiguration.fromJson(obj.get("config"), blockTags);
+                yield new ConfiguredFeature<>(ROOT_SYSTEM, config);
+            }
+            case "minecraft:underwater_magma" -> {
+                var config = UnderwaterMagmaConfiguration.fromJson(obj.get("config"));
+                yield new ConfiguredFeature<>(UNDERWATER_MAGMA, config);
+            }
+            case "minecraft:fossil" -> {
+                var config = FossilFeatureConfiguration.fromJson(obj.get("config"), blockTags);
+                yield new ConfiguredFeature<>(FOSSIL, config);
+            }
+            case "minecraft:desert_well" -> new ConfiguredFeature<>(DESERT_WELL, new NoneFeatureConfiguration());
+            case "minecraft:sea_pickle" -> new ConfiguredFeature<>(SEA_PICKLE, CountConfiguration.fromJson(obj.get("config")));
+            case "minecraft:bamboo" -> new ConfiguredFeature<>(BAMBOO, ProbabilityConfiguration.fromJson(obj.get("config")));
+            case "minecraft:fill_layer" -> new ConfiguredFeature<>(FILL_LAYER, LayerConfiguration.fromJson(obj.get("config")));
+            case "minecraft:bonus_chest" -> new ConfiguredFeature<>(BONUS_CHEST, new NoneFeatureConfiguration());
+            case "minecraft:coral_tree" -> {
+                var config = NONE_CONFIGURED_FEATURE_CODEC.decode(Transcoder.JSON, obj).orElseThrow().config();
+                yield new ConfiguredFeature<>(CORAL_TREE, config);
+            }
+            case "minecraft:coral_claw" -> {
+                var config = NONE_CONFIGURED_FEATURE_CODEC.decode(Transcoder.JSON, obj).orElseThrow().config();
+                yield new ConfiguredFeature<>(CORAL_CLAW, config);
+            }
+            case "minecraft:coral_mushroom" -> {
+                var config = NONE_CONFIGURED_FEATURE_CODEC.decode(Transcoder.JSON, obj).orElseThrow().config();
+                yield new ConfiguredFeature<>(CORAL_MUSHROOM, config);
+            }
+            case "minecraft:iceberg" -> {
+                var config = IcebergConfiguration.fromJson(obj.get("config"));
+                yield new ConfiguredFeature<>(ICEBERG, config);
+            }
+            case "minecraft:blue_ice" -> {
+                yield new ConfiguredFeature<>(BLUE_ICE, new NoneFeatureConfiguration());
+            }
+            case "minecraft:ice_spike" -> {
+                yield new ConfiguredFeature<>(ICE_SPIKE, new NoneFeatureConfiguration());
+            }
+            case "minecraft:geode" -> {
+                var config = GeodeConfiguration.fromJson(obj.get("config"), blockTags);
+                yield new ConfiguredFeature<>(GEODE, config);
+            }
+            case "minecraft:end_island" -> {
+                var config = NONE_CONFIGURED_FEATURE_CODEC.decode(Transcoder.JSON, obj).orElseThrow().config();
+                yield new ConfiguredFeature<>(END_ISLAND, config);
+            }
+            case "minecraft:end_gateway" -> {
+                var config = EndGatewayConfiguration.fromJson(obj.get("config"));
+                yield new ConfiguredFeature<>(END_GATEWAY, config);
+            }
+            case "minecraft:void_start_platform" -> {
+                var config = NONE_CONFIGURED_FEATURE_CODEC.decode(Transcoder.JSON, obj).orElseThrow().config();
+                yield new ConfiguredFeature<>(VOID_START_PLATFORM, config);
+            }
+            case "minecraft:freeze_top_layer" -> {
+                var config = NONE_CONFIGURED_FEATURE_CODEC.decode(Transcoder.JSON, obj).orElseThrow().config();
+                yield new ConfiguredFeature<>(FREEZE_TOP_LAYER, config);
+            }
             case "minecraft:netherrack_replace_blobs" -> {
                 var config = ReplaceSphereConfiguration.fromJson(obj.get("config"));
                 yield new ConfiguredFeature<>(NETHERRACK_REPLACE_BLOBS, config);
             }
-            case "minecraft:bamboo", "minecraft:blue_ice",
-                    "minecraft:bonus_chest", "minecraft:coral_claw", "minecraft:coral_mushroom",
-                    "minecraft:coral_tree", "minecraft:desert_well",
-                    "minecraft:end_gateway", "minecraft:end_island",
-                    "minecraft:fill_layer", "minecraft:forest_rock", "minecraft:fossil", "minecraft:geode",
-                    "minecraft:ice_spike",
-                    "minecraft:iceberg",
-                    "minecraft:no_op", "minecraft:root_system",
-                    "minecraft:sculk_patch", "minecraft:sea_pickle" -> {
+            case "minecraft:forest_rock", "minecraft:no_op" -> {
                 yield new ConfiguredFeature<>(NO_OP, new NoneFeatureConfiguration());
             }
             default -> null;

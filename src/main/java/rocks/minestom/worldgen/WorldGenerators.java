@@ -24,6 +24,7 @@ public final class WorldGenerators {
     private final StructureLoader structureLoader;
     private final StructurePlacer overworldStructures;
     private final StructurePlacer netherStructures;
+    private final StructurePlacer endStructures;
     private final NoiseGeneratorSettingsRuntime overworldSettings;
     private final BiomeSource overworldBiomes;
     private final NoiseGeneratorSettingsRuntime netherSettings;
@@ -41,6 +42,7 @@ public final class WorldGenerators {
                 this.structureLoader,
                 this.featureLoader,
                 List.of(
+                        Key.key("minecraft:strongholds"),
                         Key.key("minecraft:mineshafts"),
                         Key.key("minecraft:villages"),
                         Key.key("minecraft:igloos"),
@@ -50,7 +52,13 @@ public final class WorldGenerators {
                         Key.key("minecraft:pillager_outposts"),
                         Key.key("minecraft:ancient_cities"),
                         Key.key("minecraft:trail_ruins"),
-                        Key.key("minecraft:trial_chambers")
+                        Key.key("minecraft:trial_chambers"),
+                        Key.key("minecraft:desert_pyramids"),
+                        Key.key("minecraft:jungle_temples"),
+                        Key.key("minecraft:swamp_huts"),
+                        Key.key("minecraft:buried_treasures"),
+                        Key.key("minecraft:ocean_monuments"),
+                        Key.key("minecraft:woodland_mansions")
                 )
         );
         this.netherStructures = new StructurePlacer(
@@ -59,6 +67,13 @@ public final class WorldGenerators {
                 List.of(
                         Key.key("minecraft:nether_fossils"),
                         Key.key("minecraft:nether_complexes")
+                )
+        );
+        this.endStructures = new StructurePlacer(
+                this.structureLoader,
+                this.featureLoader,
+                List.of(
+                        Key.key("minecraft:end_cities")
                 )
         );
         this.biomeZoomSeed = BiomeZoomer.obfuscateSeed(seed);
@@ -88,7 +103,7 @@ public final class WorldGenerators {
     }
 
     public Generator end() {
-        return new WorldGenerator(this.endSettings, this.endBiomes, this.biomeZoomSeed, this.biomeResolver, this.featureLoader, null, true);
+        return new WorldGenerator(this.endSettings, this.endBiomes, this.biomeZoomSeed, this.biomeResolver, this.featureLoader, this.endStructures, true);
     }
 
     public Path dataPackRoot() {

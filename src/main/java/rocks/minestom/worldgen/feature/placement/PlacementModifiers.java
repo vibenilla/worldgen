@@ -541,7 +541,11 @@ public final class PlacementModifiers {
             public boolean test(PlacementContext context, BlockVec position) {
                 var targetPosition = position.add(this.offset.blockX(), this.offset.blockY(), this.offset.blockZ());
                 var block = context.accessor().getBlock(targetPosition);
-                if (this.fluids.contains(Key.key("minecraft:water")) && block.compare(Block.WATER)) {
+                // Vanilla tests the block's FluidState, which is water for
+                // waterlogged blocks too (fences, slabs, sea pickles, and so
+                // on), not only for the literal water block.
+                if (this.fluids.contains(Key.key("minecraft:water"))
+                        && (block.compare(Block.WATER) || "true".equals(block.getProperty("waterlogged")))) {
                     return true;
                 }
                 return this.fluids.contains(Key.key("minecraft:lava")) && block.compare(Block.LAVA);

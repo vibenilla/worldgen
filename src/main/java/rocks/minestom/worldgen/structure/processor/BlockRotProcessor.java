@@ -20,6 +20,15 @@ public final class BlockRotProcessor implements StructureProcessor {
         this.integrity = integrity;
     }
 
+    @Nullable
+    public Key rottableBlocksTag() {
+        return this.rottableBlocksTag;
+    }
+
+    public float integrity() {
+        return this.integrity;
+    }
+
     @Override
     public StructureBlockInfo processBlock(
             StructureProcessorContext context,

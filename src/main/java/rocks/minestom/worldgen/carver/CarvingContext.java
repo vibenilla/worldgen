@@ -99,7 +99,10 @@ public final class CarvingContext {
     public void setCarved(int blockX, int blockY, int blockZ, Block state) {
         var index = this.blockIndex(blockX, blockY, blockZ);
         if (state.isAir()) {
-            this.data.blocks()[index] = null;
+            // Cave air is still air for every mask consumer, but the block
+            // itself must survive to the blit so carved cavities store
+            // cave_air like vanilla's nether carver.
+            this.data.blocks()[index] = state.compare(Block.CAVE_AIR) ? state : null;
             this.data.stoneMask()[index] = TerrainData.AIR;
         } else {
             this.data.blocks()[index] = state;

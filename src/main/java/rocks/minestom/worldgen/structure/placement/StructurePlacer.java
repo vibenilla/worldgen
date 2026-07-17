@@ -16,11 +16,19 @@ import rocks.minestom.worldgen.random.LegacyRandomSource;
 import rocks.minestom.worldgen.random.WorldgenRandom;
 import rocks.minestom.worldgen.structure.*;
 import rocks.minestom.worldgen.structure.assembly.JigsawAssembler;
+import rocks.minestom.worldgen.structure.endcity.EndCityPieces;
+import rocks.minestom.worldgen.structure.endcity.EndCityStructure;
+import rocks.minestom.worldgen.structure.fortress.FortressPlacer;
+import rocks.minestom.worldgen.structure.fortress.FortressStructure;
 import rocks.minestom.worldgen.structure.loader.StructureLoader;
 import rocks.minestom.worldgen.structure.mineshaft.MineshaftPlacer;
+import rocks.minestom.worldgen.structure.mansion.MansionPlacer;
+import rocks.minestom.worldgen.structure.monument.MonumentPlacer;
 import rocks.minestom.worldgen.structure.pool.*;
+import rocks.minestom.worldgen.structure.stronghold.StrongholdPlacer;
 import rocks.minestom.worldgen.structure.processor.StructureProcessorContext;
 import rocks.minestom.worldgen.structure.processor.StructureProcessorList;
+import rocks.minestom.worldgen.structure.scattered.ScatteredFeaturePlacer;
 import rocks.minestom.worldgen.structure.template.BoundingBox;
 import rocks.minestom.worldgen.structure.template.LiquidSettings;
 import rocks.minestom.worldgen.structure.template.Rotation;
@@ -57,6 +65,14 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class StructurePlacer {
     private static final Logger LOGGER = LoggerFactory.getLogger(StructurePlacer.class);
+    /**
+     * How far away (in chunks) an end city start can lie while its pieces
+     * still reach the generating chunk. End cities recurse up to
+     * {@code EndCityPieces.MAX_GEN_DEPTH} levels deep through bridges that
+     * each span multiple chunks (the end ship alone can sit up to 79 blocks
+     * from its bridge), so this is deliberately generous.
+     */
+    private static final int END_CITY_SCAN_RADIUS = 8;
 
     private final StructureLoader structureLoader;
     private final FeatureLoader featureLoader;
@@ -66,6 +82,11 @@ public final class StructurePlacer {
     private final Map<Key, Boolean> setsWithAdaptation;
     private final Map<Long, Integer> startSurfaceHeights;
     private final MineshaftPlacer mineshaftPlacer;
+    private final FortressPlacer fortressPlacer;
+    private final ScatteredFeaturePlacer scatteredFeaturePlacer;
+    private final MonumentPlacer monumentPlacer;
+    private final StrongholdPlacer strongholdPlacer;
+    private final MansionPlacer mansionPlacer;
 
     public StructurePlacer(StructureLoader structureLoader, FeatureLoader featureLoader, List<Key> structureSets) {
         this.structureLoader = structureLoader;
@@ -76,6 +97,11 @@ public final class StructurePlacer {
         this.setsWithAdaptation = new ConcurrentHashMap<>();
         this.startSurfaceHeights = new ConcurrentHashMap<>();
         this.mineshaftPlacer = new MineshaftPlacer(structureLoader, featureLoader);
+        this.fortressPlacer = new FortressPlacer(structureLoader, featureLoader);
+        this.scatteredFeaturePlacer = new ScatteredFeaturePlacer(structureLoader, featureLoader);
+        this.monumentPlacer = new MonumentPlacer(structureLoader, featureLoader);
+        this.strongholdPlacer = new StrongholdPlacer(structureLoader, featureLoader);
+        this.mansionPlacer = new MansionPlacer(structureLoader);
     }
 
     public void placeStructures(GenerationUnit unit, int[] surfaceHeights, BiomeZoomer biomeZoomer,
@@ -116,6 +142,45 @@ public final class StructurePlacer {
                 // their own multi-chunk placement path.
                 this.mineshaftPlacer.place(unit, biomeZoomer, settings, structureSet, surfaceHeights);
                 continue;
+            }
+
+            if (this.scatteredFeaturePlacer.isScatteredFeatureSet(structureSet)) {
+                // Desert pyramid, jungle temple, swamp hut and buried
+                // treasure are also procedural single pieces rather than
+                // templates.
+                this.scatteredFeaturePlacer.place(unit, biomeZoomer, settings, structureSet, surfaceHeights);
+                continue;
+            }
+
+            if (this.strongholdPlacer.isStrongholdSet(structureSet)) {
+                // Like the mineshaft, the strongholds set contains a single
+                // procedural structure with its own multi-chunk placement path.
+                this.strongholdPlacer.place(unit, biomeZoomer, settings, structureSet, surfaceHeights);
+                continue;
+            }
+
+            if (this.mansionPlacer.isMansionSet(structureSet)) {
+                // The woodland mansion is a single grid-solved template
+                // structure with its own multi-chunk placement path.
+                this.mansionPlacer.place(unit, biomeZoomer, settings, structureSet, surfaceHeights);
+                continue;
+            }
+
+            if (this.monumentPlacer.isMonumentSet(structureSet)) {
+                // The ocean monument is a single procedural top piece
+                // (its child rooms are dispatched internally), so - like
+                // mineshaft and scattered features - it fully replaces the
+                // generic path for its set rather than complementing it.
+                this.monumentPlacer.place(unit, biomeZoomer, settings, structureSet, surfaceHeights);
+                continue;
+            }
+
+            if (this.fortressPlacer.isFortressSet(structureSet)) {
+                // Unlike mineshafts, nether_complexes mixes the procedural
+                // fortress with the jigsaw bastion remnant, so the fortress
+                // placer runs in addition to (not instead of) the generic
+                // path below, which still places bastion remnant starts.
+                this.fortressPlacer.place(unit, biomeZoomer, settings, structureSet, surfaceHeights);
             }
 
             // Starts are pure functions of their start chunk, so scan every
@@ -205,7 +270,7 @@ public final class StructurePlacer {
         for (var setEntry : candidateSets) {
             var structureSet = setEntry.getValue();
             if (!structureSet.placement().isStartChunk(chunkX, chunkZ, settings.randomState().seed(),
-                    settings.randomState().legacyRandomSource())) {
+                    settings.randomState().legacyRandomSource(), biomeZoomer.source(), this.structureLoader.biomeTags())) {
                 continue;
             }
 
@@ -273,6 +338,14 @@ public final class StructurePlacer {
         for (var structureSetId : this.structureSets) {
             var structureSet = this.structureLoader.getStructureSet(structureSetId);
             if (structureSet == null || !this.hasTerrainAdaptation(structureSetId, structureSet)) {
+                continue;
+            }
+
+            if (this.strongholdPlacer.isStrongholdSet(structureSet)) {
+                // The stronghold is generated by its own piece-based placer
+                // rather than the generic template path below, so its beard
+                // contribution is queried directly from that placer's cache.
+                this.strongholdPlacer.contributeBeard(chunkX, chunkZ, structureSet, settings, biomeZoomer, rigids);
                 continue;
             }
 
@@ -372,9 +445,12 @@ public final class StructurePlacer {
         // Simple template structures span at most a couple of chunks.
         var radius = 2;
         for (var entry : structureSet.structures()) {
-            if (this.structureLoader.getStructure(entry.structure()) instanceof JigsawStructure jigsaw) {
+            var structure = this.structureLoader.getStructure(entry.structure());
+            if (structure instanceof JigsawStructure jigsaw) {
                 var span = Math.max(jigsaw.maxDistanceFromCenter(), 80);
                 radius = Math.max(radius, span / 16 + 2);
+            } else if (structure instanceof EndCityStructure) {
+                radius = Math.max(radius, END_CITY_SCAN_RADIUS);
             }
         }
 
@@ -400,7 +476,7 @@ public final class StructurePlacer {
             BiomeZoomer biomeZoomer, NoiseGeneratorSettingsRuntime settings) {
         var placement = structureSet.placement();
         if (!placement.isStartChunk(chunkX, chunkZ, settings.randomState().seed(),
-                settings.randomState().legacyRandomSource())) {
+                settings.randomState().legacyRandomSource(), biomeZoomer.source(), this.structureLoader.biomeTags())) {
             return null;
         }
 
@@ -420,6 +496,22 @@ public final class StructurePlacer {
         while (!options.isEmpty() && total > 0) {
             var index = pickWeightedIndex(options, random.nextInt(total));
             var selected = options.get(index);
+            if (this.structureLoader.getStructure(selected.structure()) instanceof FortressStructure fortress) {
+                // Handled entirely by FortressPlacer, which replicates this
+                // same weighted draw. Vanilla's piece-based fortress always
+                // succeeds once its (random-independent) biome check passes
+                // - it never falls through to the next weighted option the
+                // way a failed jigsaw assembly would - so the generic path
+                // must stop here rather than spuriously trying e.g. bastion
+                // remnant instead. If the biome check fails, fall through to
+                // the normal remove-and-retry path like any other candidate.
+                if (this.fortressBiomeMatches(fortress, chunkX, chunkZ, biomeZoomer)) {
+                    return null;
+                }
+                options.remove(index);
+                total -= selected.weight();
+                continue;
+            }
             var start = this.tryBuildStart(selected.structure(), chunkX, chunkZ, biomeZoomer, settings);
             if (start != null) {
                 return start;
@@ -428,6 +520,18 @@ public final class StructurePlacer {
             total -= selected.weight();
         }
         return null;
+    }
+
+    /**
+     * Vanilla {@code NetherFortressStructure.findGenerationPoint}: a fixed
+     * stub position (chunk min X/Z, y=64) independent of any piece geometry
+     * or random state.
+     */
+    private boolean fortressBiomeMatches(FortressStructure fortress, int chunkX, int chunkZ, BiomeZoomer biomeZoomer) {
+        var stubX = chunkX << 4;
+        var stubZ = chunkZ << 4;
+        var biome = biomeZoomer.source().biome(stubX >> 2, 64 >> 2, stubZ >> 2);
+        return fortress.biomes().matches(biome, this.structureLoader.biomeTags());
     }
 
     private static int pickWeightedIndex(List<StructureSet.StructureSelection> options, int choice) {
@@ -447,6 +551,15 @@ public final class StructurePlacer {
         var structure = this.structureLoader.getStructure(structureKey);
         if (structure == null) {
             return null;
+        }
+
+        if (structure instanceof EndCityStructure endCity) {
+            // Vanilla EndCityStructure.findGenerationPoint: the biome check
+            // runs at the computed start position (chunk corner + 7, lowest
+            // corner height), not the chunk center used by every other
+            // structure type here, so this bypasses the generic biome check
+            // below entirely.
+            return this.buildEndCityStructureStart(endCity, chunkX, chunkZ, settings, biomeZoomer);
         }
 
         var centerX = (chunkX << 4) + 8;
@@ -522,6 +635,95 @@ public final class StructurePlacer {
                 LiquidSettings.APPLY_WATERLOGGING);
 
         return new StructureStart(start, List.of(piece), copyBounds(bounds), simple.terrainAdaptation());
+    }
+
+    /**
+     * Vanilla {@code EndCityStructure.findGenerationPoint}: draws a random
+     * rotation, finds the lowest {@code WORLD_SURFACE_WG} corner of a 5x5
+     * chunk box offset 7 blocks into the chunk (in the direction the
+     * rotation faces), rejects anything below y=60, then - only if the biome
+     * at that position matches - continues drawing from the same random to
+     * recursively assemble the piece list ({@link EndCityPieces}).
+     */
+    private StructureStart buildEndCityStructureStart(EndCityStructure endCity, int chunkX, int chunkZ,
+            NoiseGeneratorSettingsRuntime settings, BiomeZoomer biomeZoomer) {
+        var random = new WorldgenRandom(new LegacyRandomSource(0L));
+        random.setLargeFeatureSeed(settings.randomState().seed(), chunkX, chunkZ);
+        var rotation = Rotation.getRandom(random);
+
+        var offsetX = 5;
+        var offsetZ = 5;
+        switch (rotation) {
+            case CLOCKWISE_90 -> offsetX = -5;
+            case CLOCKWISE_180 -> {
+                offsetX = -5;
+                offsetZ = -5;
+            }
+            case COUNTERCLOCKWISE_90 -> offsetZ = -5;
+            case NONE -> {
+            }
+        }
+
+        var blockX = (chunkX << 4) + 7;
+        var blockZ = (chunkZ << 4) + 7;
+        var lowestY = this.getLowestY(blockX, blockZ, offsetX, offsetZ, settings);
+        if (lowestY < 60) {
+            return null;
+        }
+
+        var startPos = new BlockVec(blockX, lowestY, blockZ);
+        var biome = biomeZoomer.source().biome(startPos.blockX() >> 2, startPos.blockY() >> 2, startPos.blockZ() >> 2);
+        if (!endCity.biomes().matches(biome, this.structureLoader.biomeTags())) {
+            return null;
+        }
+
+        var pieces = EndCityPieces.startHouseTower(this.structureLoader, startPos, rotation, random);
+        if (pieces.isEmpty()) {
+            return null;
+        }
+
+        var bounds = copyBounds(pieces.getFirst().boundingBox);
+        var placedPieces = new ArrayList<JigsawAssembler.PlacedPiece>(pieces.size());
+        for (var index = 0; index < pieces.size(); index++) {
+            var piece = pieces.get(index);
+            if (index > 0) {
+                bounds.encapsulate(piece.boundingBox);
+            }
+            var element = new SinglePoolElement(piece.templateKey, StructureProcessorList.EMPTY, Projection.RIGID,
+                    null, !piece.overwrite);
+            placedPieces.add(new JigsawAssembler.PlacedPiece(element, piece.position, piece.rotation,
+                    copyBounds(piece.boundingBox), 0, LiquidSettings.APPLY_WATERLOGGING));
+        }
+
+        return new StructureStart(startPos, placedPieces, bounds, endCity.terrainAdaptation());
+    }
+
+    /**
+     * Vanilla {@code Structure.getLowestY}: the minimum of the four corner
+     * {@code WORLD_SURFACE_WG} heights of the box anchored at (blockX,
+     * blockZ) with the given (possibly negative) span.
+     */
+    private int getLowestY(int blockX, int blockZ, int offsetX, int offsetZ, NoiseGeneratorSettingsRuntime settings) {
+        var a = this.worldSurfaceHeight(blockX, blockZ, settings);
+        var b = this.worldSurfaceHeight(blockX, blockZ + offsetZ, settings);
+        var c = this.worldSurfaceHeight(blockX + offsetX, blockZ, settings);
+        var d = this.worldSurfaceHeight(blockX + offsetX, blockZ + offsetZ, settings);
+        return Math.min(Math.min(a, b), Math.min(c, d));
+    }
+
+    /**
+     * Approximation of vanilla {@code getFirstOccupiedHeight} for
+     * {@code WORLD_SURFACE_WG}: one above the highest solid block of the raw
+     * noise terrain, matching {@link rocks.minestom.worldgen.structure.scattered.ScatteredFeaturePlacer}'s
+     * {@code worldSurfaceHeight}.
+     */
+    private int worldSurfaceHeight(int blockX, int blockZ, NoiseGeneratorSettingsRuntime settings) {
+        var chunkX = Math.floorDiv(blockX, 16);
+        var chunkZ = Math.floorDiv(blockZ, 16);
+        var terrainData = new TerrainGenerator(settings).generate(chunkX, chunkZ);
+        var index = (blockX - (chunkX << 4)) * 16 + (blockZ - (chunkZ << 4));
+        var solidTop = terrainData.surfaceHeights()[index];
+        return solidTop == Integer.MIN_VALUE ? settings.minY() : solidTop + 1;
     }
 
     private void placeStart(StructureStart structureStart, BoundingBox chunkBounds, GenerationUnitAdapter adapter,

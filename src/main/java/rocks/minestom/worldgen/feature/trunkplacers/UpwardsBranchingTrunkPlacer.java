@@ -110,12 +110,16 @@ public record UpwardsBranchingTrunkPlacer(
         return this.baseHeight + random.nextInt(this.heightRandA + 1) + random.nextInt(this.heightRandB + 1);
     }
 
+    /**
+     * Vanilla {@code Direction.Plane.HORIZONTAL.faces}: {@code {NORTH, EAST,
+     * SOUTH, WEST}}, so {@code random.nextInt(4)} selects the same direction.
+     */
     private record HorizontalDirection(int stepX, int stepZ) {
         private static final HorizontalDirection[] VALUES = new HorizontalDirection[]{
+                new HorizontalDirection(0, -1),
                 new HorizontalDirection(1, 0),
-                new HorizontalDirection(-1, 0),
                 new HorizontalDirection(0, 1),
-                new HorizontalDirection(0, -1)
+                new HorizontalDirection(-1, 0)
         };
 
         private static HorizontalDirection random(RandomSource random) {

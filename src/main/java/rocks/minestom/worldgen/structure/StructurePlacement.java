@@ -24,4 +24,15 @@ public interface StructurePlacement {
      * @return true if this chunk is valid for structure generation
      */
     boolean isStartChunk(int chunkX, int chunkZ, long seed, boolean legacyRandomSource);
+
+    /**
+     * Variant carrying the biome source and biome tags, needed by placements
+     * whose positions depend on biome searches (concentric rings). The default
+     * delegates to the plain check.
+     */
+    default boolean isStartChunk(int chunkX, int chunkZ, long seed, boolean legacyRandomSource,
+            rocks.minestom.worldgen.biome.BiomeSource biomeSource,
+            rocks.minestom.worldgen.structure.context.BiomeTagManager biomeTags) {
+        return this.isStartChunk(chunkX, chunkZ, seed, legacyRandomSource);
+    }
 }

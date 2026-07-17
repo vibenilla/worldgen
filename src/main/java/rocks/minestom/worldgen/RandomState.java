@@ -84,19 +84,15 @@ public final class RandomState {
     }
 
     private NormalNoise createNoise(Key id) {
-        if (this.legacyRandomSource) {
-            if (id.asString().equals("minecraft:temperature")) {
-                return NormalNoise.createLegacyNetherBiome(new LegacyRandomSource(this.seed), new NormalNoise.NoiseParameters(-7, new double[]{1.0, 1.0}));
-            }
-            if (id.asString().equals("minecraft:vegetation")) {
-                return NormalNoise.createLegacyNetherBiome(new LegacyRandomSource(this.seed + 1L), new NormalNoise.NoiseParameters(-7, new double[]{1.0, 1.0}));
-            }
-            if (id.asString().equals("minecraft:offset")) {
-                return NormalNoise.create(this.positionalRandomFactory.fromHashOf(Key.key("minecraft:offset").asString()), new NormalNoise.NoiseParameters(0, new double[]{0.0}));
-            }
+        var parameters = this.parametersCache.computeIfAbsent(id, this::readNoiseParameters);
+
+        if (id.asString().equals("minecraft:nether/temperature")) {
+            return NormalNoise.createLegacyNetherBiome(new LegacyRandomSource(this.seed), parameters);
+        }
+        if (id.asString().equals("minecraft:nether/vegetation")) {
+            return NormalNoise.createLegacyNetherBiome(new LegacyRandomSource(this.seed + 1L), parameters);
         }
 
-        var parameters = this.parametersCache.computeIfAbsent(id, this::readNoiseParameters);
         return NormalNoise.create(this.positionalRandomFactory.fromHashOf(id.asString()), parameters);
     }
 
