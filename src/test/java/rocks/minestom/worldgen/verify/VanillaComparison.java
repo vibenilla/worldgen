@@ -29,7 +29,22 @@ public final class VanillaComparison {
         MinecraftServer.init();
         var generators = new WorldGenerators(datapackDir, seed);
         var instance = MinecraftServer.getInstanceManager().createInstanceContainer();
-        instance.setGenerator(generators.overworld());
+        var dimension = System.getProperty("compare.dimension", "overworld");
+        rocks.minestom.worldgen.biome.BiomeSource sourceBiomes;
+        switch (dimension) {
+            case "nether" -> {
+                instance.setGenerator(generators.nether());
+                sourceBiomes = generators.netherBiomes();
+            }
+            case "end" -> {
+                instance.setGenerator(generators.end());
+                sourceBiomes = generators.endBiomes();
+            }
+            default -> {
+                instance.setGenerator(generators.overworld());
+                sourceBiomes = generators.overworldBiomes();
+            }
+        }
 
         var regionCache = new HashMap<Long, RegionFile>();
         var stats = new Stats();
@@ -98,7 +113,7 @@ public final class VanillaComparison {
                 if (chunkMismatch > 0) {
                     stats.chunkMismatches.put(chunkX + "," + chunkZ, chunkMismatch);
                 }
-                compareSourceBiomes(generators.overworldBiomes(), chunkX, chunkZ, vanillaChunk, stats);
+                compareSourceBiomes(sourceBiomes, chunkX, chunkZ, vanillaChunk, stats);
             }
         }
 
