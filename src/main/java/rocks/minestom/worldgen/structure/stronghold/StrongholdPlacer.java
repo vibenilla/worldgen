@@ -268,7 +268,8 @@ public final class StrongholdPlacer {
             NoiseGeneratorSettingsRuntime settings, BiomeZoomer biomeZoomer) {
         var seed = settings.randomState().seed();
         var placement = structureSet.placement();
-        if (!placement.isStartChunk(chunkX, chunkZ, seed, settings.randomState().legacyRandomSource())) {
+        if (!placement.isStartChunk(chunkX, chunkZ, seed, settings.randomState().legacyRandomSource(),
+                biomeZoomer.source(), this.structureLoader.biomeTags())) {
             return null;
         }
 
