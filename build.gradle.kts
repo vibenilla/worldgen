@@ -68,3 +68,16 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
 }
+
+tasks.register<JavaExec>("demoServer") {
+    group = "application"
+    description = "Runs a demo server with all dimensions and vanilla-style commands"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass = "rocks.minestom.worldgen.demo.DemoServer"
+    jvmArgs("-Xmx4G", "-Dminestom.chunk-view-distance=32")
+    args(
+        providers.gradleProperty("port").getOrElse("25565"),
+        providers.gradleProperty("seed").getOrElse("123456789")
+    )
+}
+
