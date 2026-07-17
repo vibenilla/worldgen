@@ -17,6 +17,7 @@ import rocks.minestom.worldgen.structure.template.BoundingBox;
 import rocks.minestom.worldgen.structure.template.LiquidSettings;
 import rocks.minestom.worldgen.structure.template.Mirror;
 import rocks.minestom.worldgen.structure.template.Rotation;
+import rocks.minestom.worldgen.structure.template.StructureShapeUpdater;
 import rocks.minestom.worldgen.structure.template.StructureTemplate;
 import rocks.minestom.worldgen.terrain.TerrainGenerator;
 
@@ -84,18 +85,30 @@ public final class MansionPlacer {
         }
 
         var chunkBlocks = this.liveChunkBlocks(chunkX, chunkZ, surfaceHeights);
+        // The connection shape pass reads neighbors across chunk boundaries
+        // (a fence or wall piece can sit right at the edge of the chunk being
+        // decorated), so the adapter needs the same live cross-chunk terrain
+        // access as regular feature decoration, not just this chunk's buffer.
         var adapter = chunkBlocks != null
                 ? new GenerationUnitAdapter(unit, startX, startZ, 16, 16, settings.minY(), chunkBlocks,
-                        settings.height(), null)
+                        settings.height(), StructureWrites.terrainLookup())
                 : new GenerationUnitAdapter(unit);
 
+        // Deferred so every piece placed in this chunk (across all
+        // intersecting starts) is committed before any connection shape
+        // (fence, wall, leaves) is recomputed against its neighbors.
+        var connectionShapeUpdates = new ArrayList<BlockVec>();
         for (var start : intersecting) {
-            this.placeStart(start, adapter, chunkBounds, settings);
+            this.placeStart(start, adapter, chunkBounds, settings, connectionShapeUpdates);
+        }
+
+        if (!connectionShapeUpdates.isEmpty()) {
+            StructureShapeUpdater.update(adapter, this.structureLoader.blockTags(), connectionShapeUpdates);
         }
     }
 
     private void placeStart(MansionStart start, GenerationUnitAdapter adapter, BoundingBox chunkBounds,
-            NoiseGeneratorSettingsRuntime settings) {
+            NoiseGeneratorSettingsRuntime settings, List<BlockVec> connectionShapeUpdates) {
         var firstBounds = start.pieces().getFirst().bounds();
         var referencePos = new BlockVec(
                 firstBounds.minX() + (firstBounds.maxX() - firstBounds.minX() + 1) / 2,
@@ -115,9 +128,10 @@ public final class MansionPlacer {
             var processorContext = new StructureProcessorContext(
                     adapter, this.structureLoader.blockTags(), settings.randomState().seed(),
                     piece.position(), referencePos, null);
-            var placementContext = new StructureTemplate.PlacementContext(adapter, chunkBounds, processorContext);
+            var placementContext = new StructureTemplate.PlacementContext(
+                    adapter, chunkBounds, processorContext, connectionShapeUpdates);
             template.place(placementContext, piece.position(), piece.rotation(), piece.mirror(),
-                    StructureProcessorList.EMPTY, false, false, LiquidSettings.APPLY_WATERLOGGING);
+                    StructureProcessorList.EMPTY, false, false, LiquidSettings.APPLY_WATERLOGGING, true);
         }
     }
 
@@ -243,7 +257,10 @@ public final class MansionPlacer {
      * Vanilla {@code Structure.getLowestYIn5by5BoxOffset7Blocks} plus
      * {@code getCornerHeights}: {@code WORLD_SURFACE_WG} is approximated the
      * same way as the other placers in this codebase (one above the highest
-     * solid block of the raw noise terrain).
+     * solid block of the raw noise terrain), but vanilla's corner heights use
+     * {@code ChunkGenerator.getFirstOccupiedHeight}, which is
+     * {@code getBaseHeight - 1} (the topmost solid block itself, not the
+     * first free block above it).
      */
     private BlockVec lowestYIn5by5BoxOffset7Blocks(int chunkX, int chunkZ, Rotation rotation,
             NoiseGeneratorSettingsRuntime settings) {
@@ -264,7 +281,7 @@ public final class MansionPlacer {
         var b = this.worldSurfaceHeight(blockX, blockZ + offsetZ, settings);
         var c = this.worldSurfaceHeight(blockX + offsetX, blockZ, settings);
         var d = this.worldSurfaceHeight(blockX + offsetX, blockZ + offsetZ, settings);
-        var lowest = Math.min(Math.min(a, b), Math.min(c, d));
+        var lowest = Math.min(Math.min(a, b), Math.min(c, d)) - 1;
         return new BlockVec(blockX, lowest, blockZ);
     }
 

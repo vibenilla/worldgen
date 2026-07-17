@@ -130,18 +130,23 @@ public final class StructureTemplate {
     /**
      * Everything piece placement needs beyond the piece itself.
      *
-     * @param level        block reads and writes
-     * @param chunkBounds  clip placed blocks (and, without whole-piece
-     *                     processors, processed blocks) to this box; null for
-     *                     unbounded placement
-     * @param referencePos structure reference position for pos rule tests
-     * @param worldSeed    world seed (capped processors)
-     * @param processorContextFactory context shared by all pieces of a start
+     * @param level                  block reads and writes
+     * @param chunkBounds            clip placed blocks (and, without whole-piece
+     *                               processors, processed blocks) to this box; null for
+     *                               unbounded placement
+     * @param processorContext       context shared by all pieces of a start
+     * @param connectionShapeUpdates positions placed with {@code updateConnectionShapes}
+     *                               true accumulate here; the caller runs
+     *                               {@link StructureShapeUpdater#update} once every
+     *                               piece sharing this context has been placed, so
+     *                               connections resolve against final neighbors
+     *                               instead of each piece's placement order
      */
     public record PlacementContext(
             GenerationUnitAdapter level,
             BoundingBox chunkBounds,
-            StructureProcessorContext processorContext
+            StructureProcessorContext processorContext,
+            List<BlockVec> connectionShapeUpdates
     ) {
     }
 
@@ -156,8 +161,10 @@ public final class StructureTemplate {
             StructureProcessorList processors,
             boolean legacy,
             boolean terrainMatching,
-            LiquidSettings liquidSettings) {
-        this.place(context, position, rotation, Mirror.NONE, processors, legacy, terrainMatching, liquidSettings);
+            LiquidSettings liquidSettings,
+            boolean updateConnectionShapes) {
+        this.place(context, position, rotation, Mirror.NONE, processors, legacy, terrainMatching, liquidSettings,
+                updateConnectionShapes);
     }
 
     public void place(
@@ -168,7 +175,8 @@ public final class StructureTemplate {
             StructureProcessorList processors,
             boolean legacy,
             boolean terrainMatching,
-            LiquidSettings liquidSettings) {
+            LiquidSettings liquidSettings,
+            boolean updateConnectionShapes) {
         var palette = this.palettes.get(this.paletteIndex(position));
 
         // Vanilla processor chain order (SinglePoolElement.getSettings /
@@ -231,6 +239,7 @@ public final class StructureTemplate {
 
         var applyWaterlogging = liquidSettings == LiquidSettings.APPLY_WATERLOGGING;
         var level = context.level();
+        var placedPositions = new ArrayList<BlockVec>(finalized.size());
         for (var blockInfo : finalized) {
             var blockPos = blockInfo.pos();
             if (chunkBounds != null && !chunkBounds.isInside(blockPos)) {
@@ -253,6 +262,17 @@ public final class StructureTemplate {
             }
 
             level.setBlock(blockPos, state);
+            placedPositions.add(blockPos);
+        }
+
+        // Vanilla StructureTemplate.placeInWorld tail: recompute connection
+        // shapes (fences, walls, leaves) against the final placed neighbors,
+        // unless the caller already knows the palette states are correct
+        // (StructurePlaceSettings.knownShape, e.g. jigsaw pool elements). The
+        // actual recompute is deferred to the caller, once every piece
+        // sharing this context has been placed.
+        if (updateConnectionShapes) {
+            context.connectionShapeUpdates().addAll(placedPositions);
         }
     }
 

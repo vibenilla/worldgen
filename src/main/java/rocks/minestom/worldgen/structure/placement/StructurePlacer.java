@@ -805,7 +805,11 @@ public final class StructurePlacer {
                 piece.position(),
                 referencePos,
                 heightSampler);
-        var placementContext = new StructureTemplate.PlacementContext(adapter, chunkBounds, processorContext);
+        // Vanilla SinglePoolElement.getSettings always calls setKnownShape(true):
+        // jigsaw pool elements skip the connection shape pass, so the queue is
+        // never appended to.
+        var placementContext = new StructureTemplate.PlacementContext(
+                adapter, chunkBounds, processorContext, List.of());
         template.place(
                 placementContext,
                 piece.position(),
@@ -813,7 +817,8 @@ public final class StructurePlacer {
                 element.processors(),
                 element.legacy(),
                 element.projection() == Projection.TERRAIN_MATCHING,
-                liquidSettings);
+                liquidSettings,
+                false);
     }
 
     private void placeFeature(Key featureKey, BlockVec position, GenerationUnitAdapter adapter,
