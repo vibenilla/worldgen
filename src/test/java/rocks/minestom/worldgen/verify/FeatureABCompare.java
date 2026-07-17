@@ -491,7 +491,7 @@ public final class FeatureABCompare {
                     }
 
                     var context = new FeaturePlaceContext<>(
-                            ourWorld, featureRandom, position, configured.config(), featureSeed, -64, 319);
+                            ourWorld, featureRandom, position, configured.config(), featureSeed, -64, 319, 63);
                     var featureImpl = configured.feature();
                     if (featureImpl instanceof RandomSelectorFeature randomSelector) {
                         randomSelector.place((FeaturePlaceContext) context, loader);

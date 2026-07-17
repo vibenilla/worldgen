@@ -64,7 +64,8 @@ public final class RandomPatchFeature implements Feature<RandomPatchConfiguratio
                         configuredFeature.config(),
                         context.worldSeed(),
                         context.minY(),
-                        context.maxY());
+                        context.maxY(),
+                        context.seaLevel());
 
                 var featureImpl = configuredFeature.feature();
                 if (featureImpl instanceof RandomSelectorFeature) {

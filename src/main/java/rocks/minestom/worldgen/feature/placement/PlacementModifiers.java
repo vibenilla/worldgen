@@ -394,19 +394,14 @@ public final class PlacementModifiers {
 
                 do {
                     found = false;
-                    var countValue = this.count.sample(random);
-                    for (var countIndex = 0; countIndex < countValue; countIndex++) {
+                    // Vanilla resamples the count on every loop check
+                    for (var countIndex = 0; countIndex < this.count.sample(random); countIndex++) {
                         var x = position.blockX() + random.nextInt(16);
                         var z = position.blockZ() + random.nextInt(16);
                         var topY = context.getHeight(PlacementContext.HeightmapType.MOTION_BLOCKING, x, z);
-                        var y = topY - 1 - layer;
-                        if (y <= context.minY()) {
-                            continue;
-                        }
-
-                        var targetPosition = new BlockVec(x, y + 1, z);
-                        if (context.inWorldBounds(targetPosition)) {
-                            results.add(targetPosition);
+                        var y = findOnGroundYPosition(context, x, topY, z, layer);
+                        if (y != Integer.MAX_VALUE) {
+                            results.add(new BlockVec(x, y, z));
                             found = true;
                         }
                     }
@@ -415,6 +410,34 @@ public final class PlacementModifiers {
                 } while (found);
 
                 return results;
+            }
+
+            /**
+             * Vanilla {@code findOnGroundYPosition}: walks down from the
+             * heightmap top and returns the air block above the
+             * {@code targetLayer}-th solid-under-empty surface.
+             */
+            private static int findOnGroundYPosition(PlacementContext context, int x, int startY, int z, int targetLayer) {
+                var accessor = context.accessor();
+                var layersFound = 0;
+                var current = accessor.getBlock(x, startY, z);
+
+                for (var y = startY; y >= context.minY() + 1; y--) {
+                    var below = accessor.getBlock(x, y - 1, z);
+                    if (!isEmpty(below) && isEmpty(current) && !below.compare(Block.BEDROCK)) {
+                        if (layersFound == targetLayer) {
+                            return y;
+                        }
+                        layersFound++;
+                    }
+                    current = below;
+                }
+
+                return Integer.MAX_VALUE;
+            }
+
+            private static boolean isEmpty(Block block) {
+                return block.isAir() || block.compare(Block.WATER) || block.compare(Block.LAVA);
             }
         }
 

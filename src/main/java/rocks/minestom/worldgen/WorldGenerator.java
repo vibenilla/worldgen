@@ -116,15 +116,16 @@ public final class WorldGenerator implements Generator {
         this.generatedChunks.add(chunkKey);
 
         // Single blit of terrain + surface + earlier neighbor spill; this chunk's
-        // own feature blocks arrive through its fork afterwards
-        var unitMinY = unit.absoluteStart().blockY();
-        var settingsMinY = this.settings.minY();
+        // own feature blocks arrive through its fork afterwards. The unit's Y
+        // range comes from the instance dimension and may exceed the generator
+        // settings' range (nether/end terrain is 128 tall in a 256-tall world).
+        var yOffset = unit.absoluteStart().blockY() - this.settings.minY();
         modifier.setAllRelative((x, y, z) -> {
-            var index = unitMinY + y - settingsMinY;
-            if (index < 0 || index >= height) {
+            var terrainY = y + yOffset;
+            if (terrainY < 0 || terrainY >= height) {
                 return Block.AIR;
             }
-            var block = terrainBlocks[(x * sizeZ + z) * height + index];
+            var block = terrainBlocks[(x * sizeZ + z) * height + terrainY];
             return block != null ? block : Block.AIR;
         });
 
@@ -351,7 +352,8 @@ public final class WorldGenerator implements Generator {
                             configuredFeature.config(),
                             this.settings.randomState().seed(),
                             this.settings.minY(),
-                            this.settings.maxYInclusive());
+                            this.settings.maxYInclusive(),
+                            this.settings.seaLevel());
 
                     var featureImpl = configuredFeature.feature();
                     if (featureImpl instanceof RandomSelectorFeature randomSelector) {

@@ -129,7 +129,8 @@ public class VegetationPatchFeature implements Feature<VegetationPatchConfigurat
                 context.config(),
                 context.worldSeed(),
                 context.minY(),
-                context.maxY());
+                context.maxY(),
+                context.seaLevel());
         return RandomSelectorFeature.placePlacedFeature(vegetationContext, config.loader(), config.vegetationFeature());
     }
 }

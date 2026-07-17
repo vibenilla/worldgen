@@ -86,7 +86,7 @@ public final class FeaturePlaceSmoke {
             var successes = 0;
             for (var attempt = 0; attempt < 16; attempt++) {
                 var origin = new BlockVec(attempt * 32, originY, attempt * 32);
-                var context = new FeaturePlaceContext<>(world, random, origin, (rocks.minestom.worldgen.feature.FeatureConfiguration) configured.config(), 123456789L, -64, 319);
+                var context = new FeaturePlaceContext<>(world, random, origin, (rocks.minestom.worldgen.feature.FeatureConfiguration) configured.config(), 123456789L, -64, 319, 63);
                 boolean ok;
                 try {
                     var impl = configured.feature();

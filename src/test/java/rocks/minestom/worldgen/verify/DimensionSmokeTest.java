@@ -16,6 +16,10 @@ final class DimensionSmokeTest {
     @Test
     void allDimensionsGenerate() {
         MinecraftServer.init();
+        // Minestom logs-and-swallows generator exceptions; surface them here so
+        // a crashing dimension fails instead of passing on a partial chunk
+        var generationErrors = new java.util.concurrent.CopyOnWriteArrayList<Throwable>();
+        MinecraftServer.getExceptionManager().setExceptionHandler(generationErrors::add);
         var generators = new WorldGenerators(Path.of("data/mc/datapack"), 123456789L);
         var manager = MinecraftServer.getInstanceManager();
 
@@ -37,6 +41,7 @@ final class DimensionSmokeTest {
                 }
             }
             assertTrue(nonAir > 0, entry[0] + " generated no blocks");
+            assertTrue(generationErrors.isEmpty(), entry[0] + " generation threw: " + generationErrors);
             System.out.println(entry[0] + " non-air samples: " + nonAir);
         }
     }

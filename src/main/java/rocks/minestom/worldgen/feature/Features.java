@@ -45,6 +45,17 @@ public final class Features {
     public static final LargeDripstoneFeature LARGE_DRIPSTONE = new LargeDripstoneFeature();
     public static final LakeFeature LAKE = new LakeFeature();
     public static final MonsterRoomFeature MONSTER_ROOM = new MonsterRoomFeature();
+    public static final HugeFungusFeature HUGE_FUNGUS = new HugeFungusFeature();
+    public static final NetherForestVegetationFeature NETHER_FOREST_VEGETATION = new NetherForestVegetationFeature();
+    public static final TwistingVinesFeature TWISTING_VINES = new TwistingVinesFeature();
+    public static final WeepingVinesFeature WEEPING_VINES = new WeepingVinesFeature();
+    public static final VinesFeature VINES = new VinesFeature();
+    public static final SpringFeature SPRING = new SpringFeature();
+    public static final GlowstoneFeature GLOWSTONE_BLOB = new GlowstoneFeature();
+    public static final BasaltColumnsFeature BASALT_COLUMNS = new BasaltColumnsFeature();
+    public static final BasaltPillarFeature BASALT_PILLAR = new BasaltPillarFeature();
+    public static final DeltaFeature DELTA_FEATURE = new DeltaFeature();
+    public static final ReplaceBlobsFeature NETHERRACK_REPLACE_BLOBS = new ReplaceBlobsFeature();
 
     private static final Codec<TreeConfiguredFeature> TREE_CONFIGURED_FEATURE_CODEC = StructCodec.struct(
             "config", TreeConfiguration.CODEC, TreeConfiguredFeature::config,
@@ -271,17 +282,59 @@ public final class Features {
                 }
                 yield new ConfiguredFeature<>(new SequenceFeature(List.copyOf(features)), null);
             }
-            case "minecraft:bamboo", "minecraft:basalt_pillar", "minecraft:blue_ice",
+            case "minecraft:huge_fungus" -> {
+                var config = HugeFungusConfiguration.fromJson(obj.get("config"), blockTags);
+                yield new ConfiguredFeature<>(HUGE_FUNGUS, config);
+            }
+            case "minecraft:nether_forest_vegetation" -> {
+                var config = NetherForestVegetationConfig.CODEC.decode(Transcoder.JSON, obj.get("config")).orElseThrow();
+                yield new ConfiguredFeature<>(NETHER_FOREST_VEGETATION, config);
+            }
+            case "minecraft:twisting_vines" -> {
+                var config = TwistingVinesConfig.CODEC.decode(Transcoder.JSON, obj.get("config")).orElseThrow();
+                yield new ConfiguredFeature<>(TWISTING_VINES, config);
+            }
+            case "minecraft:weeping_vines" -> {
+                var config = NONE_CONFIGURED_FEATURE_CODEC.decode(Transcoder.JSON, obj).orElseThrow().config();
+                yield new ConfiguredFeature<>(WEEPING_VINES, config);
+            }
+            case "minecraft:vines" -> {
+                var config = NONE_CONFIGURED_FEATURE_CODEC.decode(Transcoder.JSON, obj).orElseThrow().config();
+                yield new ConfiguredFeature<>(VINES, config);
+            }
+            case "minecraft:spring_feature" -> {
+                var config = SpringConfiguration.fromJson(obj.get("config"), blockTags);
+                yield new ConfiguredFeature<>(SPRING, config);
+            }
+            case "minecraft:glowstone_blob" -> {
+                var config = NONE_CONFIGURED_FEATURE_CODEC.decode(Transcoder.JSON, obj).orElseThrow().config();
+                yield new ConfiguredFeature<>(GLOWSTONE_BLOB, config);
+            }
+            case "minecraft:basalt_columns" -> {
+                var config = ColumnFeatureConfiguration.fromJson(obj.get("config"));
+                yield new ConfiguredFeature<>(BASALT_COLUMNS, config);
+            }
+            case "minecraft:basalt_pillar" -> {
+                var config = NONE_CONFIGURED_FEATURE_CODEC.decode(Transcoder.JSON, obj).orElseThrow().config();
+                yield new ConfiguredFeature<>(BASALT_PILLAR, config);
+            }
+            case "minecraft:delta_feature" -> {
+                var config = DeltaFeatureConfiguration.fromJson(obj.get("config"));
+                yield new ConfiguredFeature<>(DELTA_FEATURE, config);
+            }
+            case "minecraft:netherrack_replace_blobs" -> {
+                var config = ReplaceSphereConfiguration.fromJson(obj.get("config"));
+                yield new ConfiguredFeature<>(NETHERRACK_REPLACE_BLOBS, config);
+            }
+            case "minecraft:bamboo", "minecraft:blue_ice",
                     "minecraft:bonus_chest", "minecraft:coral_claw", "minecraft:coral_mushroom",
-                    "minecraft:coral_tree", "minecraft:delta_feature", "minecraft:desert_well",
+                    "minecraft:coral_tree", "minecraft:desert_well",
                     "minecraft:end_gateway", "minecraft:end_island",
                     "minecraft:fill_layer", "minecraft:forest_rock", "minecraft:fossil", "minecraft:geode",
-                    "minecraft:glowstone_blob", "minecraft:huge_fungus", "minecraft:ice_spike",
+                    "minecraft:ice_spike",
                     "minecraft:iceberg",
                     "minecraft:no_op", "minecraft:root_system",
-                    "minecraft:sculk_patch", "minecraft:sea_pickle",
-                    "minecraft:spring_feature", "minecraft:twisting_vines", "minecraft:vines",
-                    "minecraft:weeping_vines" -> {
+                    "minecraft:sculk_patch", "minecraft:sea_pickle" -> {
                 yield new ConfiguredFeature<>(NO_OP, new NoneFeatureConfiguration());
             }
             default -> null;

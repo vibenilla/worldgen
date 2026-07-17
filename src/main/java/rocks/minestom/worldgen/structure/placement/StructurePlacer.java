@@ -637,7 +637,8 @@ public final class StructurePlacer {
                 configuredFeature.config(),
                 settings.randomState().seed(),
                 settings.minY(),
-                settings.maxYInclusive());
+                settings.maxYInclusive(),
+                settings.seaLevel());
 
         var featureImpl = configuredFeature.feature();
         if (featureImpl instanceof RandomSelectorFeature randomSelector) {
