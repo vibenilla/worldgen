@@ -303,3 +303,95 @@ tasks.register<JavaExec>("chunkVegReplay") {
         providers.gradleProperty("biome").getOrElse("minecraft:dark_forest")
     )
 }
+
+tasks.register<JavaExec>("locateOnly") {
+    group = "verification"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass = "rocks.minestom.worldgen.verify.LocateOnly"
+    jvmArgs("-Xmx4G")
+    args(
+        providers.gradleProperty("datapack").getOrElse("data/mc/datapack"),
+        providers.gradleProperty("seed").getOrElse("123456789"),
+        providers.gradleProperty("structure").getOrElse("minecraft:monument"),
+        providers.gradleProperty("centerX").getOrElse("0"),
+        providers.gradleProperty("centerZ").getOrElse("0"),
+        providers.gradleProperty("radiusChunks").getOrElse("100")
+    )
+}
+
+tasks.register<JavaExec>("monumentVerify") {
+    group = "verification"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass = "rocks.minestom.worldgen.verify.StructureVerify"
+    jvmArgs("-Xmx4G")
+    args(
+        providers.gradleProperty("vanillaWorld").getOrElse("data/vanilla-monument/world/dimensions/minecraft/overworld"),
+        providers.gradleProperty("datapack").getOrElse("data/mc/datapack"),
+        providers.gradleProperty("seed").getOrElse("123456789"),
+        providers.gradleProperty("minChunkX").getOrElse("-10"),
+        providers.gradleProperty("minChunkZ").getOrElse("-10"),
+        providers.gradleProperty("maxChunkX").getOrElse("10"),
+        providers.gradleProperty("maxChunkZ").getOrElse("10"),
+        providers.gradleProperty("nameFilter").getOrElse("Monument"),
+        providers.gradleProperty("locateKey").getOrElse("minecraft:monument")
+    )
+}
+
+tasks.register<JavaExec>("strongholdVerify") {
+    group = "verification"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass = "rocks.minestom.worldgen.verify.StructureVerify"
+    jvmArgs("-Xmx4G")
+    args(
+        providers.gradleProperty("vanillaWorld").getOrElse("data/vanilla-stronghold/world/dimensions/minecraft/overworld"),
+        providers.gradleProperty("datapack").getOrElse("data/mc/datapack"),
+        providers.gradleProperty("seed").getOrElse("123456789"),
+        providers.gradleProperty("minChunkX").getOrElse("-10"),
+        providers.gradleProperty("minChunkZ").getOrElse("-10"),
+        providers.gradleProperty("maxChunkX").getOrElse("10"),
+        providers.gradleProperty("maxChunkZ").getOrElse("10"),
+        providers.gradleProperty("nameFilter").getOrElse("Stronghold"),
+        providers.gradleProperty("locateKey").getOrElse("minecraft:stronghold")
+    )
+}
+
+tasks.register<JavaExec>("strongholdPieceDump") {
+    group = "verification"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass = "rocks.minestom.worldgen.verify.StrongholdPieceDump"
+    args(
+        providers.gradleProperty("vanillaWorld").getOrElse("data/vanilla-stronghold/world/dimensions/minecraft/overworld"),
+        providers.gradleProperty("chunkX").getOrElse("-70"),
+        providers.gradleProperty("chunkZ").getOrElse("-100")
+    )
+}
+
+tasks.register<JavaExec>("strongholdOurPieceDump") {
+    group = "verification"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass = "rocks.minestom.worldgen.verify.StrongholdOurPieceDump"
+    args(
+        providers.gradleProperty("datapack").getOrElse("data/mc/datapack"),
+        providers.gradleProperty("seed").getOrElse("123456789"),
+        providers.gradleProperty("chunkX").getOrElse("-70"),
+        providers.gradleProperty("chunkZ").getOrElse("-100")
+    )
+}
+
+tasks.register<JavaExec>("blockBoxPeek") {
+    group = "verification"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass = "rocks.minestom.worldgen.verify.BlockBoxPeek"
+    jvmArgs("-Xmx4G")
+    systemProperty("stronghold.debug", providers.gradleProperty("strongholdDebug").getOrElse(""))
+    args(
+        providers.gradleProperty("datapack").getOrElse("data/mc/datapack"),
+        providers.gradleProperty("seed").getOrElse("123456789"),
+        providers.gradleProperty("minX").getOrElse("0"),
+        providers.gradleProperty("minY").getOrElse("0"),
+        providers.gradleProperty("minZ").getOrElse("0"),
+        providers.gradleProperty("maxX").getOrElse("0"),
+        providers.gradleProperty("maxY").getOrElse("0"),
+        providers.gradleProperty("maxZ").getOrElse("0")
+    )
+}
