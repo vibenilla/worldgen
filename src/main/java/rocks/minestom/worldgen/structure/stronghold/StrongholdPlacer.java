@@ -14,6 +14,7 @@ import rocks.minestom.worldgen.structure.StructureWrites;
 import rocks.minestom.worldgen.structure.TerrainAdjustment;
 import rocks.minestom.worldgen.structure.loader.StructureLoader;
 import rocks.minestom.worldgen.structure.template.BoundingBox;
+import rocks.minestom.worldgen.structure.template.StructureShapeUpdater;
 import rocks.minestom.worldgen.terrain.Beardifier;
 import rocks.minestom.worldgen.terrain.TerrainGenerator;
 
@@ -94,11 +95,17 @@ public final class StrongholdPlacer {
         var forkUnit = unit.fork(
                 new BlockVec(startX, settings.minY(), startZ),
                 new BlockVec(startX + 16, settings.maxYInclusive() + 1, startZ + 16));
-        var forkAdapter = new GenerationUnitAdapter(forkUnit);
+        // The connection shape pass (fences, iron bars) reads neighbors
+        // across chunk boundaries, so the adapter needs the same live
+        // cross-chunk terrain access as regular feature decoration, not
+        // just an unbacked getter that always reads air.
+        var forkAdapter = new GenerationUnitAdapter(forkUnit, startX, startZ, 16, 16, settings.minY(),
+                chunkBlocks, settings.height(), StructureWrites.terrainLookup());
 
         var replayHandle = usingLiveBuffer ? null : surfaceHeights;
+        var shapeUpdatePositions = new ArrayList<BlockVec>();
         var level = new StrongholdLevel(forkAdapter, chunkBlocks, startX, startZ,
-                settings.minY(), settings.maxYInclusive(), replayHandle);
+                settings.minY(), settings.maxYInclusive(), replayHandle, shapeUpdatePositions);
         var chunkBB = new BoundingBox(startX, settings.minY() + 1, startZ,
                 startX + 15, settings.maxYInclusive(), startZ + 15);
 
@@ -127,6 +134,10 @@ public final class StrongholdPlacer {
                     }
                 }
             }
+        }
+
+        if (!shapeUpdatePositions.isEmpty()) {
+            StructureShapeUpdater.update(forkAdapter, this.structureLoader.blockTags(), shapeUpdatePositions);
         }
     }
 
