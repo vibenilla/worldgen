@@ -12,6 +12,8 @@ import rocks.minestom.worldgen.feature.FeatureLoader;
 import rocks.minestom.worldgen.feature.FeaturePlaceContext;
 import rocks.minestom.worldgen.feature.GenerationUnitAdapter;
 import rocks.minestom.worldgen.feature.RandomSelectorFeature;
+import rocks.minestom.worldgen.random.LegacyRandomSource;
+import rocks.minestom.worldgen.random.WorldgenRandom;
 import rocks.minestom.worldgen.structure.*;
 import rocks.minestom.worldgen.structure.assembly.JigsawAssembler;
 import rocks.minestom.worldgen.structure.loader.StructureLoader;
@@ -276,6 +278,12 @@ public final class StructurePlacer {
                 .orElse(null);
     }
 
+    /**
+     * Vanilla {@code ChunkGenerator} structure selection: a single-entry set
+     * generates directly, while multi-entry sets draw weighted picks from a
+     * per-chunk large-feature random, removing entries whose structure fails
+     * (wrong biome, failed assembly) until one succeeds or none remain.
+     */
     private StructureStart computeStart(Key structureSetId, StructureSet structureSet, int chunkX, int chunkZ,
             BiomeZoomer biomeZoomer, NoiseGeneratorSettingsRuntime settings) {
         var placement = structureSet.placement();
@@ -284,11 +292,46 @@ public final class StructurePlacer {
             return null;
         }
 
-        var structureKey = this.pickStructure(structureSetId, structureSet, settings);
-        if (structureKey == null) {
-            return null;
+        if (structureSet.structures().size() == 1) {
+            return this.tryBuildStart(structureSet.structures().getFirst().structure(), chunkX, chunkZ,
+                    biomeZoomer, settings);
         }
 
+        var options = new ArrayList<>(structureSet.structures());
+        var random = new WorldgenRandom(new LegacyRandomSource(0L));
+        random.setLargeFeatureSeed(settings.randomState().seed(), chunkX, chunkZ);
+        var total = 0;
+        for (var option : options) {
+            total += option.weight();
+        }
+
+        while (!options.isEmpty() && total > 0) {
+            var index = pickWeightedIndex(options, random.nextInt(total));
+            var selected = options.get(index);
+            var start = this.tryBuildStart(selected.structure(), chunkX, chunkZ, biomeZoomer, settings);
+            if (start != null) {
+                return start;
+            }
+            options.remove(index);
+            total -= selected.weight();
+        }
+        return null;
+    }
+
+    private static int pickWeightedIndex(List<StructureSet.StructureSelection> options, int choice) {
+        var index = 0;
+        for (var option : options) {
+            choice -= option.weight();
+            if (choice < 0) {
+                break;
+            }
+            index++;
+        }
+        return index;
+    }
+
+    private StructureStart tryBuildStart(Key structureKey, int chunkX, int chunkZ,
+            BiomeZoomer biomeZoomer, NoiseGeneratorSettingsRuntime settings) {
         var structure = this.structureLoader.getStructure(structureKey);
         if (structure == null) {
             return null;
@@ -511,28 +554,4 @@ public final class StructurePlacer {
             TerrainAdjustment terrainAdaptation) {
     }
 
-    private Key pickStructure(Key structureSetId, StructureSet structureSet, NoiseGeneratorSettingsRuntime settings) {
-        var randomFactory = settings.randomState().getOrCreateRandomFactory(Key.key("minecraft:structure_set"));
-        var random = randomFactory.fromHashOf(structureSetId.asString());
-
-        var totalWeight = 0;
-        for (var entry : structureSet.structures()) {
-            totalWeight += entry.weight();
-        }
-
-        if (totalWeight <= 0) {
-            return null;
-        }
-
-        var selected = random.nextInt(totalWeight);
-        var running = 0;
-        for (var entry : structureSet.structures()) {
-            running += entry.weight();
-            if (selected < running) {
-                return entry.structure();
-            }
-        }
-
-        return structureSet.structures().getFirst().structure();
-    }
 }
