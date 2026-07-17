@@ -22,5 +22,11 @@ jobs:
       - name: Add execute permissions for gradlew
         run: chmod +x gradlew
 
+      - name: Cache vanilla server
+        uses: actions/cache@v4
+        with:
+          path: data/mc/26.2
+          key: mc-26.2-v1
+
       - name: Build with Gradle
         run: ./gradlew build
