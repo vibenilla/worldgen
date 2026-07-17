@@ -53,6 +53,9 @@ public final class KelpFeature implements Feature<NoneFeatureConfiguration> {
 
     private static <T extends Block.Getter & Block.Setter> boolean canSurvive(T level, BlockVec position) {
         var below = level.getBlock(position.add(0, -1, 0));
+        if (below.compare(Block.MAGMA_BLOCK)) {
+            return false;
+        }
         return below.isSolid() || below.compare(Block.KELP) || below.compare(Block.KELP_PLANT);
     }
 }

@@ -26,7 +26,8 @@ public final class SeagrassFeature implements Feature<ProbabilityConfiguration> 
         }
 
         var tall = random.nextDouble() < context.config().probability();
-        if (!level.getBlock(grassPos.add(0, -1, 0)).isSolid()) {
+        var below = level.getBlock(grassPos.add(0, -1, 0));
+        if (!below.isSolid() || below.compare(Block.MAGMA_BLOCK)) {
             return false;
         }
 
