@@ -140,6 +140,118 @@ public final class StructurePlacer {
     }
 
     /**
+     * Finds the nearest chunk that starts the given structure, scanning
+     * outward in square rings from the center chunk like vanilla locate.
+     * Applies the same placement, weighted selection and biome checks as
+     * generation without assembling any pieces, so the returned position is
+     * the start candidate's chunk center at the raw terrain surface.
+     */
+    public BlockVec locateNearest(Key structureKey, int centerChunkX, int centerChunkZ, int radiusChunks,
+            BiomeZoomer biomeZoomer, NoiseGeneratorSettingsRuntime settings) {
+        var candidateSets = new ArrayList<Map.Entry<Key, StructureSet>>();
+        for (var structureSetId : this.structureSets) {
+            var structureSet = this.structureLoader.getStructureSet(structureSetId);
+            if (structureSet == null) {
+                continue;
+            }
+            for (var entry : structureSet.structures()) {
+                if (entry.structure().equals(structureKey)) {
+                    candidateSets.add(Map.entry(structureSetId, structureSet));
+                    break;
+                }
+            }
+        }
+        if (candidateSets.isEmpty()) {
+            return null;
+        }
+
+        for (var ring = 0; ring <= radiusChunks; ring++) {
+            BlockVec best = null;
+            var bestDistanceSquared = Long.MAX_VALUE;
+            for (var chunkX = centerChunkX - ring; chunkX <= centerChunkX + ring; chunkX++) {
+                for (var chunkZ = centerChunkZ - ring; chunkZ <= centerChunkZ + ring; chunkZ++) {
+                    if (Math.max(Math.abs(chunkX - centerChunkX), Math.abs(chunkZ - centerChunkZ)) != ring) {
+                        continue;
+                    }
+                    var candidate = this.startCandidate(structureKey, candidateSets, chunkX, chunkZ,
+                            biomeZoomer, settings);
+                    if (candidate == null) {
+                        continue;
+                    }
+                    var deltaX = (long) (chunkX - centerChunkX);
+                    var deltaZ = (long) (chunkZ - centerChunkZ);
+                    var distanceSquared = deltaX * deltaX + deltaZ * deltaZ;
+                    if (distanceSquared < bestDistanceSquared) {
+                        bestDistanceSquared = distanceSquared;
+                        best = candidate;
+                    }
+                }
+            }
+            if (best != null) {
+                return best;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The start position if the given structure would start in this chunk,
+     * mirroring {@link #computeStart}'s selection and biome checks without
+     * assembling pieces (like vanilla locate, assembly failures that would
+     * fall through to the next weighted option are not simulated).
+     */
+    private BlockVec startCandidate(Key structureKey, List<Map.Entry<Key, StructureSet>> candidateSets,
+            int chunkX, int chunkZ, BiomeZoomer biomeZoomer, NoiseGeneratorSettingsRuntime settings) {
+        for (var setEntry : candidateSets) {
+            var structureSet = setEntry.getValue();
+            if (!structureSet.placement().isStartChunk(chunkX, chunkZ, settings.randomState().seed(),
+                    settings.randomState().legacyRandomSource())) {
+                continue;
+            }
+
+            var centerX = (chunkX << 4) + 8;
+            var centerZ = (chunkZ << 4) + 8;
+            var surfaceY = this.surfaceYAt(chunkX, chunkZ, settings);
+            var biomeKey = biomeZoomer.biome(centerX, surfaceY, centerZ);
+
+            if (structureSet.structures().size() == 1) {
+                var only = structureSet.structures().getFirst().structure();
+                if (only.equals(structureKey) && this.biomeMatches(only, biomeKey)) {
+                    return new BlockVec(centerX, surfaceY, centerZ);
+                }
+                continue;
+            }
+
+            var options = new ArrayList<>(structureSet.structures());
+            var random = new WorldgenRandom(new LegacyRandomSource(0L));
+            random.setLargeFeatureSeed(settings.randomState().seed(), chunkX, chunkZ);
+            var total = 0;
+            for (var option : options) {
+                total += option.weight();
+            }
+
+            while (!options.isEmpty() && total > 0) {
+                var index = pickWeightedIndex(options, random.nextInt(total));
+                var selected = options.get(index);
+                if (this.biomeMatches(selected.structure(), biomeKey)) {
+                    if (selected.structure().equals(structureKey)) {
+                        return new BlockVec(centerX, surfaceY, centerZ);
+                    }
+                    break;
+                }
+                options.remove(index);
+                total -= selected.weight();
+            }
+        }
+        return null;
+    }
+
+    private boolean biomeMatches(Key structureKey, Key biomeKey) {
+        var structure = this.structureLoader.getStructure(structureKey);
+        return structure != null && structure.biomes().matches(biomeKey, this.structureLoader.biomeTags());
+    }
+
+    /**
      * Vanilla {@code Beardifier.forStructuresInChunk}: collects, from every
      * start with a terrain adaptation whose bounds intersect the chunk (the
      * structure-reference criterion), the rigid pool pieces within the

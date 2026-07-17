@@ -134,6 +134,19 @@ public final class WorldGenerator implements Generator {
     }
 
     /**
+     * Locates the nearest start of the given structure around a block
+     * position, scanning up to {@code radiusChunks} chunks outward, or null
+     * if none is found (or this dimension places no structures).
+     */
+    public BlockVec locateStructure(Key structureKey, int centerX, int centerZ, int radiusChunks) {
+        if (this.structurePlacer == null) {
+            return null;
+        }
+        return this.structurePlacer.locateNearest(structureKey, centerX >> 4, centerZ >> 4, radiusChunks,
+                this.biomeZoomer, this.settings);
+    }
+
+    /**
      * Applies the surface rules onto the terrain buffer, mirroring vanilla's
      * per-column scan (fluid keeps the stone-depth-above run, air resets it;
      * rules only replace the default block).
