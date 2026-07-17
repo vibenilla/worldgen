@@ -117,8 +117,14 @@ public final class WorldGenerator implements Generator {
 
         // Single blit of terrain + surface + earlier neighbor spill; this chunk's
         // own feature blocks arrive through its fork afterwards
+        var unitMinY = unit.absoluteStart().blockY();
+        var settingsMinY = this.settings.minY();
         modifier.setAllRelative((x, y, z) -> {
-            var block = terrainBlocks[(x * sizeZ + z) * height + y];
+            var index = unitMinY + y - settingsMinY;
+            if (index < 0 || index >= height) {
+                return Block.AIR;
+            }
+            var block = terrainBlocks[(x * sizeZ + z) * height + index];
             return block != null ? block : Block.AIR;
         });
 
