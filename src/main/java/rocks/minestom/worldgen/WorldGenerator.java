@@ -41,12 +41,18 @@ public final class WorldGenerator implements Generator {
     private final BiomeZoomer biomeZoomer;
     private final BiomeResolver biomeResolver;
     private final FeatureLoader featureLoader;
-    private static final int MAX_CACHED_TERRAIN = 256;
+    // Must comfortably exceed a pregen run's whole working set: evicting an
+    // already-decorated chunk here silently discards its feature writes, since
+    // the recomputed replacement only has terrain, surface, and carvers again
+    private static final int MAX_CACHED_TERRAIN = 3000;
 
     private final StructurePlacer structurePlacer;
     private final boolean generateEndStructures;
     private final Carvers carvers;
-    private final Set<Long> generatedChunks = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    // A chunk is blitted long before its own decoration finishes; spill writes
+    // arriving in that window must still land chronologically, so writePending
+    // only switches to the live (fork) path once decoration is fully done
+    private final Set<Long> fullyDecorated = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final Map<Long, Map<Integer, Block>> pendingCrossWrites = new java.util.concurrent.ConcurrentHashMap<>();
 
     private final GenerationUnitAdapter.TerrainLookup terrainAccess = new GenerationUnitAdapter.TerrainLookup() {
@@ -56,11 +62,25 @@ public final class WorldGenerator implements Generator {
         }
 
         @Override
-        public boolean writePending(int chunkX, int chunkZ, int bufferIndex, Block block) {
+        public boolean writePending(int chunkX, int chunkZ, int bufferIndex, Block block, Block previousBlock) {
             var key = (long) chunkX << 32 | (chunkZ & 0xFFFFFFFFL);
-            if (WorldGenerator.this.generatedChunks.contains(key)) {
+            if (WorldGenerator.this.fullyDecorated.contains(key)) {
                 return false;
             }
+
+            // Only replace-style writes (a feature overwriting an already
+            // solid block, like the granite/andesite/diorite blobs replacing
+            // stone or each other) need deferred replay so the target's own
+            // decoration can still land on top of them. Placement-style
+            // writes onto air (foliage, vines) keep the original immediate
+            // write: deferring those only delays their first appearance,
+            // which double-applies fine but was measured to lose ground in
+            // foliage-heavy biomes since the target chunk's own reads during
+            // decoration already see the immediate write either way
+            if (previousBlock == null || previousBlock.isAir()) {
+                return false;
+            }
+
             WorldGenerator.this.pendingCrossWrites
                     .computeIfAbsent(key, mapKey -> new java.util.concurrent.ConcurrentHashMap<>())
                     .put(bufferIndex, block);
@@ -113,7 +133,6 @@ public final class WorldGenerator implements Generator {
                 terrainBlocks[entry.getKey()] = entry.getValue();
             }
         }
-        this.generatedChunks.add(chunkKey);
 
         // Single blit of terrain + surface + earlier neighbor spill; this chunk's
         // own feature blocks arrive through its fork afterwards. The unit's Y
@@ -138,6 +157,44 @@ public final class WorldGenerator implements Generator {
         }
 
         this.placeFeatures(unit, terrainData);
+
+        // This chunk is now fully decorated: replace-style writes queued by
+        // neighbors while it was mid-decoration must be replayed directly onto
+        // the already-blitted chunk (its own terrain blit will never run
+        // again), landing on top of its decoration exactly like a live spill
+        // would
+        this.fullyDecorated.add(chunkKey);
+        this.applyLateSpillWrites(unit, chunkKey, height);
+    }
+
+    /**
+     * Replays the cross-chunk writes queued for this chunk while it was
+     * mid-decoration, translating each terrain-buffer index back into a
+     * position relative to the unit and writing it through the modifier so
+     * it lands directly on the already-blitted chunk.
+     */
+    private void applyLateSpillWrites(GenerationUnit unit, long chunkKey, int height) {
+        var lateWrites = this.pendingCrossWrites.remove(chunkKey);
+        if (lateWrites == null) {
+            return;
+        }
+
+        var minY = this.settings.minY();
+        var unitStartY = unit.absoluteStart().blockY();
+        var unitSizeY = unit.size().blockY();
+        var lateModifier = unit.modifier();
+        for (var entry : lateWrites.entrySet()) {
+            var bufferIndex = entry.getKey();
+            var yIndex = bufferIndex % height;
+            var remainder = bufferIndex / height;
+            var localZ = remainder % 16;
+            var localX = remainder / 16;
+            var localY = (minY + yIndex) - unitStartY;
+            if (localY < 0 || localY >= unitSizeY) {
+                continue;
+            }
+            lateModifier.setRelative(localX, localY, localZ, entry.getValue());
+        }
     }
 
     /**

@@ -35,8 +35,12 @@ public final class GenerationUnitAdapter implements Block.Getter, Block.Setter {
          * preserving vanilla's chronological write order (the target chunk's
          * own decoration must land on top). Returns false when the chunk is
          * already generated and the write must go through the fork instead.
+         * {@code previousBlock} is whatever the target position held before
+         * this write, so callers can tell a replace-style write (ore blobs
+         * overwriting stone with a different rock type) from a placement-style
+         * write (foliage appearing over air).
          */
-        default boolean writePending(int chunkX, int chunkZ, int bufferIndex, Block block) {
+        default boolean writePending(int chunkX, int chunkZ, int bufferIndex, Block block, Block previousBlock) {
             return false;
         }
     }
@@ -138,8 +142,9 @@ public final class GenerationUnitAdapter implements Block.Getter, Block.Setter {
                 var neighborChunkZ = position.blockZ() >> 4;
                 var neighborIndex = ((position.blockX() & 15) * 16 + (position.blockZ() & 15)) * this.terrainHeight + yIndex;
                 var neighbor = this.terrainLookup.terrain(neighborChunkX, neighborChunkZ);
+                var previousBlock = neighbor.blocks()[neighborIndex];
                 neighbor.blocks()[neighborIndex] = block;
-                if (this.terrainLookup.writePending(neighborChunkX, neighborChunkZ, neighborIndex, block)) {
+                if (this.terrainLookup.writePending(neighborChunkX, neighborChunkZ, neighborIndex, block, previousBlock)) {
                     // Not blitted yet: the write arrives via the neighbor's own
                     // blit so its later decoration stays on top (vanilla order)
                     return;
