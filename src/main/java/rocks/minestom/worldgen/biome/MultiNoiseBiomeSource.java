@@ -1,6 +1,9 @@
 package rocks.minestom.worldgen.biome;
 
 import net.kyori.adventure.key.Key;
+import rocks.minestom.worldgen.density.DensityFunction;
+
+import java.util.List;
 
 /**
  * Biome source that selects biomes by comparing multi-noise climate samples to parameter ranges.
@@ -11,5 +14,15 @@ public record MultiNoiseBiomeSource(ClimateSampler sampler, Climate.ParameterLis
     @Override
     public Key biome(int quartX, int quartY, int quartZ) {
         return this.parameters.findValue(this.sampler.sample(quartX, quartY, quartZ));
+    }
+
+    @Override
+    public Key biome(int quartX, int quartY, int quartZ, DensityFunction.Context context) {
+        return this.parameters.findValue(this.sampler.sample(context));
+    }
+
+    @Override
+    public List<Key> possibleBiomes() {
+        return this.parameters.values().stream().map(Pair::second).distinct().toList();
     }
 }

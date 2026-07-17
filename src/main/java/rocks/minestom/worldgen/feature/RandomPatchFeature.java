@@ -38,6 +38,7 @@ public final class RandomPatchFeature implements Feature<RandomPatchConfiguratio
                 context.maxY(),
                 context.minY(),
                 null,
+                null,
                 null);
 
         var placed = false;

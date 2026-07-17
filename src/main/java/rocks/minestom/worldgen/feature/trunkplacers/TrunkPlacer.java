@@ -31,7 +31,7 @@ public interface TrunkPlacer {
             TreeConfiguration config
     ) {
         if (this.isValidTreePosition(getter, pos)) {
-            logSetter.accept(pos, config.trunkProvider().getState(random, pos));
+            logSetter.accept(pos, config.trunkProvider().getState(getter, random, pos));
             return true;
         }
         return false;
@@ -42,18 +42,26 @@ public interface TrunkPlacer {
     }
 
     default boolean isFree(Block.Getter getter, BlockVec pos) {
-        if (!this.isValidTreePosition(getter, pos)) {
-            var block = getter.getBlock(pos);
-
-            return block.compare(Block.OAK_LOG) || block.compare(Block.SPRUCE_LOG) ||
-                    block.compare(Block.BIRCH_LOG) || block.compare(Block.JUNGLE_LOG) ||
-                    block.compare(Block.ACACIA_LOG) || block.compare(Block.DARK_OAK_LOG) ||
-                    block.compare(Block.CHERRY_LOG) || block.compare(Block.MANGROVE_LOG);
-        }
-
-        return true;
+        return this.isValidTreePosition(getter, pos) || isLog(getter.getBlock(pos));
     }
 
+    /**
+     * Vanilla's {@code #minecraft:logs} block tag: every log/wood variant plus
+     * bamboo blocks and the nether stems.
+     */
+    static boolean isLog(Block block) {
+        var name = block.name();
+        return name.endsWith("_log") || name.endsWith("_wood")
+                || name.equals("minecraft:bamboo_block") || name.equals("minecraft:stripped_bamboo_block")
+                || name.equals("minecraft:crimson_stem") || name.equals("minecraft:stripped_crimson_stem")
+                || name.equals("minecraft:warped_stem") || name.equals("minecraft:stripped_warped_stem");
+    }
+
+    /**
+     * Vanilla 26.2 {@code placeBelowTrunkBlock}: the below trunk provider (a
+     * rule based provider in the vanilla datapack) decides whether anything is
+     * placed. When it provides no state, the position is left untouched.
+     */
     static void setDirtAt(
             Block.Getter getter,
             BiConsumer<BlockVec, Block> blockSetter,
@@ -61,9 +69,14 @@ public interface TrunkPlacer {
             BlockVec pos,
             TreeConfiguration config
     ) {
-        var block = getter.getBlock(pos);
-        if (config.forceDirt() || !Feature.isDirt(block) || block.compare(Block.GRASS_BLOCK) || block.compare(Block.MYCELIUM)) {
-            blockSetter.accept(pos, config.dirtProvider().getState(random, pos));
+        var provider = config.belowTrunkProvider();
+        if (provider == null) {
+            return;
+        }
+
+        var state = provider.getOptionalState(getter, random, pos);
+        if (state != null) {
+            blockSetter.accept(pos, state);
         }
     }
 }

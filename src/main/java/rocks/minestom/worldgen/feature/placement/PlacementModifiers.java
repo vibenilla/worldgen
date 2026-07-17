@@ -12,7 +12,8 @@ import rocks.minestom.worldgen.VMath;
 import rocks.minestom.worldgen.feature.valueproviders.IntProvider;
 import rocks.minestom.worldgen.noise.SimplexNoise;
 import rocks.minestom.worldgen.random.RandomSource;
-import rocks.minestom.worldgen.random.XoroshiroRandomSource;
+import rocks.minestom.worldgen.random.LegacyRandomSource;
+import rocks.minestom.worldgen.structure.context.BlockTagManager;
 import rocks.minestom.worldgen.surface.VerticalAnchor;
 
 import java.util.ArrayList;
@@ -21,9 +22,31 @@ import java.util.List;
 import java.util.Set;
 
 public final class PlacementModifiers {
-    private static final SimplexNoise BIOME_INFO_NOISE = new SimplexNoise(new XoroshiroRandomSource(2345L));
+    // Vanilla Biome.BIOME_INFO_NOISE: PerlinSimplexNoise over a legacy random;
+    // with octave set [0] the wrapper is identity, so a single simplex suffices
+    private static final SimplexNoise BIOME_INFO_NOISE = new SimplexNoise(new LegacyRandomSource(2345L));
+
+    /**
+     * Block tag manager for the configured feature currently being parsed.
+     * Set by {@code Features.parseConfiguredFeature} so that nested parses
+     * (inline placed features, state provider rules) can resolve block tags
+     * without threading the manager through every codec.
+     */
+    private static final ThreadLocal<BlockTagManager> CURRENT_BLOCK_TAGS = new ThreadLocal<>();
 
     private PlacementModifiers() {
+    }
+
+    public static BlockTagManager currentBlockTags() {
+        return CURRENT_BLOCK_TAGS.get();
+    }
+
+    public static void currentBlockTags(BlockTagManager blockTags) {
+        if (blockTags == null) {
+            CURRENT_BLOCK_TAGS.remove();
+        } else {
+            CURRENT_BLOCK_TAGS.set(blockTags);
+        }
     }
 
     public static List<PlacementModifier> parse(JsonArray placementArray) {
@@ -129,9 +152,24 @@ public final class PlacementModifiers {
     }
 
     public static BlockPredicate parseBlockPredicate(JsonObject object) {
+        return parseBlockPredicate(object, currentBlockTags());
+    }
+
+    public static BlockPredicate parseBlockPredicate(JsonObject object, BlockTagManager blockTags) {
         var type = Key.key(object.get("type").getAsString()).asString();
         return switch (type) {
+            case "minecraft:true" -> new AlwaysTrueBlockPredicate();
             case "minecraft:matching_blocks" -> new MatchingBlocksPredicate(parseBlocks(object.get("blocks")), parseOffset(object));
+            case "minecraft:matching_block_tag" -> {
+                if (blockTags == null) {
+                    // No tag manager available in this parse context; keep the
+                    // historical always-true fallback rather than a never-matching set.
+                    yield new AlwaysTrueBlockPredicate();
+                }
+
+                var tag = Key.key(object.get("tag").getAsString());
+                yield new MatchingBlocksPredicate(resolveTag(tag, blockTags), parseOffset(object));
+            }
             case "minecraft:matching_fluids" -> new MatchingFluidsPredicate(parseFluids(object.get("fluids")), parseOffset(object));
             case "minecraft:would_survive" -> new WouldSurvivePredicate(
                     object.has("state") ? object.getAsJsonObject("state") : null,
@@ -139,18 +177,18 @@ public final class PlacementModifiers {
             case "minecraft:all_of" -> {
                 var predicates = new ArrayList<BlockPredicate>();
                 for (var predicate : object.getAsJsonArray("predicates")) {
-                    predicates.add(parseBlockPredicate(predicate.getAsJsonObject()));
+                    predicates.add(parseBlockPredicate(predicate.getAsJsonObject(), blockTags));
                 }
                 yield new AllOfPredicate(predicates);
             }
             case "minecraft:any_of" -> {
                 var predicates = new ArrayList<BlockPredicate>();
                 for (var predicate : object.getAsJsonArray("predicates")) {
-                    predicates.add(parseBlockPredicate(predicate.getAsJsonObject()));
+                    predicates.add(parseBlockPredicate(predicate.getAsJsonObject(), blockTags));
                 }
                 yield new AnyOfPredicate(predicates);
             }
-            case "minecraft:not" -> new NotPredicate(parseBlockPredicate(object.getAsJsonObject("predicate")));
+            case "minecraft:not" -> new NotPredicate(parseBlockPredicate(object.getAsJsonObject("predicate"), blockTags));
             case "minecraft:inside_world_bounds" -> new InsideWorldBoundsPredicate(parseOffset(object));
             case "minecraft:solid" -> new SolidPredicate(parseOffset(object));
             case "minecraft:has_sturdy_face" -> new HasSturdyFacePredicate(
@@ -158,6 +196,12 @@ public final class PlacementModifiers {
                     parseOffset(object));
             default -> new AlwaysTrueBlockPredicate();
         };
+    }
+
+    private static Set<Key> resolveTag(Key tag, BlockTagManager blockTags) {
+        synchronized (blockTags) {
+            return blockTags.blocks(tag);
+        }
     }
 
     private static Set<Key> parseBlocks(JsonElement value) {
@@ -226,10 +270,15 @@ public final class PlacementModifiers {
         }
 
     private static final class InSquareModifier implements PlacementModifier {
+        private static final boolean DEBUG = Boolean.getBoolean("worldgen.debugInSquare");
+
         @Override
         public List<BlockVec> apply(PlacementContext context, rocks.minestom.worldgen.random.RandomSource random, BlockVec position) {
             var x = position.blockX() + random.nextInt(16);
             var z = position.blockZ() + random.nextInt(16);
+            if (DEBUG) {
+                System.out.println("INSQ " + position.blockX() + "," + position.blockZ() + " -> " + x + "," + z);
+            }
             return List.of(new BlockVec(x, position.blockY(), z));
         }
     }
@@ -237,11 +286,7 @@ public final class PlacementModifiers {
     private static final class BiomeModifier implements PlacementModifier {
         @Override
         public List<BlockVec> apply(PlacementContext context, rocks.minestom.worldgen.random.RandomSource random, BlockVec position) {
-            if (context.sourceBiome() == null) {
-                return List.of(position);
-            }
-
-            if (context.biomeAt(position).equals(context.sourceBiome())) {
+            if (context.currentFeatureInBiomeAt(position)) {
                 return List.of(position);
             }
             return List.of();
@@ -481,6 +526,18 @@ public final class PlacementModifiers {
         }
 
     private record WouldSurvivePredicate(Block state, BlockVec offset) implements BlockPredicate {
+
+            /**
+             * Vanilla's 26.2 {@code #minecraft:supports_vegetation} block tag
+             * (what saplings and other {@code VegetationBlock}s survive on).
+             */
+            private static final java.util.Set<String> SUPPORTS_VEGETATION = java.util.Set.of(
+                    "minecraft:dirt", "minecraft:coarse_dirt", "minecraft:rooted_dirt",
+                    "minecraft:mud", "minecraft:muddy_mangrove_roots",
+                    "minecraft:moss_block", "minecraft:pale_moss_block",
+                    "minecraft:grass_block", "minecraft:podzol", "minecraft:mycelium",
+                    "minecraft:farmland");
+
             private WouldSurvivePredicate(JsonObject state, BlockVec offset) {
                 this(state == null ? Block.AIR : BlockCodec.CODEC.decode(Transcoder.JSON, state).orElse(Block.AIR),
                         offset);
@@ -488,19 +545,21 @@ public final class PlacementModifiers {
 
             @Override
             public boolean test(PlacementContext context, BlockVec position) {
+                // Vanilla evaluates state.canSurvive(level, pos): survival only
+                // looks at the supporting block, never at the target content
                 var targetPosition = position.add(this.offset.blockX(), this.offset.blockY(), this.offset.blockZ());
-                var targetBlock = context.accessor().getBlock(targetPosition);
-                if (!targetBlock.isAir()) {
-                    return false;
-                }
-
                 var below = context.accessor().getBlock(targetPosition.sub(0, 1, 0));
+
                 if (this.state.compare(Block.CACTUS)) {
                     return below.compare(Block.SAND) || below.compare(Block.RED_SAND) || below.compare(Block.CACTUS);
                 }
 
                 if (this.state.compare(Block.MANGROVE_PROPAGULE)) {
-                    return below.compare(Block.MUD) || below.registry().isSolid();
+                    return SUPPORTS_VEGETATION.contains(below.name()) || below.compare(Block.CLAY);
+                }
+
+                if (this.state.name().endsWith("_sapling") || this.state.compare(Block.BAMBOO)) {
+                    return SUPPORTS_VEGETATION.contains(below.name());
                 }
 
                 return below.registry().isSolid();
@@ -568,9 +627,10 @@ public final class PlacementModifiers {
 
         @Override
             public boolean test(PlacementContext context, BlockVec position) {
+                // Vanilla: the block AT position+offset must have a sturdy face in
+                // the given direction (isFaceSturdy); solid full blocks approximate it.
                 var targetPosition = position.add(this.offset.blockX(), this.offset.blockY(), this.offset.blockZ());
-                var supportPosition = targetPosition.add(-this.direction.stepX, -this.direction.stepY, -this.direction.stepZ);
-                return context.accessor().getBlock(supportPosition).registry().isSolid();
+                return context.accessor().getBlock(targetPosition).registry().isSolid();
             }
         }
 
@@ -601,8 +661,16 @@ public final class PlacementModifiers {
         int sample(rocks.minestom.worldgen.random.RandomSource random, PlacementContext context);
 
         static HeightProvider parse(JsonObject object) {
+            if (!object.has("type")) {
+                // Bare vertical anchor, e.g. {"absolute": 62}
+                return new ConstantAnchorHeightProvider(
+                        VerticalAnchor.CODEC.decode(net.minestom.server.codec.Transcoder.JSON, object).orElseThrow());
+            }
+
             var type = Key.key(object.get("type").getAsString()).asString();
             return switch (type) {
+                case "minecraft:constant" -> new ConstantAnchorHeightProvider(
+                        VerticalAnchor.CODEC.decode(net.minestom.server.codec.Transcoder.JSON, object.get("value")).orElseThrow());
                 case "minecraft:uniform" -> new UniformHeightProvider(
                         VerticalAnchor.CODEC.decode(net.minestom.server.codec.Transcoder.JSON, object.get("min_inclusive")).orElseThrow(),
                         VerticalAnchor.CODEC.decode(net.minestom.server.codec.Transcoder.JSON, object.get("max_inclusive")).orElseThrow());
@@ -610,19 +678,24 @@ public final class PlacementModifiers {
                         VerticalAnchor.CODEC.decode(net.minestom.server.codec.Transcoder.JSON, object.get("min_inclusive")).orElseThrow(),
                         VerticalAnchor.CODEC.decode(net.minestom.server.codec.Transcoder.JSON, object.get("max_inclusive")).orElseThrow(),
                         object.has("plateau") ? object.get("plateau").getAsInt() : 0);
-                case "minecraft:biased_to_bottom", "minecraft:very_biased_to_bottom" -> new BiasedToBottomHeightProvider(
+                case "minecraft:biased_to_bottom" -> new BiasedToBottomHeightProvider(
                         VerticalAnchor.CODEC.decode(net.minestom.server.codec.Transcoder.JSON, object.get("min_inclusive")).orElseThrow(),
-                        VerticalAnchor.CODEC.decode(net.minestom.server.codec.Transcoder.JSON, object.get("max_inclusive")).orElseThrow());
-                default -> new ConstantHeightProvider(PlacementContext::seaLevel);
+                        VerticalAnchor.CODEC.decode(net.minestom.server.codec.Transcoder.JSON, object.get("max_inclusive")).orElseThrow(),
+                        object.has("inner") ? object.get("inner").getAsInt() : 1);
+                case "minecraft:very_biased_to_bottom" -> new VeryBiasedToBottomHeightProvider(
+                        VerticalAnchor.CODEC.decode(net.minestom.server.codec.Transcoder.JSON, object.get("min_inclusive")).orElseThrow(),
+                        VerticalAnchor.CODEC.decode(net.minestom.server.codec.Transcoder.JSON, object.get("max_inclusive")).orElseThrow(),
+                        object.has("inner") ? object.get("inner").getAsInt() : 1);
+                default -> new ConstantAnchorHeightProvider(
+                        VerticalAnchor.CODEC.decode(net.minestom.server.codec.Transcoder.JSON, object).orElseThrow());
             };
         }
     }
 
-    private record ConstantHeightProvider(java.util.function.Function<PlacementContext, Integer> valueProvider)
-            implements HeightProvider {
+    private record ConstantAnchorHeightProvider(VerticalAnchor anchor) implements HeightProvider {
         @Override
         public int sample(rocks.minestom.worldgen.random.RandomSource random, PlacementContext context) {
-            return this.valueProvider.apply(context);
+            return this.anchor.resolveY(context.minY(), context.maxY());
         }
     }
 
@@ -631,7 +704,7 @@ public final class PlacementModifiers {
         public int sample(rocks.minestom.worldgen.random.RandomSource random, PlacementContext context) {
             var minY = this.minInclusive.resolveY(context.minY(), context.maxY());
             var maxY = this.maxInclusive.resolveY(context.minY(), context.maxY());
-            if (maxY <= minY) {
+            if (minY > maxY) {
                 return minY;
             }
             return minY + random.nextInt(maxY - minY + 1);
@@ -644,33 +717,54 @@ public final class PlacementModifiers {
         public int sample(rocks.minestom.worldgen.random.RandomSource random, PlacementContext context) {
             var minY = this.minInclusive.resolveY(context.minY(), context.maxY());
             var maxY = this.maxInclusive.resolveY(context.minY(), context.maxY());
-            if (maxY <= minY) {
+            if (minY > maxY) {
                 return minY;
             }
 
-            var span = maxY - minY;
-            var plateauSize = Math.max(0, Math.min(this.plateau, span));
-            var slope = (span - plateauSize) / 2;
-            if (slope <= 0) {
-                return minY + random.nextInt(span + 1);
+            var range = maxY - minY;
+            if (this.plateau >= range) {
+                return minY + random.nextInt(range + 1);
             }
 
-            var randomSample = random.nextInt(span + slope + 1) - random.nextInt(slope + 1);
-            var clamped = VMath.clamp(minY + randomSample, minY, maxY);
-            return (int) clamped;
+            var plateauStart = (range - this.plateau) / 2;
+            var plateauEnd = range - plateauStart;
+            return minY + random.nextInt(plateauEnd + 1) + random.nextInt(plateauStart + 1);
         }
     }
 
-    private record BiasedToBottomHeightProvider(VerticalAnchor minInclusive, VerticalAnchor maxInclusive) implements HeightProvider {
+    private record BiasedToBottomHeightProvider(VerticalAnchor minInclusive, VerticalAnchor maxInclusive, int inner)
+            implements HeightProvider {
         @Override
         public int sample(rocks.minestom.worldgen.random.RandomSource random, PlacementContext context) {
             var minY = this.minInclusive.resolveY(context.minY(), context.maxY());
             var maxY = this.maxInclusive.resolveY(context.minY(), context.maxY());
-            if (maxY <= minY) {
+            if (maxY - minY - this.inner + 1 <= 0) {
                 return minY;
             }
 
-            return minY + random.nextInt(random.nextInt(maxY - minY + 1) + 1);
+            var limit = random.nextInt(maxY - minY - this.inner + 1);
+            return random.nextInt(limit + this.inner) + minY;
+        }
+    }
+
+    private record VeryBiasedToBottomHeightProvider(VerticalAnchor minInclusive, VerticalAnchor maxInclusive, int inner)
+            implements HeightProvider {
+        @Override
+        public int sample(rocks.minestom.worldgen.random.RandomSource random, PlacementContext context) {
+            var minY = this.minInclusive.resolveY(context.minY(), context.maxY());
+            var maxY = this.maxInclusive.resolveY(context.minY(), context.maxY());
+            if (maxY - minY - this.inner + 1 <= 0) {
+                return minY;
+            }
+
+            var upperInclusive = nextIntBetween(random, minY + this.inner, maxY);
+            var biasedUpperInclusive = nextIntBetween(random, minY, upperInclusive - 1);
+            return nextIntBetween(random, minY, biasedUpperInclusive - 1 + this.inner);
+        }
+
+        // Vanilla Mth.nextInt: no draw when the range is empty or a single value
+        private static int nextIntBetween(rocks.minestom.worldgen.random.RandomSource random, int minInclusive, int maxInclusive) {
+            return minInclusive >= maxInclusive ? minInclusive : random.nextInt(maxInclusive - minInclusive + 1) + minInclusive;
         }
     }
 }

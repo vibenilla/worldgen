@@ -18,6 +18,14 @@ public final class BiomeZoomer {
         this.zoomSeed = zoomSeed;
     }
 
+    /**
+     * The unzoomed quart-resolution biome source backing this zoomer, used by
+     * structure placement which samples noise biomes without the zoom offset.
+     */
+    public BiomeSource source() {
+        return this.source;
+    }
+
     public static long obfuscateSeed(long seed) {
         try {
             var digest = MessageDigest.getInstance("SHA-256");

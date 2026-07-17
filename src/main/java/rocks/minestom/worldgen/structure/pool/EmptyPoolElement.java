@@ -1,15 +1,37 @@
 package rocks.minestom.worldgen.structure.pool;
 
+import net.minestom.server.coordinate.BlockVec;
+import rocks.minestom.worldgen.random.RandomSource;
+import rocks.minestom.worldgen.structure.loader.StructureLoader;
+import rocks.minestom.worldgen.structure.template.BoundingBox;
+import rocks.minestom.worldgen.structure.template.JigsawBlockInfo;
+import rocks.minestom.worldgen.structure.template.Rotation;
+
+import java.util.List;
+
 /**
- * A pool element that places nothing and terminates jigsaw expansion.
- *
- * <p>When the assembler picks an empty element, it stops trying to place
- * pieces at that jigsaw connection. This is used in pools where expansion
- * should sometimes end (e.g., village streets that don't always continue).
+ * Vanilla {@code EmptyPoolElement}: a terminator that stops jigsaw expansion.
+ * Identity-compared against {@link #INSTANCE} like vanilla.
  */
 public final class EmptyPoolElement implements PoolElement {
     public static final EmptyPoolElement INSTANCE = new EmptyPoolElement();
 
     private EmptyPoolElement() {
+    }
+
+    @Override
+    public Projection projection() {
+        return Projection.TERRAIN_MATCHING;
+    }
+
+    @Override
+    public List<JigsawBlockInfo> getShuffledJigsawBlocks(StructureLoader loader, BlockVec position, Rotation rotation,
+            RandomSource random) {
+        return List.of();
+    }
+
+    @Override
+    public BoundingBox getBoundingBox(StructureLoader loader, BlockVec position, Rotation rotation) {
+        throw new IllegalStateException("Invalid call to EmptyPoolElement.getBoundingBox, filter me!");
     }
 }

@@ -18,10 +18,18 @@ public record UniformIntProvider(int minInclusive, int maxInclusive) implements 
     }
 
     @Override
+    public int minValue() {
+        return this.minInclusive;
+    }
+
+    @Override
+    public int maxValue() {
+        return this.maxInclusive;
+    }
+
+    @Override
     public int sample(RandomSource random) {
-        if (this.minInclusive == this.maxInclusive) {
-            return this.minInclusive;
-        }
+        // No min==max shortcut: vanilla always consumes one draw here
         return this.minInclusive + random.nextInt(this.maxInclusive - this.minInclusive + 1);
     }
 }

@@ -37,7 +37,8 @@ public record DarkOakTrunkPlacer(int baseHeight, int heightRandA, int heightRand
         TrunkPlacer.setDirtAt(getter, logSetter, random, below.add(0, 0, 1), config);
         TrunkPlacer.setDirtAt(getter, logSetter, random, below.add(1, 0, 1), config);
 
-        var direction = HorizontalDirection.random(random);
+        var direction = rocks.minestom.worldgen.feature.Direction.HORIZONTAL.get(
+                random.nextInt(rocks.minestom.worldgen.feature.Direction.HORIZONTAL.size()));
         var bendStart = freeTreeHeight - random.nextInt(4);
         var bendLength = 2 - random.nextInt(3);
 
@@ -51,17 +52,20 @@ public record DarkOakTrunkPlacer(int baseHeight, int heightRandA, int heightRand
 
         for (var trunkIndex = 0; trunkIndex < freeTreeHeight; trunkIndex++) {
             if (trunkIndex >= bendStart && bendLength > 0) {
-                trunkX += direction.stepX;
-                trunkZ += direction.stepZ;
+                trunkX += direction.stepX();
+                trunkZ += direction.stepZ();
                 bendLength--;
             }
 
             var blockY = baseY + trunkIndex;
             var logPos = new BlockVec(trunkX, blockY, trunkZ);
-            this.placeLog(getter, logSetter, random, logPos, config);
-            this.placeLog(getter, logSetter, random, logPos.add(1, 0, 0), config);
-            this.placeLog(getter, logSetter, random, logPos.add(0, 0, 1), config);
-            this.placeLog(getter, logSetter, random, logPos.add(1, 0, 1), config);
+            // Vanilla gates each 2x2 layer on the corner being air or leaves
+            if (isAirOrLeaves(getter, logPos)) {
+                this.placeLog(getter, logSetter, random, logPos, config);
+                this.placeLog(getter, logSetter, random, logPos.add(1, 0, 0), config);
+                this.placeLog(getter, logSetter, random, logPos.add(0, 0, 1), config);
+                this.placeLog(getter, logSetter, random, logPos.add(1, 0, 1), config);
+            }
         }
 
         foliageAttachments.add(new FoliagePlacer.FoliageAttachment(new BlockVec(trunkX, topY, trunkZ), 0, true));
@@ -86,17 +90,10 @@ public record DarkOakTrunkPlacer(int baseHeight, int heightRandA, int heightRand
         return this.baseHeight + random.nextInt(this.heightRandA + 1) + random.nextInt(this.heightRandB + 1);
     }
 
-    private record HorizontalDirection(int stepX, int stepZ) {
-        private static final HorizontalDirection[] VALUES = new HorizontalDirection[]{
-                new HorizontalDirection(1, 0),
-                new HorizontalDirection(-1, 0),
-                new HorizontalDirection(0, 1),
-                new HorizontalDirection(0, -1)
-        };
-
-        private static HorizontalDirection random(RandomSource random) {
-            return VALUES[random.nextInt(VALUES.length)];
-        }
+    /** Vanilla {@code TreeFeature.isAirOrLeaves}. */
+    private static boolean isAirOrLeaves(Block.Getter getter, BlockVec position) {
+        var block = getter.getBlock(position);
+        return block.isAir() || rocks.minestom.worldgen.feature.Feature.LEAVES.contains(block.name());
     }
 }
 

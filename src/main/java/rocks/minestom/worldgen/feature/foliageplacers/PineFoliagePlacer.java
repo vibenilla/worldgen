@@ -5,13 +5,14 @@ import net.minestom.server.codec.StructCodec;
 import net.minestom.server.coordinate.BlockVec;
 import net.minestom.server.instance.block.Block;
 import rocks.minestom.worldgen.feature.configurations.TreeConfiguration;
+import rocks.minestom.worldgen.feature.valueproviders.IntProvider;
 import rocks.minestom.worldgen.random.RandomSource;
 
-public record PineFoliagePlacer(int radius, int offset, int height) implements FoliagePlacer {
+public record PineFoliagePlacer(IntProvider radius, IntProvider offset, IntProvider height) implements FoliagePlacer {
     public static final Codec<PineFoliagePlacer> CODEC = StructCodec.struct(
-            "radius", Codec.INT, PineFoliagePlacer::radius,
-            "offset", Codec.INT, PineFoliagePlacer::offset,
-            "height", Codec.INT, PineFoliagePlacer::height,
+            "radius", IntProvider.CODEC, PineFoliagePlacer::radius,
+            "offset", IntProvider.CODEC, PineFoliagePlacer::offset,
+            "height", IntProvider.CODEC, PineFoliagePlacer::height,
             PineFoliagePlacer::new);
 
     @Override
@@ -25,9 +26,11 @@ public record PineFoliagePlacer(int radius, int offset, int height) implements F
             int foliageHeight,
             int foliageRadius
     ) {
+        // Vanilla samples the offset before running the placer body.
+        var offset = this.offset.sample(random);
         var currentRadius = 0;
 
-        for (var y = this.offset; y >= this.offset - foliageHeight; y--) {
+        for (var y = offset; y >= offset - foliageHeight; y--) {
             this.placeLeavesRow(
                     getter,
                     foliageSetter,
@@ -39,7 +42,7 @@ public record PineFoliagePlacer(int radius, int offset, int height) implements F
                     attachment.doubleTrunk()
             );
 
-            if (currentRadius >= 1 && y == this.offset - foliageHeight + 1) {
+            if (currentRadius >= 1 && y == offset - foliageHeight + 1) {
                 currentRadius--;
             } else if (currentRadius < foliageRadius + attachment.radiusOffset()) {
                 currentRadius++;
@@ -49,12 +52,12 @@ public record PineFoliagePlacer(int radius, int offset, int height) implements F
 
     @Override
     public int foliageRadius(RandomSource random, int baseHeight) {
-        return this.radius + random.nextInt(Math.max(baseHeight + 1, 1));
+        return this.radius.sample(random) + random.nextInt(Math.max(baseHeight + 1, 1));
     }
 
     @Override
     public int foliageHeight(RandomSource random, int treeHeight, TreeConfiguration config) {
-        return this.height;
+        return this.height.sample(random);
     }
 
     private void placeLeavesRow(

@@ -20,16 +20,18 @@ public record ClampedNormalIntProvider(float mean, float deviation, int minInclu
     }
 
     @Override
-    public int sample(RandomSource random) {
-        var gaussianValue = nextGaussian(random) * this.deviation + this.mean;
-        var clamped = Math.max(this.minInclusive, Math.min(this.maxInclusive, gaussianValue));
-        return (int) clamped;
+    public int minValue() {
+        return this.minInclusive;
     }
 
-    private static double nextGaussian(RandomSource random) {
-        var valueOne = random.nextDouble();
-        var valueTwo = random.nextDouble();
-        var magnitude = Math.sqrt(-2.0D * Math.log(Math.max(1.0E-7D, valueOne)));
-        return magnitude * Math.cos(2.0D * Math.PI * valueTwo);
+    @Override
+    public int maxValue() {
+        return this.maxInclusive;
+    }
+
+    @Override
+    public int sample(RandomSource random) {
+        var gaussianValue = this.mean + (float) GaussianSource.nextGaussian(random) * this.deviation;
+        return (int) Math.max(this.minInclusive, Math.min(this.maxInclusive, gaussianValue));
     }
 }

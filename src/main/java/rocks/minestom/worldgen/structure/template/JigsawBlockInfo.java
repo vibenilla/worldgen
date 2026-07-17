@@ -6,10 +6,10 @@ import net.kyori.adventure.nbt.StringBinaryTag;
 import net.minestom.server.coordinate.BlockVec;
 import net.minestom.server.instance.block.Block;
 import net.minestom.server.utils.Direction;
-import rocks.minestom.worldgen.structure.assembly.JigsawAssembler;
 
 /**
- * Parsed data from a jigsaw block in a structure template.
+ * Parsed data from a jigsaw block in a structure template, mirroring vanilla's
+ * {@code StructureTemplate.JigsawBlockInfo}.
  *
  * <p>Jigsaw blocks are the connection points used during structure assembly.
  * Each jigsaw defines:
@@ -19,12 +19,11 @@ import rocks.minestom.worldgen.structure.assembly.JigsawAssembler;
  *   <li>{@code target} - The name to look for on connecting pieces
  *   <li>{@code front} - Direction the jigsaw faces (where pieces connect)
  *   <li>{@code jointType} - How rotations are constrained at this connection
+ *   <li>{@code placementPriority} - Expansion-queue priority of the piece this
+ *       jigsaw spawns (26.2)
+ *   <li>{@code selectionPriority} - Order this jigsaw is processed within its
+ *       piece, after shuffling (26.2)
  * </ul>
- *
- * <p>Two jigsaws can connect if their fronts face each other and the first's
- * target matches the second's name.
- *
- * @see JigsawAssembler for how jigsaws are used during assembly
  */
 public record JigsawBlockInfo(
         BlockVec position,
@@ -35,6 +34,7 @@ public record JigsawBlockInfo(
         Direction front,
         Direction top,
         int placementPriority,
+        int selectionPriority,
         String finalState
 ) {
     private static final Key EMPTY_KEY = Key.key("minecraft:empty");
@@ -54,15 +54,8 @@ public record JigsawBlockInfo(
         var poolString = getStringTag(nbt, "pool");
         var pool = poolString != null ? Key.key(poolString) : EMPTY_KEY;
 
-        var name = getStringTag(nbt, "name");
-        if (name == null) {
-            name = EMPTY_NAME;
-        }
-
-        var target = getStringTag(nbt, "target");
-        if (target == null) {
-            target = EMPTY_NAME;
-        }
+        var name = normalizeName(getStringTag(nbt, "name"));
+        var target = normalizeName(getStringTag(nbt, "target"));
 
         var jointString = getStringTag(nbt, "joint");
         var jointType = JointType.fromString(jointString);
@@ -71,13 +64,15 @@ public record JigsawBlockInfo(
         }
 
         var placementPriority = getIntTag(nbt, "placement_priority", 0);
+        var selectionPriority = getIntTag(nbt, "selection_priority", 0);
 
         var finalState = getStringTag(nbt, "final_state");
         if (finalState == null) {
             finalState = "minecraft:air";
         }
 
-        return new JigsawBlockInfo(position, pool, name, target, jointType, front, top, placementPriority, finalState);
+        return new JigsawBlockInfo(position, pool, name, target, jointType, front, top,
+                placementPriority, selectionPriority, finalState);
     }
 
     public JigsawBlockInfo withRotation(Rotation rotation, BlockVec newPosition) {
@@ -90,24 +85,29 @@ public record JigsawBlockInfo(
                 rotation.rotate(this.front),
                 rotation.rotate(this.top),
                 this.placementPriority,
+                this.selectionPriority,
                 this.finalState
         );
     }
 
+    /**
+     * Vanilla {@code JigsawBlock.canAttach}: fronts must oppose, the source's
+     * target must match the candidate's name, and non-rollable joints must
+     * share their top direction.
+     */
     public boolean canAttach(JigsawBlockInfo other) {
-        if (!this.front.equals(other.front.opposite())) {
-            return false;
-        }
+        return this.front == other.front.opposite()
+                && (this.jointType == JointType.ROLLABLE || this.top == other.top)
+                && this.target.equals(other.name);
+    }
 
-        if (!this.target.equals(other.name)) {
-            return false;
+    private static String normalizeName(String value) {
+        if (value == null || value.isEmpty()) {
+            return EMPTY_NAME;
         }
-
-        if (this.jointType == JointType.ALIGNED && !this.top.equals(other.top)) {
-            return false;
-        }
-
-        return true;
+        // Vanilla stores Identifiers; normalize to the namespaced form so
+        // name/target comparisons are namespace-insensitive.
+        return value.indexOf(':') >= 0 ? value : "minecraft:" + value;
     }
 
     private static Direction[] parseOrientation(String orientation) {

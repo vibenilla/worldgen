@@ -4,6 +4,8 @@ import net.kyori.adventure.key.Key;
 import net.minestom.server.coordinate.BlockVec;
 import net.minestom.server.instance.block.Block;
 import rocks.minestom.worldgen.biome.BiomeZoomer;
+import rocks.minestom.worldgen.feature.FeatureLoader;
+import rocks.minestom.worldgen.feature.GenerationUnitAdapter;
 
 public final class PlacementContext {
     private final Block.Getter accessor;
@@ -18,6 +20,8 @@ public final class PlacementContext {
     private final int seaLevel;
     private final BiomeZoomer biomeZoomer;
     private final Key sourceBiome;
+    private final FeatureLoader featureLoader;
+    private Key currentFeature;
 
     public PlacementContext(
             Block.Getter accessor,
@@ -31,7 +35,8 @@ public final class PlacementContext {
             int maxY,
             int seaLevel,
             BiomeZoomer biomeZoomer,
-            Key sourceBiome
+            Key sourceBiome,
+            FeatureLoader featureLoader
     ) {
         this.accessor = accessor;
         this.startX = startX;
@@ -39,12 +44,39 @@ public final class PlacementContext {
         this.sizeX = sizeX;
         this.sizeZ = sizeZ;
         this.surfaceHeights = surfaceHeights;
+        // Structure-phase writes become visible to decoration here, like
+        // vanilla features reading the proto-chunk after structure placement.
+        rocks.minestom.worldgen.structure.StructureWrites.replay(surfaceHeights, accessor);
+        if (accessor instanceof GenerationUnitAdapter adapter) {
+            rocks.minestom.worldgen.structure.StructureWrites.captureTerrainLookup(adapter.terrainLookup());
+        }
         this.waterHeights = waterHeights;
         this.minY = minY;
         this.maxY = maxY;
         this.seaLevel = seaLevel;
         this.biomeZoomer = biomeZoomer;
         this.sourceBiome = sourceBiome;
+        this.featureLoader = featureLoader;
+    }
+
+    /**
+     * Marks the placed feature currently running through the modifier pipeline,
+     * consulted by the biome placement modifier.
+     */
+    public void currentFeature(Key placedFeatureId) {
+        this.currentFeature = placedFeatureId;
+    }
+
+    /**
+     * Vanilla biome filter: the position's biome must list the current placed
+     * feature in its generation settings.
+     */
+    public boolean currentFeatureInBiomeAt(BlockVec position) {
+        if (this.featureLoader == null || this.currentFeature == null || this.biomeZoomer == null) {
+            return true;
+        }
+        var biome = this.biomeZoomer.biome(position.blockX(), position.blockY(), position.blockZ());
+        return this.featureLoader.biomeHasFeature(biome, this.currentFeature);
     }
 
     public Block.Getter accessor() {
@@ -68,9 +100,27 @@ public final class PlacementContext {
     }
 
     public int getHeight(HeightmapType type, int blockX, int blockZ) {
+        // Live heightmaps over generated blocks, like vanilla's chunk maps
+        // that update while decoration runs. OCEAN_FLOOR counts motion
+        // blockers (leaves yes, litter/plants no) while WORLD_SURFACE counts
+        // everything non-air, which is what makes the surface-water-depth
+        // filter reject tree positions on littered or planted ground.
+        if (this.accessor instanceof GenerationUnitAdapter adapter) {
+            var adapterType = switch (type) {
+                case WORLD_SURFACE_WG, WORLD_SURFACE -> GenerationUnitAdapter.HeightmapType.WORLD_SURFACE;
+                case OCEAN_FLOOR_WG, OCEAN_FLOOR -> GenerationUnitAdapter.HeightmapType.OCEAN_FLOOR;
+                case MOTION_BLOCKING -> GenerationUnitAdapter.HeightmapType.MOTION_BLOCKING;
+                case MOTION_BLOCKING_NO_LEAVES -> GenerationUnitAdapter.HeightmapType.MOTION_BLOCKING_NO_LEAVES;
+            };
+            var height = adapter.heightmap(adapterType, blockX, blockZ);
+            if (height != Integer.MAX_VALUE) {
+                return height;
+            }
+        }
+
         var localX = blockX - this.startX;
         var localZ = blockZ - this.startZ;
-        if (localX >= 0 && localX < this.sizeX && localZ >= 0 && localZ < this.sizeZ) {
+        if (localX >= 0 && localX < this.sizeX && localZ >= 0 && localZ < this.sizeZ && this.surfaceHeights != null) {
             var index = localX * this.sizeZ + localZ;
             var surfaceHeight = this.surfaceHeights[index];
             if (surfaceHeight == Integer.MIN_VALUE) {
@@ -85,19 +135,14 @@ public final class PlacementContext {
                     }
                     yield surfaceHeight + 1;
                 }
-                case OCEAN_FLOOR_WG, OCEAN_FLOOR -> {
-                    var waterHeight = this.waterHeights[index];
-                    if (waterHeight == Integer.MIN_VALUE) {
-                        yield surfaceHeight + 1;
-                    }
-
-                    yield surfaceHeight + 1;
-                }
+                case OCEAN_FLOOR_WG, OCEAN_FLOOR -> surfaceHeight + 1;
             };
         }
 
         return this.seaLevel + 1;
     }
+
+
 
     public Key biomeAt(BlockVec position) {
         return this.biomeZoomer.biome(position.blockX(), position.blockY(), position.blockZ());

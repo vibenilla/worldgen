@@ -1,6 +1,7 @@
 package rocks.minestom.worldgen.structure.loader;
 
 import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import net.kyori.adventure.key.Key;
 import net.minestom.server.codec.Codec;
 import net.minestom.server.codec.StructCodec;
@@ -9,24 +10,25 @@ import org.jetbrains.annotations.Nullable;
 import rocks.minestom.worldgen.structure.JigsawStructure;
 import rocks.minestom.worldgen.structure.SimpleStructure;
 import rocks.minestom.worldgen.structure.Structure;
+import rocks.minestom.worldgen.structure.TerrainAdjustment;
+import rocks.minestom.worldgen.structure.mineshaft.MineshaftStructure;
+import rocks.minestom.worldgen.structure.mineshaft.MineshaftType;
+import rocks.minestom.worldgen.structure.pool.PoolAliasBinding;
+import rocks.minestom.worldgen.structure.template.LiquidSettings;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public final class Structures {
-    private static final Codec<JigsawStructureData> JIGSAW_CODEC = StructCodec.struct(
-            "start_pool", Codec.KEY, JigsawStructureData::startPool,
-            "size", Codec.INT, JigsawStructureData::size,
-            "start_height", Codec.RAW_VALUE, JigsawStructureData::startHeight,
-            "project_start_to_heightmap", Codec.STRING.optional(), JigsawStructureData::projectStartToHeightmap,
-            "max_distance_from_center", Codec.INT.optional(), JigsawStructureData::maxDistanceFromCenter,
-            "biomes", Codec.RAW_VALUE, JigsawStructureData::biomes,
-            JigsawStructureData::new
-    );
-
     private static final Codec<SimpleStructureData> SIMPLE_CODEC = StructCodec.struct(
             "biomes", Codec.RAW_VALUE, SimpleStructureData::biomes,
             SimpleStructureData::new
+    );
+
+    private static final Codec<MineshaftStructureData> MINESHAFT_CODEC = StructCodec.struct(
+            "biomes", Codec.RAW_VALUE, MineshaftStructureData::biomes,
+            "mineshaft_type", Codec.STRING.optional("normal"), MineshaftStructureData::mineshaftType,
+            MineshaftStructureData::new
     );
 
     private Structures() {
@@ -44,17 +46,68 @@ public final class Structures {
             return parseJigsawStructure(json);
         }
 
+        if (typeStr.equals("minecraft:mineshaft")) {
+            return parseMineshaftStructure(json);
+        }
+
         return parseSimpleStructure(typeStr, json);
     }
 
-    private static Structure parseJigsawStructure(JsonElement json) {
-        var decoded = JIGSAW_CODEC.decode(Transcoder.JSON, json).orElseThrow();
+    private static Structure parseMineshaftStructure(JsonElement json) {
+        var decoded = MINESHAFT_CODEC.decode(Transcoder.JSON, json).orElseThrow();
         var biomes = parseBiomes(decoded.biomes().convertTo(Transcoder.JSON).orElseThrow());
-        var startHeight = parseStartHeight(decoded.startHeight().convertTo(Transcoder.JSON).orElseThrow());
-        var projectToHeightmap = decoded.projectStartToHeightmap() != null;
-        var maxDistanceFromCenter = decoded.maxDistanceFromCenter();
-        var maxDistance = maxDistanceFromCenter == null ? 0 : maxDistanceFromCenter;
-        return new JigsawStructure(biomes, decoded.startPool(), decoded.size(), startHeight, projectToHeightmap, maxDistance);
+        var type = MineshaftType.fromName(decoded.mineshaftType());
+        return new MineshaftStructure(type, biomes);
+    }
+
+    private static Structure parseJigsawStructure(JsonElement json) {
+        var obj = json.getAsJsonObject();
+        var biomes = parseBiomes(obj.get("biomes"));
+        var startPool = Key.key(obj.get("start_pool").getAsString());
+        var startJigsawName = obj.has("start_jigsaw_name")
+                ? Key.key(obj.get("start_jigsaw_name").getAsString())
+                : null;
+        var size = obj.get("size").getAsInt();
+        var startHeight = parseStartHeight(obj.get("start_height"));
+        var projectToHeightmap = obj.has("project_start_to_heightmap");
+        var useExpansionHack = obj.has("use_expansion_hack") && obj.get("use_expansion_hack").getAsBoolean();
+        // Vanilla's builder default is 80 when the datapack omits the field.
+        var maxDistance = obj.has("max_distance_from_center")
+                ? parseMaxDistance(obj.get("max_distance_from_center"))
+                : 80;
+        var poolAliases = PoolAliasBinding.parseList(obj.get("pool_aliases"));
+        var paddingBottom = 0;
+        var paddingTop = 0;
+        if (obj.has("dimension_padding")) {
+            var padding = obj.get("dimension_padding");
+            if (padding.isJsonPrimitive()) {
+                paddingBottom = padding.getAsInt();
+                paddingTop = padding.getAsInt();
+            } else if (padding.isJsonObject()) {
+                var paddingObj = padding.getAsJsonObject();
+                paddingBottom = paddingObj.has("bottom") ? paddingObj.get("bottom").getAsInt() : 0;
+                paddingTop = paddingObj.has("top") ? paddingObj.get("top").getAsInt() : 0;
+            }
+        }
+        var liquidSettings = obj.has("liquid_settings")
+                ? LiquidSettings.fromName(obj.get("liquid_settings").getAsString())
+                : LiquidSettings.APPLY_WATERLOGGING;
+        var terrainAdaptation = parseTerrainAdaptation(obj);
+
+        return new JigsawStructure(biomes, startPool, startJigsawName, size,
+                new JigsawStructure.StartHeight(startHeight.min(), startHeight.max()),
+                projectToHeightmap, useExpansionHack, maxDistance, poolAliases,
+                paddingBottom, paddingTop, liquidSettings, terrainAdaptation);
+    }
+
+    private static int parseMaxDistance(JsonElement json) {
+        if (json.isJsonPrimitive()) {
+            return json.getAsInt();
+        }
+        if (json.isJsonObject() && json.getAsJsonObject().has("horizontal")) {
+            return json.getAsJsonObject().get("horizontal").getAsInt();
+        }
+        return 80;
     }
 
     private static Structure parseSimpleStructure(String typeStr, JsonElement json) {
@@ -62,7 +115,14 @@ public final class Structures {
         var biomes = parseBiomes(decoded.biomes().convertTo(Transcoder.JSON).orElseThrow());
         var type = Key.key(typeStr);
         var templates = getTemplatesForType(typeStr);
-        return new SimpleStructure(type, biomes, templates);
+        var terrainAdaptation = parseTerrainAdaptation(json.getAsJsonObject());
+        return new SimpleStructure(type, biomes, templates, terrainAdaptation);
+    }
+
+    private static TerrainAdjustment parseTerrainAdaptation(JsonObject obj) {
+        return obj.has("terrain_adaptation")
+                ? TerrainAdjustment.fromName(obj.get("terrain_adaptation").getAsString())
+                : TerrainAdjustment.NONE;
     }
 
     private static List<Key> getTemplatesForType(String type) {
@@ -210,15 +270,16 @@ public final class Structures {
         return new Structure.StructureBiomes(null, List.of());
     }
 
-    private static int parseStartHeight(JsonElement json) {
+    private static HeightRange parseStartHeight(JsonElement json) {
         if (!json.isJsonObject()) {
-            return 0;
+            return new HeightRange(0, 0);
         }
 
         var obj = json.getAsJsonObject();
 
         if (obj.has("absolute")) {
-            return obj.get("absolute").getAsInt();
+            var absolute = obj.get("absolute").getAsInt();
+            return new HeightRange(absolute, absolute);
         }
 
         if (obj.has("type")) {
@@ -230,16 +291,19 @@ public final class Structures {
                         ? minInclusive.get("absolute").getAsInt() : 0;
                 var max = maxInclusive != null && maxInclusive.has("absolute")
                         ? maxInclusive.get("absolute").getAsInt() : 0;
-                return (min + max) / 2;
+                return new HeightRange(min, max);
             }
         }
 
-        return 0;
+        return new HeightRange(0, 0);
     }
 
-    private record JigsawStructureData(Key startPool, int size, Codec.RawValue startHeight, @Nullable String projectStartToHeightmap, @Nullable Integer maxDistanceFromCenter, Codec.RawValue biomes) {
+    private record HeightRange(int min, int max) {
     }
 
     private record SimpleStructureData(Codec.RawValue biomes) {
+    }
+
+    private record MineshaftStructureData(Codec.RawValue biomes, String mineshaftType) {
     }
 }

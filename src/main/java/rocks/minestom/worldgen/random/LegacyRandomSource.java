@@ -30,7 +30,7 @@ public final class LegacyRandomSource implements RandomSource {
         this.seed.set((seed ^ MULTIPLIER) & MODULUS_MASK);
     }
 
-    private int next(int bits) {
+    int next(int bits) {
         var seedValue = this.seed.get();
         var next = seedValue * MULTIPLIER + INCREMENT & MODULUS_MASK;
         this.seed.set(next);
@@ -63,7 +63,9 @@ public final class LegacyRandomSource implements RandomSource {
 
     @Override
     public long nextLong() {
-        return (long) this.next(32) << 32 | (long) this.next(32) & 0xFFFFFFFFL;
+        var upper = this.next(32);
+        var lower = this.next(32);
+        return ((long) upper << 32) + lower;
     }
 
     @Override

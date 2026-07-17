@@ -94,6 +94,12 @@ public final class DensityFunctions {
                     return value > 0.0 ? value : value * 0.25;
                 }
             },
+            INVERT {
+                @Override
+                public double transform(double value) {
+                    return 1.0 / value;
+                }
+            },
             SQUEEZE {
                 @Override
                 public double transform(double value) {
@@ -215,6 +221,9 @@ public final class DensityFunctions {
             if (context instanceof ChunkContext chunkContext) {
                 return chunkContext.cache2DValue(this);
             }
+            if (context instanceof ColumnCacheContext columnContext) {
+                return columnContext.columnValue(this, this.argument);
+            }
             return this.argument.compute(context);
         }
     }
@@ -224,6 +233,9 @@ public final class DensityFunctions {
         public double compute(Context context) {
             if (context instanceof ChunkContext chunkContext) {
                 return chunkContext.flatCacheValue(this);
+            }
+            if (context instanceof ColumnCacheContext columnContext) {
+                return columnContext.columnValue(this, this.argument);
             }
             return this.argument.compute(context);
         }
@@ -322,6 +334,38 @@ public final class DensityFunctions {
         }
     }
 
+    public record FindTopSurface(DensityFunction density, DensityFunction upperBound, int lowerBound, int cellHeight)
+            implements DensityFunction {
+        @Override
+        public double compute(Context context) {
+            var topY = (int) Math.floor(this.upperBound.compute(context) / this.cellHeight) * this.cellHeight;
+            if (topY <= this.lowerBound) {
+                return this.lowerBound;
+            }
+
+            for (var blockY = topY; blockY >= this.lowerBound; blockY -= this.cellHeight) {
+                if (this.density.compute(new DensityFunction.SinglePointContext(context.blockX(), blockY, context.blockZ())) > 0.0) {
+                    return blockY;
+                }
+            }
+            return this.lowerBound;
+        }
+    }
+
+    public record IntervalSelect(DensityFunction input, double[] thresholds, List<DensityFunction> functions)
+            implements DensityFunction {
+        @Override
+        public double compute(Context context) {
+            var value = this.input.compute(context);
+            for (var i = 0; i < this.thresholds.length; i++) {
+                if (value < this.thresholds[i]) {
+                    return this.functions.get(i).compute(context);
+                }
+            }
+            return this.functions.getLast().compute(context);
+        }
+    }
+
     public sealed interface SplineNode permits SplineConstant, SplineMultipoint {
         float compute(DensityFunction.Context context);
     }
@@ -360,7 +404,12 @@ public final class DensityFunctions {
             var endDerivative = this.derivatives[intervalStart + 1];
             var p = startDerivative * (endLocation - startLocation) - (endValue - startValue);
             var q = -endDerivative * (endLocation - startLocation) + (endValue - startValue);
-            return (float) VMath.lerp((double) delta, (double) startValue, (double) endValue) + delta * (1.0F - delta) * (float) VMath.lerp((double) delta, (double) p, (double) q);
+            // Vanilla evaluates splines in float; double-lerp-then-cast drifts by ULPs
+            return lerp(delta, startValue, endValue) + delta * (1.0F - delta) * lerp(delta, p, q);
+        }
+
+        private static float lerp(float delta, float start, float end) {
+            return start + delta * (end - start);
         }
 
         private static float linearExtend(float coordinate, float[] locations, float value, float[] derivatives, int index) {

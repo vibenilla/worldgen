@@ -2,8 +2,6 @@ package rocks.minestom.worldgen.structure;
 
 import net.kyori.adventure.key.Key;
 import rocks.minestom.worldgen.structure.context.StructurePlaceContext;
-import rocks.minestom.worldgen.structure.processor.StructureProcessorList;
-import rocks.minestom.worldgen.structure.template.Rotation;
 import rocks.minestom.worldgen.structure.template.StructureTemplate;
 
 import java.util.List;
@@ -24,29 +22,11 @@ import java.util.List;
  *
  * @see StructureTemplate for the template format
  */
-public record SimpleStructure(Key type, StructureBiomes biomes, List<Key> templates) implements Structure {
+public record SimpleStructure(Key type, StructureBiomes biomes, List<Key> templates,
+        TerrainAdjustment terrainAdaptation) implements Structure {
     @Override
     public void place(StructurePlaceContext context) {
-        if (this.templates.isEmpty()) {
-            return;
-        }
-
-        var random = context.randomFactory().fromHashOf(context.start().blockX() + ":" + context.start().blockZ());
-        var templateKey = this.templates.get(random.nextInt(this.templates.size()));
-        var template = context.structureLoader().getTemplate(templateKey);
-
-        if (template == null) {
-            return;
-        }
-
-        var rotation = Rotation.values()[random.nextInt(Rotation.values().length)];
-
-        template.place(
-                context.level(),
-                context.start(),
-                rotation,
-                StructureProcessorList.EMPTY,
-                context.randomFactory(),
-                context.structureLoader().blockTags());
+        // Simple structures are assembled and placed by the StructurePlacer,
+        // which selects the template and rotation and clips per chunk.
     }
 }

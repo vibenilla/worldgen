@@ -1,23 +1,34 @@
 package rocks.minestom.worldgen.structure.pool;
 
-import rocks.minestom.worldgen.structure.assembly.JigsawAssembler;
+import net.minestom.server.coordinate.BlockVec;
+import rocks.minestom.worldgen.random.RandomSource;
+import rocks.minestom.worldgen.structure.loader.StructureLoader;
+import rocks.minestom.worldgen.structure.template.BoundingBox;
+import rocks.minestom.worldgen.structure.template.JigsawBlockInfo;
+import rocks.minestom.worldgen.structure.template.Rotation;
+
+import java.util.List;
 
 /**
- * An element that can be selected from a {@link TemplatePool} during jigsaw assembly.
- *
- * <p>Pool elements are the building blocks of jigsaw structures. When assembling a structure,
- * the {@link JigsawAssembler} picks elements from pools and places them based on jigsaw
- * block connections.
- *
- * <p>Element types:
- * <ul>
- *   <li>{@link LegacySinglePoolElement} - A single NBT template with optional processors
- *   <li>{@link ListPoolElement} - Multiple elements placed together at the same location
- *   <li>{@link FeaturePoolElement} - A worldgen feature (not a template)
- *   <li>{@link EmptyPoolElement} - A terminator that stops jigsaw expansion
- * </ul>
- *
- * @see TemplatePool for weighted selection of elements
+ * An element that can be selected from a {@link TemplatePool} during jigsaw
+ * structure assembly, mirroring vanilla's {@code StructurePoolElement}.
  */
-public sealed interface PoolElement permits EmptyPoolElement, FeaturePoolElement, LegacySinglePoolElement, ListPoolElement {
+public sealed interface PoolElement permits EmptyPoolElement, FeaturePoolElement, SinglePoolElement, ListPoolElement {
+    Projection projection();
+
+    /**
+     * The element's jigsaw blocks at the given placement, shuffled with the
+     * assembly random then ordered by selection priority (vanilla
+     * {@code getShuffledJigsawBlocks}). Draw counts must match vanilla
+     * exactly: single elements Fisher-Yates shuffle their jigsaw list.
+     */
+    List<JigsawBlockInfo> getShuffledJigsawBlocks(StructureLoader loader, BlockVec position, Rotation rotation,
+            RandomSource random);
+
+    BoundingBox getBoundingBox(StructureLoader loader, BlockVec position, Rotation rotation);
+
+    /** Vanilla {@code getGroundLevelDelta}, constant 1 for all element types. */
+    default int groundLevelDelta() {
+        return 1;
+    }
 }

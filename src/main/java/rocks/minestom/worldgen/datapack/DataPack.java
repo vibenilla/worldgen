@@ -52,6 +52,10 @@ public final class DataPack {
         return this.readJson(this.resolve("worldgen/configured_feature", id));
     }
 
+    public JsonElement readConfiguredCarver(Key id) {
+        return this.readJson(this.resolve("worldgen/configured_carver", id));
+    }
+
     public JsonElement readPlacedFeature(Key id) {
         return this.readJson(this.resolve("worldgen/placed_feature", id));
     }

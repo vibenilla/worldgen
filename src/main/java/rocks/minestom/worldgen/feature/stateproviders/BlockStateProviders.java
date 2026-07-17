@@ -42,6 +42,11 @@ public final class BlockStateProviders {
                         .mapResult(provider -> (BlockStateProvider) provider);
                 case "minecraft:dual_noise_provider" -> DualNoiseProvider.CODEC.decode(coder, value)
                         .mapResult(provider -> (BlockStateProvider) provider);
+                case "minecraft:rule_based_state_provider" -> {
+                    var raw = Codec.RAW_VALUE.decode(coder, value).orElseThrow();
+                    var json = raw.convertTo(Transcoder.JSON).orElseThrow();
+                    yield new Result.Ok<>(RuleBasedStateProvider.fromJson(json.getAsJsonObject()));
+                }
                 default -> new Result.Error<>("Unknown block state provider type: " + type);
             };
         }

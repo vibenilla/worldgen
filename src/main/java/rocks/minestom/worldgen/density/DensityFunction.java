@@ -15,4 +15,7 @@ public interface DensityFunction {
 
         int blockZ();
     }
+
+    record SinglePointContext(int blockX, int blockY, int blockZ) implements Context {
+    }
 }

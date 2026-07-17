@@ -10,6 +10,16 @@ public record ConstantIntProvider(int value) implements IntProvider {
     }
 
     @Override
+    public int minValue() {
+        return this.value;
+    }
+
+    @Override
+    public int maxValue() {
+        return this.value;
+    }
+
+    @Override
     public int sample(RandomSource random) {
         return this.value;
     }

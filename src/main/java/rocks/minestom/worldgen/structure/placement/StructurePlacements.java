@@ -12,6 +12,8 @@ public final class StructurePlacements {
             "separation", Codec.INT, RandomSpreadPlacementData::separation,
             "salt", Codec.INT, RandomSpreadPlacementData::salt,
             "spread_type", Codec.STRING.optional("linear"), RandomSpreadPlacementData::spreadType,
+            "frequency", Codec.FLOAT.optional(1.0f), RandomSpreadPlacementData::frequency,
+            "frequency_reduction_method", Codec.STRING.optional("default"), RandomSpreadPlacementData::frequencyReductionMethod,
             RandomSpreadPlacementData::new
     );
 
@@ -29,7 +31,9 @@ public final class StructurePlacements {
         if (type.equals("minecraft:random_spread")) {
             var decoded = RANDOM_SPREAD_CODEC.decode(Transcoder.JSON, json).orElseThrow();
             var spreadType = parseSpreadType(decoded.spreadType());
-            return new RandomSpreadPlacement(decoded.spacing(), decoded.separation(), decoded.salt(), spreadType);
+            var frequencyReduction = FrequencyReduction.fromName(decoded.frequencyReductionMethod());
+            return new RandomSpreadPlacement(decoded.spacing(), decoded.separation(), decoded.salt(), spreadType,
+                    decoded.frequency(), frequencyReduction);
         }
 
         return null;
@@ -46,6 +50,7 @@ public final class StructurePlacements {
         };
     }
 
-    private record RandomSpreadPlacementData(int spacing, int separation, int salt, String spreadType) {
+    private record RandomSpreadPlacementData(int spacing, int separation, int salt, String spreadType,
+                                             float frequency, String frequencyReductionMethod) {
     }
 }

@@ -4,19 +4,19 @@ import net.minestom.server.codec.Codec;
 import net.minestom.server.codec.StructCodec;
 import net.minestom.server.instance.block.Block;
 import rocks.minestom.worldgen.VMath;
-import rocks.minestom.worldgen.feature.configurations.SpikeConfiguration;
+import rocks.minestom.worldgen.feature.configurations.EndSpikeConfiguration;
 import rocks.minestom.worldgen.random.RandomSource;
 import rocks.minestom.worldgen.random.XoroshiroRandomSource;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public final class EndSpikeFeature implements Feature<SpikeConfiguration> {
+public final class EndSpikeFeature implements Feature<EndSpikeConfiguration> {
     private static final int SPIKE_COUNT = 10;
     private static final int SPIKE_DISTANCE = 42;
 
     @Override
-    public <T extends Block.Getter & Block.Setter> boolean place(FeaturePlaceContext<SpikeConfiguration, T> context) {
+    public <T extends Block.Getter & Block.Setter> boolean place(FeaturePlaceContext<EndSpikeConfiguration, T> context) {
         var chunkStartX = context.origin().blockX() & ~15;
         var chunkStartZ = context.origin().blockZ() & ~15;
         var spikes = context.config().spikes();

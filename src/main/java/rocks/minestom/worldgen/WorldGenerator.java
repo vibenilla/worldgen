@@ -2,20 +2,32 @@ package rocks.minestom.worldgen;
 
 import net.kyori.adventure.key.Key;
 import net.minestom.server.coordinate.BlockVec;
+import net.minestom.server.instance.block.Block;
 import net.minestom.server.instance.generator.GenerationUnit;
 import net.minestom.server.instance.generator.Generator;
 import net.minestom.server.registry.RegistryKey;
 import net.minestom.server.world.biome.Biome;
 import rocks.minestom.worldgen.biome.BiomeSource;
 import rocks.minestom.worldgen.biome.BiomeZoomer;
+import rocks.minestom.worldgen.biome.CachedBiomeSource;
+import rocks.minestom.worldgen.carver.CarverLoader;
+import rocks.minestom.worldgen.carver.Carvers;
 import rocks.minestom.worldgen.feature.*;
 import rocks.minestom.worldgen.feature.placement.PlacementContext;
+import rocks.minestom.worldgen.random.WorldgenRandom;
+import rocks.minestom.worldgen.random.XoroshiroRandomSource;
 import rocks.minestom.worldgen.structure.placement.StructurePlacer;
 import rocks.minestom.worldgen.surface.BiomeResolver;
 import rocks.minestom.worldgen.surface.SurfaceRules;
+import rocks.minestom.worldgen.terrain.Beardifier;
+import rocks.minestom.worldgen.terrain.TerrainData;
 import rocks.minestom.worldgen.terrain.TerrainGenerator;
 
-import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Orchestrates chunk generation by filling biomes, evaluating density to place
@@ -25,23 +37,58 @@ import java.util.Arrays;
  */
 public final class WorldGenerator implements Generator {
     private final NoiseGeneratorSettingsRuntime settings;
-    private final BiomeSource biomeSource;
+    private final CachedBiomeSource biomeSource;
     private final BiomeZoomer biomeZoomer;
     private final BiomeResolver biomeResolver;
     private final FeatureLoader featureLoader;
+    private static final int MAX_CACHED_TERRAIN = 256;
+
     private final StructurePlacer structurePlacer;
     private final boolean generateEndStructures;
+    private final Carvers carvers;
+    private final Set<Long> generatedChunks = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final Map<Long, Map<Integer, Block>> pendingCrossWrites = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private final GenerationUnitAdapter.TerrainLookup terrainAccess = new GenerationUnitAdapter.TerrainLookup() {
+        @Override
+        public TerrainData terrain(int chunkX, int chunkZ) {
+            return WorldGenerator.this.terrainData(chunkX, chunkZ);
+        }
+
+        @Override
+        public boolean writePending(int chunkX, int chunkZ, int bufferIndex, Block block) {
+            var key = (long) chunkX << 32 | (chunkZ & 0xFFFFFFFFL);
+            if (WorldGenerator.this.generatedChunks.contains(key)) {
+                return false;
+            }
+            WorldGenerator.this.pendingCrossWrites
+                    .computeIfAbsent(key, mapKey -> new java.util.concurrent.ConcurrentHashMap<>())
+                    .put(bufferIndex, block);
+            return true;
+        }
+    };
+    // LRU: decoration probes neighbors, so evicting wholesale caused recompute
+    // storms of the full terrain+surface+carve pipeline
+    private final Map<Long, TerrainData> terrainDataCache = java.util.Collections.synchronizedMap(
+            new java.util.LinkedHashMap<>(64, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<Long, TerrainData> eldest) {
+                    return this.size() > MAX_CACHED_TERRAIN;
+                }
+            });
 
     public WorldGenerator(NoiseGeneratorSettingsRuntime settings, BiomeSource biomeSource, long biomeZoomSeed,
             BiomeResolver biomeResolver, FeatureLoader featureLoader, StructurePlacer structurePlacer,
             boolean generateEndStructures) {
         this.settings = settings;
-        this.biomeSource = biomeSource;
-        this.biomeZoomer = new BiomeZoomer(biomeSource, biomeZoomSeed);
+        this.biomeSource = new CachedBiomeSource(biomeSource, settings.minY(), settings.height());
+        this.biomeZoomer = new BiomeZoomer(this.biomeSource, biomeZoomSeed);
         this.biomeResolver = biomeResolver;
         this.featureLoader = featureLoader;
         this.structurePlacer = structurePlacer;
         this.generateEndStructures = generateEndStructures;
+        this.carvers = new Carvers(settings, this.biomeSource, biomeResolver, this.biomeZoomer,
+                new CarverLoader(featureLoader.dataPack(), featureLoader.blockTags()));
     }
 
     @Override
@@ -49,102 +96,31 @@ public final class WorldGenerator implements Generator {
         var modifier = unit.modifier();
         fillBiomesFromNoise(unit, this.biomeSource, this.settings.minY(), this.settings.maxYInclusive());
         var startX = unit.absoluteStart().blockX();
-        var startY = unit.absoluteStart().blockY();
         var startZ = unit.absoluteStart().blockZ();
-        var sizeX = unit.size().blockX();
         var sizeZ = unit.size().blockZ();
-        var minY = this.settings.minY();
-        var maxY = this.settings.maxYInclusive();
-        var height = maxY - minY + 1;
-        var defaultBlock = this.settings.defaultBlock();
+        var height = this.settings.height();
 
-        var terrainGenerator = new TerrainGenerator(this.settings);
-        var terrainData = terrainGenerator.generate(unit);
+        var chunkKey = (long) (startX >> 4) << 32 | ((startZ >> 4) & 0xFFFFFFFFL);
+        var terrainData = this.terrainData(startX >> 4, startZ >> 4);
         var surfaceHeights = terrainData.surfaceHeights();
-        var waterHeights = terrainData.waterHeights();
-        var stoneMask = terrainData.stoneMask();
+        var terrainBlocks = terrainData.blocks();
 
-        var surfaceRule = this.settings.surfaceRule();
-        var constantSurface = SurfaceRules.constantBlock(surfaceRule);
-        var surfaceContext = new SurfaceRules.Context(
-                this.settings.surfaceSystem(),
-                this.settings.randomState(),
-                this.biomeResolver,
-                this.biomeZoomer,
-                minY,
-                maxY);
-        var stoneDepthAbove = new int[height];
-        var stoneDepthBelow = new int[height];
-
-        var shouldApplySurface = constantSurface == null || !constantSurface.equals(defaultBlock);
-        for (var localX = 0; localX < sizeX; localX++) {
-            var blockX = startX + localX;
-
-            for (var localZ = 0; localZ < sizeZ; localZ++) {
-                var blockZ = startZ + localZ;
-                var surfaceIndex = localX * sizeZ + localZ;
-                var maskIndex = surfaceIndex * height;
-                var preliminarySurfaceLevel = surfaceHeights[surfaceIndex];
-                if (preliminarySurfaceLevel == Integer.MIN_VALUE) {
-                    continue;
-                }
-
-                if (!shouldApplySurface) {
-                    continue;
-                }
-
-                Arrays.fill(stoneDepthAbove, 0);
-                Arrays.fill(stoneDepthBelow, 0);
-
-                for (var yIndex = height - 1; yIndex >= 0; yIndex--) {
-                    if (stoneMask[maskIndex + yIndex] == 0) {
-                        continue;
-                    }
-
-                    var aboveIndex = yIndex + 1;
-                    if (aboveIndex >= height || stoneMask[maskIndex + aboveIndex] == 0) {
-                        stoneDepthAbove[yIndex] = 1;
-                    } else {
-                        stoneDepthAbove[yIndex] = stoneDepthAbove[aboveIndex] + 1;
-                    }
-                }
-
-                for (var yIndex = 0; yIndex < height; yIndex++) {
-                    if (stoneMask[maskIndex + yIndex] == 0) {
-                        continue;
-                    }
-
-                    var belowIndex = yIndex - 1;
-                    if (belowIndex < 0 || stoneMask[maskIndex + belowIndex] == 0) {
-                        stoneDepthBelow[yIndex] = 1;
-                    } else {
-                        stoneDepthBelow[yIndex] = stoneDepthBelow[belowIndex] + 1;
-                    }
-                }
-
-                var steep = isSteep(surfaceHeights, sizeZ, localX, localZ);
-                surfaceContext.updateXZ(blockX, blockZ, preliminarySurfaceLevel, steep, waterHeights[surfaceIndex]);
-
-                for (var yIndex = height - 1; yIndex >= 0; yIndex--) {
-                    if (stoneMask[maskIndex + yIndex] == 0) {
-                        continue;
-                    }
-
-                    var depthAbove = stoneDepthAbove[yIndex];
-                    var depthBelow = stoneDepthBelow[yIndex];
-                    if (!shouldApplySurfaceRule(yIndex, height, depthAbove, depthBelow)) {
-                        continue;
-                    }
-
-                    var blockY = minY + yIndex;
-                    surfaceContext.updateY(blockY, depthAbove, depthBelow);
-                    var newBlock = surfaceRule.tryApply(surfaceContext);
-                    if (newBlock != null && !newBlock.equals(defaultBlock)) {
-                        modifier.setRelative(localX, blockY - startY, localZ, newBlock);
-                    }
-                }
+        // Earlier-decorated neighbors' spill-over writes land chronologically
+        // before this chunk's own decoration, exactly like vanilla proto-chunks
+        var pending = this.pendingCrossWrites.remove(chunkKey);
+        if (pending != null) {
+            for (var entry : pending.entrySet()) {
+                terrainBlocks[entry.getKey()] = entry.getValue();
             }
         }
+        this.generatedChunks.add(chunkKey);
+
+        // Single blit of terrain + surface + earlier neighbor spill; this chunk's
+        // own feature blocks arrive through its fork afterwards
+        modifier.setAllRelative((x, y, z) -> {
+            var block = terrainBlocks[(x * sizeZ + z) * height + y];
+            return block != null ? block : Block.AIR;
+        });
 
         if (this.structurePlacer != null) {
             this.structurePlacer.placeStructures(unit, surfaceHeights, this.biomeZoomer, this.settings);
@@ -154,26 +130,119 @@ public final class WorldGenerator implements Generator {
             this.placeEndPodium(unit, surfaceHeights);
         }
 
-        this.placeFeatures(unit, surfaceHeights, waterHeights);
+        this.placeFeatures(unit, terrainData);
+    }
+
+    /**
+     * Applies the surface rules onto the terrain buffer, mirroring vanilla's
+     * per-column scan (fluid keeps the stone-depth-above run, air resets it;
+     * rules only replace the default block).
+     */
+    private void applySurface(TerrainData terrainData, int chunkX, int chunkZ) {
+        var surfaceRule = this.settings.surfaceRule();
+        var defaultBlock = this.settings.defaultBlock();
+        var constantSurface = SurfaceRules.constantBlock(surfaceRule);
+        if (constantSurface != null && constantSurface.equals(defaultBlock)) {
+            return;
+        }
+
+        var startX = chunkX * 16;
+        var startZ = chunkZ * 16;
+        var sizeX = 16;
+        var sizeZ = 16;
+        var minY = this.settings.minY();
+        var maxY = this.settings.maxYInclusive();
+        var height = maxY - minY + 1;
+        var surfaceHeights = terrainData.surfaceHeights();
+        var waterHeights = terrainData.waterHeights();
+        var stoneMask = terrainData.stoneMask();
+        var terrainBlocks = terrainData.blocks();
+
+        var surfaceContext = new SurfaceRules.Context(
+                this.settings.surfaceSystem(),
+                this.settings.randomState(),
+                this.biomeResolver,
+                this.biomeZoomer,
+                this.settings.preliminarySurfaceLevel(),
+                minY,
+                maxY);
+
+        // WORLD_SURFACE_WG equivalent: highest non-air block (solid or fluid) per column
+        var worldSurfaceHeights = new int[sizeX * sizeZ];
+        for (var surfaceIndex = 0; surfaceIndex < worldSurfaceHeights.length; surfaceIndex++) {
+            var solidTop = surfaceHeights[surfaceIndex];
+            var fluidTop = waterHeights[surfaceIndex] == Integer.MIN_VALUE ? Integer.MIN_VALUE : waterHeights[surfaceIndex] - 1;
+            worldSurfaceHeights[surfaceIndex] = Math.max(solidTop, fluidTop);
+        }
+
+        for (var localX = 0; localX < sizeX; localX++) {
+            var blockX = startX + localX;
+
+            for (var localZ = 0; localZ < sizeZ; localZ++) {
+                var blockZ = startZ + localZ;
+                var surfaceIndex = localX * sizeZ + localZ;
+                var maskIndex = surfaceIndex * height;
+                var scanStart = worldSurfaceHeights[surfaceIndex];
+                if (scanStart == Integer.MIN_VALUE) {
+                    continue;
+                }
+
+                var steep = isSteep(worldSurfaceHeights, sizeZ, localX, localZ);
+                surfaceContext.updateXZ(blockX, blockZ, steep);
+
+                var stoneDepthAbove = 0;
+                var waterHeight = Integer.MIN_VALUE;
+                var nextCeilingStoneY = Integer.MAX_VALUE;
+                for (var blockY = Math.min(scanStart, maxY); blockY >= minY; blockY--) {
+                    var state = stoneMask[maskIndex + blockY - minY];
+                    if (state == TerrainData.AIR) {
+                        stoneDepthAbove = 0;
+                        waterHeight = Integer.MIN_VALUE;
+                        continue;
+                    }
+
+                    if (state == TerrainData.FLUID) {
+                        if (waterHeight == Integer.MIN_VALUE) {
+                            waterHeight = blockY + 1;
+                        }
+                        continue;
+                    }
+
+                    if (nextCeilingStoneY >= blockY) {
+                        nextCeilingStoneY = minY;
+                        for (var lookaheadY = blockY - 1; lookaheadY >= minY; lookaheadY--) {
+                            var lookaheadState = stoneMask[maskIndex + lookaheadY - minY];
+                            if (lookaheadState == TerrainData.AIR || lookaheadState == TerrainData.FLUID) {
+                                nextCeilingStoneY = lookaheadY + 1;
+                                break;
+                            }
+                        }
+                    }
+
+                    stoneDepthAbove++;
+                    if (state != TerrainData.SOLID) {
+                        continue;
+                    }
+
+                    var stoneDepthBelow = blockY - nextCeilingStoneY + 1;
+                    surfaceContext.updateY(blockY, stoneDepthAbove, stoneDepthBelow, waterHeight);
+                    var newBlock = surfaceRule.tryApply(surfaceContext);
+                    if (newBlock != null && !newBlock.equals(defaultBlock)) {
+                        terrainBlocks[maskIndex + blockY - minY] = newBlock;
+                    }
+                }
+            }
+        }
     }
 
     @SuppressWarnings("unchecked")
-    private void placeFeatures(GenerationUnit unit, int[] surfaceHeights, int[] waterHeights) {
+    private void placeFeatures(GenerationUnit unit, TerrainData terrainData) {
+        var surfaceHeights = terrainData.surfaceHeights();
+        var waterHeights = terrainData.waterHeights();
         var startX = unit.absoluteStart().blockX();
         var startZ = unit.absoluteStart().blockZ();
         var sizeX = unit.size().blockX();
         var sizeZ = unit.size().blockZ();
-        var centerLocalX = sizeX / 2;
-        var centerLocalZ = sizeZ / 2;
-        var centerSurfaceY = surfaceHeights[centerLocalX * sizeZ + centerLocalZ];
-
-        if (centerSurfaceY == Integer.MIN_VALUE) {
-            centerSurfaceY = this.settings.seaLevel();
-        }
-
-        var biomeKey = this.biomeZoomer.biome(startX + centerLocalX, centerSurfaceY, startZ + centerLocalZ);
-        var biomeFeatures = this.featureLoader.getBiomeFeatures(biomeKey);
-
         var forkPadding = 16;
         var forkStart = new BlockVec(startX - forkPadding, this.settings.minY(), startZ - forkPadding);
         var forkEnd = new BlockVec(startX + sizeX + forkPadding, this.settings.maxYInclusive() + 1,
@@ -186,11 +255,9 @@ public final class WorldGenerator implements Generator {
                 sizeX,
                 sizeZ,
                 this.settings.minY(),
-                surfaceHeights,
-                waterHeights,
-                this.settings.defaultBlock(),
-                this.settings.defaultFluid());
-        var randomFactory = this.settings.randomState().getOrCreateRandomFactory(Key.key("minecraft:feature"));
+                terrainData.blocks(),
+                this.settings.height(),
+                this.terrainAccess);
 
         var placementContext = new PlacementContext(
                 levelAdapter,
@@ -204,41 +271,60 @@ public final class WorldGenerator implements Generator {
                 this.settings.maxYInclusive(),
                 this.settings.seaLevel(),
                 this.biomeZoomer,
-                biomeKey);
+                null,
+                this.featureLoader);
 
-        for (var stepIndex = 0; stepIndex < biomeFeatures.size(); stepIndex++) {
-            var step = biomeFeatures.get(stepIndex);
+        // Vanilla decoration: biomes from the 3x3 chunk neighborhood pick the feature
+        // set; each feature is seeded from the decoration seed and its global index
+        // within its step, so placement is independent of biome layout details.
+        var chunkBiomes = this.collectNeighborhoodBiomes(startX >> 4, startZ >> 4);
+        var featuresPerStep = this.featureLoader.featuresPerStep(this.biomeSource.possibleBiomes());
+        var random = new WorldgenRandom(new XoroshiroRandomSource(0L));
+        var decorationSeed = random.setDecorationSeed(this.settings.randomState().seed(), startX, startZ);
+        var origin = new BlockVec(startX, this.settings.minY(), startZ);
 
-            for (var featureIndex = 0; featureIndex < step.size(); featureIndex++) {
-                var placedFeatureKey = step.get(featureIndex);
+        for (var stepIndex = 0; stepIndex < featuresPerStep.size(); stepIndex++) {
+            var stepData = featuresPerStep.get(stepIndex);
+            var featureIndexes = new TreeSet<Integer>();
+            for (var biome : chunkBiomes) {
+                var biomeSteps = this.featureLoader.getBiomeFeatures(biome);
+                if (stepIndex >= biomeSteps.size()) {
+                    continue;
+                }
+
+                for (var featureKey : biomeSteps.get(stepIndex)) {
+                    var index = stepData.indexMapping().get(featureKey);
+                    if (index != null) {
+                        featureIndexes.add(index);
+                    }
+                }
+            }
+
+            for (var featureIndex : featureIndexes) {
+                var placedFeatureKey = stepData.features().get(featureIndex);
+                random.setFeatureSeed(decorationSeed, featureIndex, stepIndex);
+
                 var placedFeature = this.featureLoader.getPlacedFeature(placedFeatureKey);
                 if (placedFeature == null) {
                     continue;
                 }
 
-                var placementRandom = randomFactory
-                        .fromHashOf(placedFeatureKey.asString() + ":" + stepIndex + ":" + featureIndex)
-                        .forkPositional()
-                        .at(startX, 0, startZ);
+                var configuredFeature = placedFeature.configuredFeature(this.featureLoader);
+                if (configuredFeature == null) {
+                    continue;
+                }
 
-                var origin = new BlockVec(startX, 0, startZ);
-                var placementPositions = placedFeature.getPositions(placementContext, placementRandom, origin);
-
-                for (var position : placementPositions) {
-                    if (position.blockY() < this.settings.minY() || position.blockY() > this.settings.maxYInclusive()) {
-                        continue;
+                placementContext.currentFeature(placedFeatureKey);
+                var debugChunk = System.getProperty("worldgen.debugchunk");
+                var debugThis = debugChunk != null && debugChunk.equals((startX >> 4) + "," + (startZ >> 4));
+                var debugStep = stepIndex;
+                placedFeature.place(placementContext, random, origin, (position, featureRandom) -> {
+                    if (debugThis) {
+                        System.out.println("FEATPOS " + placedFeatureKey.asString() + " idx=" + featureIndex + " step=" + debugStep + " pos=" + position);
                     }
-
-                    var featureRandom = randomFactory
-                            .fromHashOf(placedFeatureKey.asString() + ":" + stepIndex + ":" + featureIndex)
-                            .forkPositional()
-                            .at(position.blockX(), position.blockY(), position.blockZ());
-
-                    var configuredFeature = placedFeature.configuredFeature(this.featureLoader);
-                    if (configuredFeature == null) {
-                        continue;
-                    }
-
+                    // No world-bounds filter: vanilla runs features at out-of-world
+                    // origins (deep ore blobs still reach into the world, and the
+                    // shared random must consume their draws either way)
                     var context = new FeaturePlaceContext<>(
                             levelAdapter,
                             featureRandom,
@@ -254,9 +340,68 @@ public final class WorldGenerator implements Generator {
                     } else {
                         ((Feature) featureImpl).place(context);
                     }
-                }
+                });
             }
         }
+    }
+
+    /**
+     * Distinct biomes over the 3x3 chunk neighborhood at quart resolution,
+     * mirroring the section palettes vanilla unions for decoration. Each chunk's
+     * set is memoized since neighbors share it.
+     */
+    private List<Key> collectNeighborhoodBiomes(int chunkX, int chunkZ) {
+        var union = new HashSet<Key>();
+        for (var offsetX = -1; offsetX <= 1; offsetX++) {
+            for (var offsetZ = -1; offsetZ <= 1; offsetZ++) {
+                union.addAll(this.chunkBiomes(chunkX + offsetX, chunkZ + offsetZ));
+            }
+        }
+
+        // Vanilla iterates an ObjectArraySet in insertion order, but the feature
+        // index set is re-sorted afterwards, so ordering here does not matter.
+        return List.copyOf(union);
+    }
+
+    /**
+     * Memoized pure terrain computation per chunk. Decoration probes neighbor
+     * heights (vanilla reads real neighbor chunks), so entries are shared
+     * between a chunk's own generation and its neighbors' feature passes.
+     */
+    private TerrainData terrainData(int chunkX, int chunkZ) {
+        var key = (long) chunkX << 32 | (chunkZ & 0xFFFFFFFFL);
+        var cached = this.terrainDataCache.get(key);
+        if (cached != null) {
+            return cached;
+        }
+
+        var generator = new TerrainGenerator(this.settings);
+        // Vanilla NOISE stage: the beardifier for the chunk's structure starts
+        // joins the density before the solid/air decision. Start computation
+        // itself only reads un-bearded terrain, so this cannot recurse.
+        var beardifier = this.structurePlacer != null
+                ? this.structurePlacer.beardifier(chunkX, chunkZ, this.biomeZoomer, this.settings)
+                : Beardifier.EMPTY;
+        var data = generator.generate(chunkX, chunkZ, beardifier);
+        this.applySurface(data, chunkX, chunkZ);
+        // Vanilla chunk status order is NOISE -> SURFACE -> CARVERS; the carvers
+        // re-apply the top material where they expose the dirt under grass.
+        this.carvers.applyCarvers(data, chunkX, chunkZ, generator.aquifer());
+        var existing = this.terrainDataCache.putIfAbsent(key, data);
+        return existing != null ? existing : data;
+    }
+
+    private int[] terrainHeights(int chunkX, int chunkZ) {
+        return this.terrainData(chunkX, chunkZ).surfaceHeights();
+    }
+
+    private Set<Key> chunkBiomes(int chunkX, int chunkZ) {
+        var column = this.biomeSource.chunkColumn(chunkX, chunkZ);
+        var biomes = new HashSet<Key>();
+        for (var biome : column) {
+            biomes.add(biome);
+        }
+        return biomes;
     }
 
     private static boolean isSteep(int[] surfaceHeights, int sizeZ, int localX, int localZ) {
@@ -302,14 +447,6 @@ public final class WorldGenerator implements Generator {
         var featureUnit = unit.fork(forkStart, forkEnd);
         var levelAdapter = new GenerationUnitAdapter(featureUnit);
         EndPodiumFeature.place(levelAdapter, new BlockVec(0, surfaceY, 0), false);
-    }
-
-    private static boolean shouldApplySurfaceRule(int yIndex, int height, int stoneDepthAbove, int stoneDepthBelow) {
-        if (yIndex <= 8 || yIndex >= height - 8) {
-            return true;
-        }
-
-        return stoneDepthAbove <= 32 || stoneDepthBelow <= 32;
     }
 
     private static void fillBiomesFromNoise(GenerationUnit unit, BiomeSource biomes, int minY, int maxY) {

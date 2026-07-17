@@ -1,16 +1,32 @@
 package rocks.minestom.worldgen.feature.configurations;
 
-import net.minestom.server.codec.Codec;
-import net.minestom.server.codec.StructCodec;
-import rocks.minestom.worldgen.feature.EndSpikeFeature;
+import com.google.gson.JsonElement;
+import net.minestom.server.codec.Transcoder;
+import net.minestom.server.instance.block.Block;
+import rocks.minestom.worldgen.BlockCodec;
 import rocks.minestom.worldgen.feature.FeatureConfiguration;
+import rocks.minestom.worldgen.feature.placement.PlacementModifiers;
+import rocks.minestom.worldgen.structure.context.BlockTagManager;
 
-import java.util.List;
+/**
+ * Configuration for {@code minecraft:spike}, the generic version of the old
+ * ice spike feature.
+ */
+public record SpikeConfiguration(
+        Block state,
+        PlacementModifiers.BlockPredicate canPlaceOn,
+        PlacementModifiers.BlockPredicate canReplace
+) implements FeatureConfiguration {
 
-public record SpikeConfiguration(boolean crystalInvulnerable, List<EndSpikeFeature.EndSpike> spikes) implements FeatureConfiguration {
-    public static final Codec<SpikeConfiguration> CODEC = StructCodec.struct(
-            "crystal_invulnerable", Codec.BOOLEAN.optional(false), SpikeConfiguration::crystalInvulnerable,
-            "spikes", EndSpikeFeature.EndSpike.CODEC.list(), SpikeConfiguration::spikes,
-            SpikeConfiguration::new
-    );
+    public static SpikeConfiguration fromJson(JsonElement json, BlockTagManager blockTags) {
+        if (!json.isJsonObject()) {
+            throw new IllegalArgumentException("SpikeConfiguration must be a JSON object");
+        }
+
+        var obj = json.getAsJsonObject();
+        var state = BlockCodec.CODEC.decode(Transcoder.JSON, obj.get("state")).orElseThrow();
+        var canPlaceOn = PlacementModifiers.parseBlockPredicate(obj.getAsJsonObject("can_place_on"), blockTags);
+        var canReplace = PlacementModifiers.parseBlockPredicate(obj.getAsJsonObject("can_replace"), blockTags);
+        return new SpikeConfiguration(state, canPlaceOn, canReplace);
+    }
 }

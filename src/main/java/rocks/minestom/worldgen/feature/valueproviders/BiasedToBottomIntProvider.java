@@ -17,11 +17,17 @@ public record BiasedToBottomIntProvider(int minInclusive, int maxInclusive) impl
     }
 
     @Override
-    public int sample(RandomSource random) {
-        if (this.maxInclusive <= this.minInclusive) {
-            return this.minInclusive;
-        }
+    public int minValue() {
+        return this.minInclusive;
+    }
 
+    @Override
+    public int maxValue() {
+        return this.maxInclusive;
+    }
+
+    @Override
+    public int sample(RandomSource random) {
         return this.minInclusive + random.nextInt(random.nextInt(this.maxInclusive - this.minInclusive + 1) + 1);
     }
 }

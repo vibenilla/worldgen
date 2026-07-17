@@ -29,6 +29,14 @@ public interface Structure {
     StructureBiomes biomes();
 
     /**
+     * How the noise terrain adapts around this structure's pieces (vanilla
+     * {@code Structure.terrainAdaptation}).
+     */
+    default TerrainAdjustment terrainAdaptation() {
+        return TerrainAdjustment.NONE;
+    }
+
+    /**
      * Places this structure at the location specified in the context.
      */
     void place(StructurePlaceContext context);

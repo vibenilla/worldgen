@@ -51,5 +51,20 @@ repositories {
 }
 
 dependencies {
-    compileOnly("net.minestom:minestom:2026.01.08-1.21.11")
+    compileOnly("net.minestom:minestom:2026.07.12-26.2")
+    compileOnly("org.slf4j:slf4j-api:2.0.17")
+
+    testImplementation("net.minestom:minestom:2026.07.12-26.2")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testRuntimeOnly("org.slf4j:slf4j-simple:2.0.17")
+    // Unobfuscated vanilla server for side-by-side parity tests (gitignored, see data/setup_mc.sh)
+    testCompileOnly(files("data/mc/26.2/server-stripped.jar"))
+    testCompileOnly(fileTree("data/mc/26.2/libraries") { include("*.jar") })
+    testRuntimeOnly(files("data/mc/26.2/server.jar"))
+    testRuntimeOnly(fileTree("data/mc/26.2/libraries") { include("*.jar") })
+}
+
+tasks.test {
+    useJUnitPlatform()
 }

@@ -59,4 +59,30 @@ public record PlacedFeature(Key feature, ConfiguredFeature<?> inlineFeature, Lis
 
         return PlacementModifiers.apply(this.placement, context, random, origin);
     }
+
+    /**
+     * Runs the placement modifier pipeline lazily (depth-first per position, like
+     * vanilla's stream pipeline) so the shared random is consumed in vanilla order,
+     * placing the feature at each surviving position.
+     */
+    public void place(PlacementContext context, RandomSource random, BlockVec origin, PositionConsumer placer) {
+        this.placeRecursive(context, random, origin, 0, placer);
+    }
+
+    private void placeRecursive(PlacementContext context, RandomSource random, BlockVec position, int modifierIndex,
+            PositionConsumer placer) {
+        if (modifierIndex >= this.placement.size()) {
+            placer.accept(position, random);
+            return;
+        }
+
+        var positions = this.placement.get(modifierIndex).apply(context, random, position);
+        for (var next : positions) {
+            this.placeRecursive(context, random, next, modifierIndex + 1, placer);
+        }
+    }
+
+    public interface PositionConsumer {
+        void accept(BlockVec position, RandomSource random);
+    }
 }

@@ -3,16 +3,11 @@ package rocks.minestom.worldgen.structure.template;
 import net.kyori.adventure.nbt.*;
 import net.minestom.server.coordinate.BlockVec;
 import net.minestom.server.instance.block.Block;
-import net.minestom.server.utils.Direction;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import rocks.minestom.worldgen.feature.GenerationUnitAdapter;
-import rocks.minestom.worldgen.random.PositionalRandomFactory;
-import rocks.minestom.worldgen.structure.context.BlockTagManager;
+import rocks.minestom.worldgen.random.LegacyRandomSource;
+import rocks.minestom.worldgen.structure.StructureRng;
 import rocks.minestom.worldgen.structure.loader.StructureLoader;
-import rocks.minestom.worldgen.structure.processor.StructureProcessor;
-import rocks.minestom.worldgen.structure.processor.StructureProcessorContext;
-import rocks.minestom.worldgen.structure.processor.StructureProcessorList;
+import rocks.minestom.worldgen.structure.processor.*;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -21,32 +16,25 @@ import java.nio.file.Path;
 import java.util.*;
 
 /**
- * A structure template loaded from an NBT file.
+ * A structure template loaded from an NBT file, ported from vanilla's
+ * {@code StructureTemplate}.
  *
- * <p>
- * Templates are the fundamental building blocks of structures, containing:
+ * <p>Vanilla-parity notes:
  * <ul>
- * <li>Block palette and positions
- * <li>Jigsaw block information for assembly
- * <li>Entity data (not yet implemented)
- * </ul>
- *
- * <p>
- * Templates support rotation during placement via {@link Rotation}, and blocks
- * can be modified by {@link StructureProcessor}s.
- *
- * <p>
- * Two placement modes are available:
- * <ul>
- * <li>{@link #place} - Standard placement at a fixed origin
- * <li>{@link #placeTerrainMatching} - Each column matches terrain surface
- * height
+ * <li>Blocks are stored per palette in vanilla's category order (full blocks,
+ * then partial blocks, then block entities; each sorted by Y, X, Z). Capped
+ * processors shuffle indices over this order, so it matters.
+ * <li>Jigsaw blocks all carry NBT, so their order is the block-entity segment
+ * order: sorted by (Y, X, Z) of the template-local position.
+ * <li>Multi-palette templates pick a palette with a fresh legacy random seeded
+ * from the piece position hash ({@code StructurePlaceSettings.getRandomPalette}).
+ * <li>Processors observe unrotated template states; the piece rotation is
+ * applied when the surviving block is placed.
  * </ul>
  *
  * @see StructureLoader for loading templates from data packs
  */
 public final class StructureTemplate {
-    private static final Logger LOGGER = LoggerFactory.getLogger(StructureTemplate.class);
     private static final String TAG_SIZE = "size";
     private static final String TAG_PALETTE = "palette";
     private static final String TAG_PALETTES = "palettes";
@@ -58,26 +46,31 @@ public final class StructureTemplate {
     private static final String TAG_PROPERTIES = "Properties";
 
     private final BlockVec size;
-    private final List<StructureBlock> blocks;
-    private final List<JigsawBlockInfo> jigsaws;
+    private final List<Palette> palettes;
 
-    private StructureTemplate(BlockVec size, List<StructureBlock> blocks, List<JigsawBlockInfo> jigsaws) {
+    private StructureTemplate(BlockVec size, List<Palette> palettes) {
         this.size = size;
-        this.blocks = blocks;
-        this.jigsaws = jigsaws;
+        this.palettes = palettes;
     }
 
     public BlockVec size() {
         return this.size;
     }
 
+    /** Blocks of the first palette, in vanilla iteration order. */
     public List<StructureBlock> blocks() {
-        return this.blocks;
+        return this.palettes.getFirst().blocks();
     }
 
+    /**
+     * Jigsaw blocks in world coordinates for a piece at {@code origin} with
+     * the given rotation. Returns a fresh mutable list (callers shuffle it).
+     */
     public List<JigsawBlockInfo> getJigsaws(BlockVec origin, Rotation rotation) {
-        var result = new ArrayList<JigsawBlockInfo>(this.jigsaws.size());
-        for (var jigsaw : this.jigsaws) {
+        var palette = this.palettes.get(this.paletteIndex(origin));
+        var jigsaws = palette.jigsaws();
+        var result = new ArrayList<JigsawBlockInfo>(jigsaws.size());
+        for (var jigsaw : jigsaws) {
             var rotatedLocalPos = rotation.rotate(jigsaw.position(), this.size);
             var worldPos = new BlockVec(
                     origin.blockX() + rotatedLocalPos.blockX(),
@@ -98,84 +91,147 @@ public final class StructureTemplate {
         return BoundingBox.fromCorners(corner1, corner2).moved(origin.blockX(), origin.blockY(), origin.blockZ());
     }
 
-    public void place(GenerationUnitAdapter level, BlockVec origin, StructureProcessorList processors,
-            PositionalRandomFactory randomFactory, BlockTagManager blockTags) {
-        this.place(level, origin, Rotation.NONE, processors, randomFactory, blockTags);
+    /**
+     * Vanilla {@code StructurePlaceSettings.getRandomPalette}: multi-palette
+     * templates pick via a fresh legacy random seeded from the position hash.
+     */
+    private int paletteIndex(BlockVec position) {
+        if (this.palettes.size() == 1) {
+            return 0;
+        }
+        var random = new LegacyRandomSource(StructureRng.getSeed(
+                position.blockX(), position.blockY(), position.blockZ()));
+        return random.nextInt(this.palettes.size());
     }
 
-    public void place(GenerationUnitAdapter level, BlockVec origin, Rotation rotation,
-            StructureProcessorList processors, PositionalRandomFactory randomFactory, BlockTagManager blockTags) {
-        for (var blockEntry : this.blocks) {
-            var position = blockEntry.position();
-            var rotatedPos = rotation.rotate(position, this.size);
-            var worldX = origin.blockX() + rotatedPos.blockX();
-            var worldY = origin.blockY() + rotatedPos.blockY();
-            var worldZ = origin.blockZ() + rotatedPos.blockZ();
-            var block = blockEntry.block();
+    /**
+     * Everything piece placement needs beyond the piece itself.
+     *
+     * @param level        block reads and writes
+     * @param chunkBounds  clip placed blocks (and, without whole-piece
+     *                     processors, processed blocks) to this box; null for
+     *                     unbounded placement
+     * @param referencePos structure reference position for pos rule tests
+     * @param worldSeed    world seed (capped processors)
+     * @param processorContextFactory context shared by all pieces of a start
+     */
+    public record PlacementContext(
+            GenerationUnitAdapter level,
+            BoundingBox chunkBounds,
+            StructureProcessorContext processorContext
+    ) {
+    }
 
-            block = rotateBlockState(block, rotation);
+    /**
+     * Vanilla {@code StructureTemplate.placeInWorld} + {@code processBlockInfos}
+     * for worldgen purposes (no entities, no block-entity loading).
+     */
+    public void place(
+            PlacementContext context,
+            BlockVec position,
+            Rotation rotation,
+            StructureProcessorList processors,
+            boolean legacy,
+            boolean terrainMatching,
+            LiquidSettings liquidSettings) {
+        var palette = this.palettes.get(this.paletteIndex(position));
 
-            var random = randomFactory.at(worldX, worldY, worldZ);
-            var processed = processors.apply(block, new StructureProcessorContext(random, blockTags));
-            if (processed == null) {
+        // Vanilla processor chain order (SinglePoolElement.getSettings /
+        // LegacySinglePoolElement.getSettings).
+        var chain = new ArrayList<StructureProcessor>(processors.processors().size() + 3);
+        if (!legacy) {
+            chain.add(BlockIgnoreProcessor.STRUCTURE_BLOCK);
+        }
+        chain.add(JigsawReplacementProcessor.INSTANCE);
+        chain.addAll(processors.processors());
+        if (terrainMatching) {
+            chain.add(new GravityProcessor(-1));
+        }
+        if (legacy) {
+            chain.add(BlockIgnoreProcessor.STRUCTURE_AND_AIR);
+        }
+
+        var processOnlyInCurrentChunk = true;
+        for (var processor : chain) {
+            if (processor.evaluatesEntirePieceState()) {
+                processOnlyInCurrentChunk = false;
+                break;
+            }
+        }
+
+        var processorContext = context.processorContext();
+        var chunkBounds = context.chunkBounds();
+        var originalBlockInfoList = new ArrayList<StructureBlockInfo>();
+        var processedBlockInfoList = new ArrayList<StructureBlockInfo>();
+
+        for (var blockEntry : palette.blocks()) {
+            var templatePos = blockEntry.position();
+            var rotatedPos = rotation.rotate(templatePos, this.size);
+            var worldPos = new BlockVec(
+                    position.blockX() + rotatedPos.blockX(),
+                    position.blockY() + rotatedPos.blockY(),
+                    position.blockZ() + rotatedPos.blockZ());
+            if (processOnlyInCurrentChunk && chunkBounds != null && !chunkBounds.isInside(worldPos)) {
                 continue;
             }
 
-            var blockKey = processed.key().asString();
+            var processed = new StructureBlockInfo(worldPos, blockEntry.block(), blockEntry.nbt());
+            for (var processor : chain) {
+                processed = processor.processBlock(processorContext, templatePos, processed);
+                if (processed == null) {
+                    break;
+                }
+            }
+
+            if (processed != null) {
+                processedBlockInfoList.add(processed);
+                originalBlockInfoList.add(new StructureBlockInfo(templatePos, blockEntry.block(), blockEntry.nbt()));
+            }
+        }
+
+        List<StructureBlockInfo> finalized = processedBlockInfoList;
+        for (var processor : chain) {
+            finalized = processor.finalizeProcessing(processorContext, originalBlockInfoList, finalized);
+        }
+
+        var applyWaterlogging = liquidSettings == LiquidSettings.APPLY_WATERLOGGING;
+        var level = context.level();
+        for (var blockInfo : finalized) {
+            var blockPos = blockInfo.pos();
+            if (chunkBounds != null && !chunkBounds.isInside(blockPos)) {
+                continue;
+            }
+
+            var state = rotateBlockState(blockInfo.state(), rotation);
+            var blockKey = state.key().asString();
             if (blockKey.equals("minecraft:structure_void") || blockKey.equals("minecraft:jigsaw")) {
                 continue;
             }
 
-            level.setBlock(new BlockVec(worldX, worldY, worldZ), processed);
+            if (applyWaterlogging && state.getProperty("waterlogged") != null
+                    && isSourceWater(level.getBlock(blockPos.blockX(), blockPos.blockY(), blockPos.blockZ()))) {
+                state = state.withProperty("waterlogged", "true");
+            }
+
+            if (blockInfo.nbt() != null && blockInfo.nbt() != state.nbt()) {
+                state = state.withNbt(blockInfo.nbt());
+            }
+
+            level.setBlock(blockPos, state);
         }
     }
 
-    public void placeTerrainMatching(GenerationUnitAdapter level, BlockVec origin, Rotation rotation,
-            StructureProcessorList processors, PositionalRandomFactory randomFactory, BlockTagManager blockTags,
-            int projectionOffset, int[] surfaceHeights, int chunkStartX, int chunkStartZ, int chunkSizeX,
-            int chunkSizeZ) {
-        // Use a single reference surface height at the piece origin
-        // This keeps the structure cohesive and avoids "block vomit" from per-block
-        // adjustments
-        var originLocalX = origin.blockX() - chunkStartX;
-        var originLocalZ = origin.blockZ() - chunkStartZ;
-
-        var referenceSurfaceY = origin.blockY();
-        if (originLocalX >= 0 && originLocalX < chunkSizeX && originLocalZ >= 0 && originLocalZ < chunkSizeZ) {
-            var surfaceIndex = originLocalX * chunkSizeZ + originLocalZ;
-            var surfaceY = surfaceHeights[surfaceIndex];
-            if (surfaceY != Integer.MIN_VALUE) {
-                referenceSurfaceY = surfaceY;
-            }
+    private static boolean isSourceWater(Block block) {
+        var key = block.key().asString();
+        if (key.equals("minecraft:water")) {
+            var levelProperty = block.getProperty("level");
+            return levelProperty == null || levelProperty.equals("0");
         }
-
-        for (var blockEntry : this.blocks) {
-            var position = blockEntry.position();
-            var rotatedPos = rotation.rotate(position, this.size);
-            var worldX = origin.blockX() + rotatedPos.blockX();
-            var worldZ = origin.blockZ() + rotatedPos.blockZ();
-
-            var worldY = referenceSurfaceY + projectionOffset + rotatedPos.blockY();
-            var block = blockEntry.block();
-
-            block = rotateBlockState(block, rotation);
-
-            var random = randomFactory.at(worldX, worldY, worldZ);
-            var processed = processors.apply(block, new StructureProcessorContext(random, blockTags));
-            if (processed == null) {
-                continue;
-            }
-
-            var blockKey = processed.key().asString();
-            if (blockKey.equals("minecraft:structure_void") || blockKey.equals("minecraft:jigsaw")) {
-                continue;
-            }
-
-            level.setBlock(new BlockVec(worldX, worldY, worldZ), processed);
-        }
+        // Waterlogged blocks expose a source water fluid state.
+        return "true".equals(block.getProperty("waterlogged"));
     }
 
-    private static Block rotateBlockState(Block block, Rotation rotation) {
+    public static Block rotateBlockState(Block block, Rotation rotation) {
         if (rotation == Rotation.NONE) {
             return block;
         }
@@ -187,6 +243,16 @@ public final class StructureTemplate {
                 var rotated = rotation.rotate(direction);
                 block = block.withProperty("facing", rotated.name().toLowerCase());
             }
+        }
+
+        var orientation = block.getProperty("orientation");
+        if (orientation != null) {
+            block = rotateOrientation(block, orientation, rotation);
+        }
+
+        var rotationProperty = block.getProperty("rotation");
+        if (rotationProperty != null) {
+            block = rotateSixteenStep(block, rotationProperty, rotation);
         }
 
         var axis = block.getProperty("axis");
@@ -201,6 +267,47 @@ public final class StructureTemplate {
         block = rotateHorizontalConnections(block, rotation);
 
         return block;
+    }
+
+    private static Block rotateOrientation(Block block, String orientation, Rotation rotation) {
+        var parts = orientation.split("_");
+        if (parts.length != 2) {
+            return block;
+        }
+
+        var front = rotateDirectionName(parts[0], rotation);
+        var top = rotateDirectionName(parts[1], rotation);
+        try {
+            return block.withProperty("orientation", front + "_" + top);
+        } catch (Exception exception) {
+            return block;
+        }
+    }
+
+    private static String rotateDirectionName(String name, Rotation rotation) {
+        var direction = parseDirection(name);
+        if (direction == null || direction.normalY() != 0) {
+            return name;
+        }
+        return rotation.rotate(direction).name().toLowerCase();
+    }
+
+    /** Banners and similar 16-step "rotation" properties. */
+    private static Block rotateSixteenStep(Block block, String value, Rotation rotation) {
+        int steps;
+        try {
+            steps = Integer.parseInt(value);
+        } catch (NumberFormatException exception) {
+            return block;
+        }
+
+        var offset = switch (rotation) {
+            case CLOCKWISE_90 -> 4;
+            case CLOCKWISE_180 -> 8;
+            case COUNTERCLOCKWISE_90 -> 12;
+            case NONE -> 0;
+        };
+        return block.withProperty("rotation", Integer.toString((steps + offset) & 15));
     }
 
     private static Block rotateHorizontalConnections(Block block, Rotation rotation) {
@@ -232,14 +339,14 @@ public final class StructureTemplate {
         };
     }
 
-    private static Direction parseDirection(String name) {
+    private static net.minestom.server.utils.Direction parseDirection(String name) {
         return switch (name.toLowerCase()) {
-            case "up" -> Direction.UP;
-            case "down" -> Direction.DOWN;
-            case "north" -> Direction.NORTH;
-            case "south" -> Direction.SOUTH;
-            case "east" -> Direction.EAST;
-            case "west" -> Direction.WEST;
+            case "up" -> net.minestom.server.utils.Direction.UP;
+            case "down" -> net.minestom.server.utils.Direction.DOWN;
+            case "north" -> net.minestom.server.utils.Direction.NORTH;
+            case "south" -> net.minestom.server.utils.Direction.SOUTH;
+            case "east" -> net.minestom.server.utils.Direction.EAST;
+            case "west" -> net.minestom.server.utils.Direction.WEST;
             default -> null;
         };
     }
@@ -272,67 +379,53 @@ public final class StructureTemplate {
                 getInt(sizeTag, 1),
                 getInt(sizeTag, 2));
 
-        var palette = readPalette(root);
+        var paletteStates = readPalettes(root);
         var blocksTag = getList(root, TAG_BLOCKS);
-        var blocks = new ArrayList<StructureBlock>(blocksTag.size());
-        var jigsaws = new ArrayList<JigsawBlockInfo>();
 
+        var rawBlocks = new ArrayList<RawBlock>(blocksTag.size());
         for (var entry : blocksTag) {
             if (!(entry instanceof CompoundBinaryTag blockTag)) {
                 continue;
             }
 
             var posTag = getList(blockTag, TAG_POS);
-            var position = new BlockVec(
+            var blockPosition = new BlockVec(
                     getInt(posTag, 0),
                     getInt(posTag, 1),
                     getInt(posTag, 2));
 
             var stateIndex = getInt(blockTag, TAG_STATE);
-            if (stateIndex < 0 || stateIndex >= palette.size()) {
-                continue;
-            }
-
-            var block = palette.get(stateIndex);
-            var nbt = blockTag.get(TAG_NBT);
             CompoundBinaryTag nbtCompound = null;
-            if (nbt instanceof CompoundBinaryTag compound) {
+            if (blockTag.get(TAG_NBT) instanceof CompoundBinaryTag compound) {
                 nbtCompound = compound;
-                block = block.withNbt(compound);
             }
 
-            var blockKey = block.key().asString();
-            if (blockKey.equals("minecraft:jigsaw")) {
-                var orientation = block.getProperty("orientation");
-                LOGGER.debug("Jigsaw block at {} has orientation property: {}", position, orientation);
-                var jigsawInfo = JigsawBlockInfo.fromBlock(position, block, nbtCompound);
-                jigsaws.add(jigsawInfo);
-                LOGGER.debug("Found jigsaw at {}: pool={}, name={}, target={}, front={}, top={}",
-                        position, jigsawInfo.pool(), jigsawInfo.name(), jigsawInfo.target(), jigsawInfo.front(),
-                        jigsawInfo.top());
-            }
-
-            blocks.add(new StructureBlock(position, block));
+            rawBlocks.add(new RawBlock(blockPosition, stateIndex, nbtCompound));
         }
 
-        if (!jigsaws.isEmpty()) {
-            LOGGER.debug("Template loaded: {} blocks, {} jigsaws", blocks.size(), jigsaws.size());
+        var palettes = new ArrayList<Palette>(paletteStates.size());
+        for (var states : paletteStates) {
+            palettes.add(Palette.build(rawBlocks, states));
         }
 
-        return new StructureTemplate(size, List.copyOf(blocks), List.copyOf(jigsaws));
+        return new StructureTemplate(size, List.copyOf(palettes));
     }
 
-    private static List<Block> readPalette(CompoundBinaryTag root) {
+    private static List<List<Block>> readPalettes(CompoundBinaryTag root) {
         var palettesTag = getList(root, TAG_PALETTES);
         if (!palettesTag.isEmpty()) {
-            var firstPalette = palettesTag.get(0);
-            if (firstPalette instanceof ListBinaryTag list) {
-                return parsePalette(list);
+            var palettes = new ArrayList<List<Block>>(palettesTag.size());
+            for (var entry : palettesTag) {
+                if (entry instanceof ListBinaryTag list) {
+                    palettes.add(parsePalette(list));
+                }
+            }
+            if (!palettes.isEmpty()) {
+                return palettes;
             }
         }
 
-        var paletteTag = getList(root, TAG_PALETTE);
-        return parsePalette(paletteTag);
+        return List.of(parsePalette(getList(root, TAG_PALETTE)));
     }
 
     private static List<Block> parsePalette(ListBinaryTag paletteTag) {
@@ -402,10 +495,73 @@ public final class StructureTemplate {
         return ListBinaryTag.empty();
     }
 
-    public record StructureBlock(BlockVec position, Block block) {
+    private record RawBlock(BlockVec position, int stateIndex, CompoundBinaryTag nbt) {
+    }
+
+    public record StructureBlock(BlockVec position, Block block, CompoundBinaryTag nbt) {
         public StructureBlock {
             Objects.requireNonNull(position, "position");
             Objects.requireNonNull(block, "block");
+        }
+    }
+
+    /**
+     * One resolved palette: blocks in vanilla iteration order (full blocks,
+     * partial blocks, block entities; each sorted by Y, X, Z) plus its jigsaw
+     * block infos.
+     */
+    private record Palette(List<StructureBlock> blocks, List<JigsawBlockInfo> jigsaws) {
+        private static final Comparator<StructureBlock> VANILLA_ORDER =
+                Comparator.<StructureBlock>comparingInt(block -> block.position().blockY())
+                        .thenComparingInt(block -> block.position().blockX())
+                        .thenComparingInt(block -> block.position().blockZ());
+
+        static Palette build(List<RawBlock> rawBlocks, List<Block> states) {
+            var fullBlocks = new ArrayList<StructureBlock>();
+            var otherBlocks = new ArrayList<StructureBlock>();
+            var blockEntities = new ArrayList<StructureBlock>();
+
+            for (var raw : rawBlocks) {
+                if (raw.stateIndex() < 0 || raw.stateIndex() >= states.size()) {
+                    continue;
+                }
+
+                var state = states.get(raw.stateIndex());
+                var structureBlock = new StructureBlock(raw.position(), state, raw.nbt());
+                if (raw.nbt() != null) {
+                    blockEntities.add(structureBlock);
+                } else if (isFullCollisionBlock(state)) {
+                    fullBlocks.add(structureBlock);
+                } else {
+                    otherBlocks.add(structureBlock);
+                }
+            }
+
+            fullBlocks.sort(VANILLA_ORDER);
+            otherBlocks.sort(VANILLA_ORDER);
+            blockEntities.sort(VANILLA_ORDER);
+
+            var blocks = new ArrayList<StructureBlock>(rawBlocks.size());
+            blocks.addAll(fullBlocks);
+            blocks.addAll(otherBlocks);
+            blocks.addAll(blockEntities);
+
+            var jigsaws = new ArrayList<JigsawBlockInfo>();
+            for (var block : blocks) {
+                if (block.block().key().asString().equals("minecraft:jigsaw")) {
+                    jigsaws.add(JigsawBlockInfo.fromBlock(block.position(), block.block(), block.nbt()));
+                }
+            }
+
+            return new Palette(List.copyOf(blocks), List.copyOf(jigsaws));
+        }
+
+        private static boolean isFullCollisionBlock(Block state) {
+            var shape = state.registry().collisionShape();
+            var start = shape.relativeStart();
+            var end = shape.relativeEnd();
+            return start.x() == 0.0 && start.y() == 0.0 && start.z() == 0.0
+                    && end.x() == 1.0 && end.y() == 1.0 && end.z() == 1.0;
         }
     }
 }

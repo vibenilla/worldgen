@@ -5,14 +5,15 @@ import net.minestom.server.codec.StructCodec;
 import net.minestom.server.coordinate.BlockVec;
 import net.minestom.server.instance.block.Block;
 import rocks.minestom.worldgen.feature.configurations.TreeConfiguration;
+import rocks.minestom.worldgen.feature.valueproviders.IntProvider;
 import rocks.minestom.worldgen.random.RandomSource;
 
-public record SpruceFoliagePlacer(int radius, int offset, int trunkHeight) implements FoliagePlacer {
+public record SpruceFoliagePlacer(IntProvider radius, IntProvider offset, IntProvider trunkHeight) implements FoliagePlacer {
 
     public static final Codec<SpruceFoliagePlacer> CODEC = StructCodec.struct(
-            "radius", Codec.INT, SpruceFoliagePlacer::radius,
-            "offset", Codec.INT, SpruceFoliagePlacer::offset,
-            "trunk_height", Codec.INT, SpruceFoliagePlacer::trunkHeight,
+            "radius", IntProvider.CODEC, SpruceFoliagePlacer::radius,
+            "offset", IntProvider.CODEC, SpruceFoliagePlacer::offset,
+            "trunk_height", IntProvider.CODEC, SpruceFoliagePlacer::trunkHeight,
             SpruceFoliagePlacer::new
     );
 
@@ -27,12 +28,14 @@ public record SpruceFoliagePlacer(int radius, int offset, int trunkHeight) imple
             int foliageHeight,
             int foliageRadius
     ) {
+        // Vanilla samples the offset before running the placer body.
+        var offset = this.offset.sample(random);
         var center = attachment.pos();
         var currentRadius = random.nextInt(2);
         var maxRadius = 1;
         var minRadius = 0;
 
-        for (var y = this.offset; y >= this.offset - foliageHeight; y--) {
+        for (var y = offset; y >= offset - foliageHeight; y--) {
             this.placeLeavesRow(
                     getter,
                     foliageSetter,
@@ -56,12 +59,12 @@ public record SpruceFoliagePlacer(int radius, int offset, int trunkHeight) imple
 
     @Override
     public int foliageHeight(RandomSource random, int treeHeight, TreeConfiguration config) {
-        return Math.max(4, treeHeight - this.trunkHeight);
+        return Math.max(4, treeHeight - this.trunkHeight.sample(random));
     }
 
     @Override
     public int foliageRadius(RandomSource random, int baseHeight) {
-        return this.radius;
+        return this.radius.sample(random);
     }
 
     private void placeLeavesRow(

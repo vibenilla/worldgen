@@ -211,6 +211,7 @@ public final class DensityFunctionResolver {
             case "minecraft:cube" -> unaryMapped(self, DensityFunctions.Mapped.Type.CUBE);
             case "minecraft:half_negative" -> unaryMapped(self, DensityFunctions.Mapped.Type.HALF_NEGATIVE);
             case "minecraft:quarter_negative" -> unaryMapped(self, DensityFunctions.Mapped.Type.QUARTER_NEGATIVE);
+            case "minecraft:invert" -> unaryMapped(self, DensityFunctions.Mapped.Type.INVERT);
             case "minecraft:squeeze" -> unaryMapped(self, DensityFunctions.Mapped.Type.SQUEEZE);
             case "minecraft:y_clamped_gradient" -> StructCodec.struct(
                     "from_y", Codec.INT, function -> {
@@ -331,6 +332,36 @@ public final class DensityFunctionResolver {
                         throw new UnsupportedOperationException("Encoding is not supported");
                     },
                     (input, noiseKey, mapper) -> new DensityFunctions.WeirdScaledSampler(input, this.randomState.getOrCreateNoise(noiseKey), mapper)
+            );
+            case "minecraft:find_top_surface" -> StructCodec.struct(
+                    "density", self, function -> {
+                        throw new UnsupportedOperationException("Encoding is not supported");
+                    },
+                    "upper_bound", self, function -> {
+                        throw new UnsupportedOperationException("Encoding is not supported");
+                    },
+                    "lower_bound", Codec.INT, function -> {
+                        throw new UnsupportedOperationException("Encoding is not supported");
+                    },
+                    "cell_height", Codec.INT, function -> {
+                        throw new UnsupportedOperationException("Encoding is not supported");
+                    },
+                    DensityFunctions.FindTopSurface::new
+            );
+            case "minecraft:interval_select" -> StructCodec.struct(
+                    "input", self, function -> {
+                        throw new UnsupportedOperationException("Encoding is not supported");
+                    },
+                    "thresholds", Codec.DOUBLE.list(), function -> {
+                        throw new UnsupportedOperationException("Encoding is not supported");
+                    },
+                    "functions", self.list(), function -> {
+                        throw new UnsupportedOperationException("Encoding is not supported");
+                    },
+                    (input, thresholds, functions) -> new DensityFunctions.IntervalSelect(
+                            input,
+                            thresholds.stream().mapToDouble(Double::doubleValue).toArray(),
+                            functions)
             );
             case "minecraft:old_blended_noise" -> StructCodec.struct(
                     "xz_scale", Codec.DOUBLE, function -> {

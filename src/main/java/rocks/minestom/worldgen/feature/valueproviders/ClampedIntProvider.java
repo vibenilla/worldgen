@@ -18,6 +18,16 @@ public record ClampedIntProvider(IntProvider source, int minInclusive, int maxIn
     }
 
     @Override
+    public int minValue() {
+        return Math.max(this.minInclusive, this.source.minValue());
+    }
+
+    @Override
+    public int maxValue() {
+        return Math.min(this.maxInclusive, this.source.maxValue());
+    }
+
+    @Override
     public int sample(RandomSource random) {
         var sampled = this.source.sample(random);
         if (sampled < this.minInclusive) {

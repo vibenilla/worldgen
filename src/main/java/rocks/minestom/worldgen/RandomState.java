@@ -52,6 +52,30 @@ public final class RandomState {
         return this.randomFactoryCache.computeIfAbsent(id, key -> this.positionalRandomFactory.fromHashOf(key.asString()).forkPositional());
     }
 
+    /**
+     * Root positional random of the world seed; vanilla hands this directly to
+     * the surface system.
+     */
+    public PositionalRandomFactory random() {
+        return this.positionalRandomFactory;
+    }
+
+    /**
+     * Positional random used for aquifer cell placement, forked from
+     * {@code minecraft:aquifer} like vanilla {@code RandomState.aquiferRandom}.
+     */
+    public PositionalRandomFactory aquiferRandom() {
+        return this.getOrCreateRandomFactory(Key.key("minecraft:aquifer"));
+    }
+
+    /**
+     * Positional random used for ore vein placement, forked from
+     * {@code minecraft:ore} like vanilla {@code RandomState.oreRandom}.
+     */
+    public PositionalRandomFactory oreRandom() {
+        return this.getOrCreateRandomFactory(Key.key("minecraft:ore"));
+    }
+
     public RandomSource terrainRandom() {
         if (this.legacyRandomSource) {
             return new LegacyRandomSource(this.seed);

@@ -74,7 +74,7 @@ public record DarkOakFoliagePlacer(int radius, int offset) implements FoliagePla
     }
 
     private boolean shouldSkipLocationSigned(RandomSource random, int x, int y, int z, int radius, boolean doubleTrunk) {
-        if (y == 0 && doubleTrunk && (x == -radius || x == radius + 1) && (z == -radius || z == radius + 1)) {
+        if (y == 0 && doubleTrunk && (x == -radius || x >= radius) && (z == -radius || z >= radius)) {
             return true;
         }
 

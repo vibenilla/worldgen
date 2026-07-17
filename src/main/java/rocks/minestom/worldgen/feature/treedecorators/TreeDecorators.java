@@ -30,14 +30,15 @@ public final class TreeDecorators {
 
             return switch (type) {
                 case "minecraft:place_on_ground" -> PlaceOnGroundDecorator.CODEC.decode(coder, value).mapResult(decorator -> (TreeDecorator) decorator);
-                default -> {
-                    // consume the unknown decorator so parsing succeeds, but return a no-op
-                    // We need to fully decode/consume it to advance the stream if needed (though map access is random access usually)
-                    // If we just return NoOpDecorator without decoding the structure, it might leave unconsumed data in some formats,
-                    // but for JSON it's fine. However, to be safe and consistent, we could decode it as RAW_VALUE.
-                    // But here we can just return the NoOp decorator directly as we're in a map context.
-                    yield new Result.Ok<>(NoOpDecorator.INSTANCE);
-                }
+                case "minecraft:beehive" -> BeehiveDecorator.CODEC.decode(coder, value).mapResult(decorator -> (TreeDecorator) decorator);
+                case "minecraft:trunk_vine" -> new Result.Ok<>(TrunkVineDecorator.INSTANCE);
+                case "minecraft:leave_vine" -> LeaveVineDecorator.CODEC.decode(coder, value).mapResult(decorator -> (TreeDecorator) decorator);
+                case "minecraft:attached_to_logs" -> AttachedToLogsDecorator.CODEC.decode(coder, value).mapResult(decorator -> (TreeDecorator) decorator);
+                case "minecraft:alter_ground" -> AlterGroundDecorator.CODEC.decode(coder, value).mapResult(decorator -> (TreeDecorator) decorator);
+                case "minecraft:cocoa" -> CocoaDecorator.CODEC.decode(coder, value).mapResult(decorator -> (TreeDecorator) decorator);
+                // pale_moss, creaking_heart, attached_to_leaves are not
+                // implemented yet; parse them as no-ops
+                default -> new Result.Ok<>(NoOpDecorator.INSTANCE);
             };
         }
     };

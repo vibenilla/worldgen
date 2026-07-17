@@ -86,9 +86,30 @@ public final class DualNoiseProvider extends NoiseProvider {
     }
 
     public record InclusiveRange(int minInclusive, int maxInclusive) {
-        public static final Codec<InclusiveRange> CODEC = StructCodec.struct(
+        private static final Codec<InclusiveRange> MAP_CODEC = StructCodec.struct(
                 "min_inclusive", Codec.INT, InclusiveRange::minInclusive,
                 "max_inclusive", Codec.INT, InclusiveRange::maxInclusive,
                 InclusiveRange::new);
+
+        /**
+         * Vanilla serializes an {@code InclusiveRange} either as a
+         * {@code [min, max]} pair or as a map with min/max fields.
+         */
+        public static final Codec<InclusiveRange> CODEC = new Codec<>() {
+            @Override
+            public <D> net.minestom.server.codec.Result<D> encode(net.minestom.server.codec.Transcoder<D> coder, InclusiveRange value) {
+                return new net.minestom.server.codec.Result.Error<>("Encoding is not supported");
+            }
+
+            @Override
+            public <D> net.minestom.server.codec.Result<InclusiveRange> decode(net.minestom.server.codec.Transcoder<D> coder, D value) {
+                var listResult = Codec.INT.list().decode(coder, value);
+                if (listResult instanceof net.minestom.server.codec.Result.Ok<List<Integer>>(var values) && values.size() == 2) {
+                    return new net.minestom.server.codec.Result.Ok<>(new InclusiveRange(values.get(0), values.get(1)));
+                }
+
+                return MAP_CODEC.decode(coder, value);
+            }
+        };
     }
 }

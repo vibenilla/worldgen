@@ -9,7 +9,6 @@ public final class ClimateSampler {
     private final DensityFunction erosion;
     private final DensityFunction depth;
     private final DensityFunction weirdness;
-    private final SinglePointContext context;
 
     public ClimateSampler(
             DensityFunction temperature,
@@ -25,53 +24,51 @@ public final class ClimateSampler {
         this.erosion = erosion;
         this.depth = depth;
         this.weirdness = weirdness;
-        this.context = new SinglePointContext();
+    }
+
+    public DensityFunction temperature() {
+        return this.temperature;
+    }
+
+    public DensityFunction humidity() {
+        return this.humidity;
+    }
+
+    public DensityFunction continentalness() {
+        return this.continentalness;
+    }
+
+    public DensityFunction weirdness() {
+        return this.weirdness;
     }
 
     public DensityFunction erosion() {
         return this.erosion;
     }
 
-    public Climate.TargetPoint sample(int quartX, int quartY, int quartZ) {
-        var blockX = quartX << 2;
-        var blockY = quartY << 2;
-        var blockZ = quartZ << 2;
-        this.context.setBlock(blockX, blockY, blockZ);
-
-        return Climate.target(
-                (float) this.temperature.compute(this.context),
-                (float) this.humidity.compute(this.context),
-                (float) this.continentalness.compute(this.context),
-                (float) this.erosion.compute(this.context),
-                (float) this.depth.compute(this.context),
-                (float) this.weirdness.compute(this.context)
-        );
+    public DensityFunction depth() {
+        return this.depth;
     }
 
-    private static final class SinglePointContext implements DensityFunction.Context {
-        private int blockX;
-        private int blockY;
-        private int blockZ;
+    public Climate.TargetPoint sample(int quartX, int quartY, int quartZ) {
+        // Context must be per-call: chunks generate concurrently and a shared
+        // mutable context races across threads
+        var context = new DensityFunction.SinglePointContext(quartX << 2, quartY << 2, quartZ << 2);
+        return this.sample(context);
+    }
 
-        private void setBlock(int blockX, int blockY, int blockZ) {
-            this.blockX = blockX;
-            this.blockY = blockY;
-            this.blockZ = blockZ;
-        }
-
-        @Override
-        public int blockX() {
-            return this.blockX;
-        }
-
-        @Override
-        public int blockY() {
-            return this.blockY;
-        }
-
-        @Override
-        public int blockZ() {
-            return this.blockZ;
-        }
+    /**
+     * Samples with a caller-managed context, allowing column-cached evaluation
+     * during chunk biome fills.
+     */
+    public Climate.TargetPoint sample(DensityFunction.Context context) {
+        return Climate.target(
+                (float) this.temperature.compute(context),
+                (float) this.humidity.compute(context),
+                (float) this.continentalness.compute(context),
+                (float) this.erosion.compute(context),
+                (float) this.depth.compute(context),
+                (float) this.weirdness.compute(context)
+        );
     }
 }

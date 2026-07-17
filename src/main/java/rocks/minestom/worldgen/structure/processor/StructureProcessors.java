@@ -1,72 +1,37 @@
 package rocks.minestom.worldgen.structure.processor;
 
 import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import net.kyori.adventure.key.Key;
-import net.minestom.server.codec.Codec;
-import net.minestom.server.codec.StructCodec;
-import net.minestom.server.codec.Transcoder;
 import net.minestom.server.instance.block.Block;
-import rocks.minestom.worldgen.BlockCodec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 public final class StructureProcessors {
-    private static final Codec<ProcessorListData> PROCESSOR_LIST_CODEC = StructCodec.struct(
-            "processors", Codec.RAW_VALUE.list().optional(List.of()), ProcessorListData::processors,
-            ProcessorListData::new
-    );
-
-    private static final Codec<RuleProcessorData> RULE_PROCESSOR_CODEC = StructCodec.struct(
-            "rules", Codec.RAW_VALUE.list().optional(List.of()), RuleProcessorData::rules,
-            RuleProcessorData::new
-    );
-
-    private static final Codec<ProcessorRuleData> RULE_CODEC = StructCodec.struct(
-            "input_predicate", Codec.RAW_VALUE, ProcessorRuleData::inputPredicate,
-            "location_predicate", Codec.RAW_VALUE, ProcessorRuleData::locationPredicate,
-            "output_state", BlockCodec.CODEC, ProcessorRuleData::outputState,
-            ProcessorRuleData::new
-    );
-
-    private static final Codec<BlockStateMatchData> BLOCK_STATE_MATCH_CODEC = StructCodec.struct(
-            "block_state", BlockCodec.CODEC, BlockStateMatchData::state,
-            BlockStateMatchData::new
-    );
-
-    private static final Codec<BlockMatchData> BLOCK_MATCH_CODEC = StructCodec.struct(
-            "block", Codec.KEY, BlockMatchData::block,
-            BlockMatchData::new
-    );
-
-    private static final Codec<RandomBlockMatchData> RANDOM_BLOCK_MATCH_CODEC = StructCodec.struct(
-            "block", Codec.KEY, RandomBlockMatchData::block,
-            "probability", Codec.FLOAT, RandomBlockMatchData::probability,
-            RandomBlockMatchData::new
-    );
-
-    private static final Codec<TagMatchData> TAG_MATCH_CODEC = StructCodec.struct(
-            "tag", Codec.KEY, TagMatchData::tag,
-            TagMatchData::new
-    );
+    private static final Logger LOGGER = LoggerFactory.getLogger(StructureProcessors.class);
 
     private StructureProcessors() {
     }
 
     public static StructureProcessorList parseProcessorList(JsonElement json) {
-        var processorList = PROCESSOR_LIST_CODEC.decode(Transcoder.JSON, json).orElseThrow();
+        if (!json.isJsonObject()) {
+            return StructureProcessorList.EMPTY;
+        }
+
+        var processorsTag = json.getAsJsonObject().get("processors");
+        if (processorsTag == null || !processorsTag.isJsonArray()) {
+            return StructureProcessorList.EMPTY;
+        }
+
         var processors = new ArrayList<StructureProcessor>();
-
-        for (var rawProcessor : processorList.processors()) {
-            var processorJson = rawProcessor.convertTo(Transcoder.JSON).orElseThrow();
-            if (!processorJson.isJsonObject()) {
-                continue;
-            }
-
-            var type = processorJson.getAsJsonObject().get("processor_type").getAsString();
-            if (type.equals("minecraft:rule")) {
-                var ruleData = RULE_PROCESSOR_CODEC.decode(Transcoder.JSON, processorJson).orElseThrow();
-                processors.add(parseRuleProcessor(ruleData));
+        for (var entry : processorsTag.getAsJsonArray()) {
+            var processor = parseProcessor(entry);
+            if (processor != null) {
+                processors.add(processor);
             }
         }
 
@@ -77,78 +42,155 @@ public final class StructureProcessors {
         return new StructureProcessorList(List.copyOf(processors));
     }
 
-    private static RuleStructureProcessor parseRuleProcessor(RuleProcessorData data) {
-        var rules = new ArrayList<ProcessorRule>();
+    private static StructureProcessor parseProcessor(JsonElement json) {
+        if (!json.isJsonObject()) {
+            return null;
+        }
 
-        for (var rawRule : data.rules()) {
-            var ruleJson = rawRule.convertTo(Transcoder.JSON).orElseThrow();
-            var ruleData = RULE_CODEC.decode(Transcoder.JSON, ruleJson).orElseThrow();
-            var input = parseRuleTest(ruleData.inputPredicate().convertTo(Transcoder.JSON).orElseThrow());
-            var location = parsePosRuleTest(ruleData.locationPredicate().convertTo(Transcoder.JSON).orElseThrow());
-            rules.add(new ProcessorRule(input, location, ruleData.outputState()));
+        var obj = json.getAsJsonObject();
+        var type = obj.get("processor_type").getAsString();
+        return switch (type) {
+            case "minecraft:rule" -> parseRuleProcessor(obj);
+            case "minecraft:block_rot" -> {
+                var rottable = obj.has("rottable_blocks") ? parseTag(obj.get("rottable_blocks")) : null;
+                yield new BlockRotProcessor(rottable, obj.get("integrity").getAsFloat());
+            }
+            case "minecraft:protected_blocks" -> new ProtectedBlockProcessor(parseTag(obj.get("value")));
+            case "minecraft:capped" -> {
+                var delegate = parseProcessor(obj.get("delegate"));
+                if (delegate == null) {
+                    yield null;
+                }
+                yield new CappedProcessor(delegate, parseIntLimit(obj.get("limit")));
+            }
+            case "minecraft:nop" -> null;
+            default -> {
+                LOGGER.warn("Unsupported processor type: {}", type);
+                yield null;
+            }
+        };
+    }
+
+    private static RuleStructureProcessor parseRuleProcessor(JsonObject obj) {
+        var rules = new ArrayList<ProcessorRule>();
+        var rulesTag = obj.get("rules");
+        if (rulesTag != null && rulesTag.isJsonArray()) {
+            for (var ruleEntry : rulesTag.getAsJsonArray()) {
+                var rule = ruleEntry.getAsJsonObject();
+                var input = parseRuleTest(rule.get("input_predicate"));
+                var location = parseRuleTest(rule.get("location_predicate"));
+                var position = rule.has("position_predicate")
+                        ? parsePosRuleTest(rule.get("position_predicate"))
+                        : PosRuleTest.PosAlwaysTrueTest.INSTANCE;
+                var output = parseBlockState(rule.get("output_state"));
+                rules.add(new ProcessorRule(input, location, position, output));
+            }
         }
 
         return new RuleStructureProcessor(List.copyOf(rules));
     }
 
     private static RuleTest parseRuleTest(JsonElement json) {
-        if (!json.isJsonObject()) {
-            throw new IllegalArgumentException("Rule test must be a JSON object");
+        if (json == null || !json.isJsonObject()) {
+            return RuleTest.AlwaysTrueTest.INSTANCE;
         }
 
-        var type = json.getAsJsonObject().get("predicate_type").getAsString();
+        var obj = json.getAsJsonObject();
+        var type = obj.get("predicate_type").getAsString();
         return switch (type) {
-            case "minecraft:block_match" -> {
-                var decoded = BLOCK_MATCH_CODEC.decode(Transcoder.JSON, json).orElseThrow();
-                yield new RuleTest.BlockMatchTest(decoded.block());
-            }
-            case "minecraft:random_block_match" -> {
-                var decoded = RANDOM_BLOCK_MATCH_CODEC.decode(Transcoder.JSON, json).orElseThrow();
-                yield new RuleTest.RandomBlockMatchTest(decoded.block(), decoded.probability());
-            }
-            case "minecraft:blockstate_match" -> {
-                var decoded = BLOCK_STATE_MATCH_CODEC.decode(Transcoder.JSON, json).orElseThrow();
-                yield new RuleTest.BlockStateMatchTest(decoded.state());
-            }
-            case "minecraft:tag_match" -> {
-                var decoded = TAG_MATCH_CODEC.decode(Transcoder.JSON, json).orElseThrow();
-                yield new RuleTest.TagMatchTest(decoded.tag());
-            }
+            case "minecraft:always_true" -> RuleTest.AlwaysTrueTest.INSTANCE;
+            case "minecraft:block_match" -> new RuleTest.BlockMatchTest(Key.key(obj.get("block").getAsString()));
+            case "minecraft:blockstate_match" -> new RuleTest.BlockStateMatchTest(parseBlockState(obj.get("block_state")));
+            case "minecraft:random_block_match" -> new RuleTest.RandomBlockMatchTest(
+                    Key.key(obj.get("block").getAsString()), obj.get("probability").getAsFloat());
+            case "minecraft:random_blockstate_match" -> new RuleTest.RandomBlockStateMatchTest(
+                    parseBlockState(obj.get("block_state")), obj.get("probability").getAsFloat());
+            case "minecraft:tag_match" -> new RuleTest.TagMatchTest(Key.key(obj.get("tag").getAsString()));
             default -> throw new IllegalArgumentException("Unsupported rule test: " + type);
         };
     }
 
     private static PosRuleTest parsePosRuleTest(JsonElement json) {
-        if (!json.isJsonObject()) {
-            return PosRuleTest.AlwaysTrueTest.INSTANCE;
+        if (json == null || !json.isJsonObject()) {
+            return PosRuleTest.PosAlwaysTrueTest.INSTANCE;
         }
 
-        var type = json.getAsJsonObject().get("predicate_type").getAsString();
-        if (type.equals("minecraft:always_true")) {
-            return PosRuleTest.AlwaysTrueTest.INSTANCE;
+        var obj = json.getAsJsonObject();
+        var type = obj.get("predicate_type").getAsString();
+        return switch (type) {
+            case "minecraft:always_true" -> PosRuleTest.PosAlwaysTrueTest.INSTANCE;
+            case "minecraft:linear_pos" -> new PosRuleTest.LinearPosTest(
+                    getFloat(obj, "min_chance", 0.0F),
+                    getFloat(obj, "max_chance", 0.0F),
+                    getInt(obj, "min_dist", 0),
+                    getInt(obj, "max_dist", 0));
+            case "minecraft:axis_aligned_linear_pos" -> new PosRuleTest.AxisAlignedLinearPosTest(
+                    getFloat(obj, "min_chance", 0.0F),
+                    getFloat(obj, "max_chance", 0.0F),
+                    getInt(obj, "min_dist", 0),
+                    getInt(obj, "max_dist", 0),
+                    obj.has("axis") ? obj.get("axis").getAsString() : "y");
+            default -> PosRuleTest.PosAlwaysTrueTest.INSTANCE;
+        };
+    }
+
+    /**
+     * Parses the vanilla block state JSON form {@code {"Name": ..., "Properties": {...}}}.
+     */
+    private static Block parseBlockState(JsonElement json) {
+        if (json == null || !json.isJsonObject()) {
+            return Block.AIR;
         }
 
-        return PosRuleTest.AlwaysFalseTest.INSTANCE;
+        var obj = json.getAsJsonObject();
+        var block = Block.fromKey(obj.get("Name").getAsString());
+        if (block == null) {
+            throw new IllegalArgumentException("Unknown block in output_state: " + obj.get("Name"));
+        }
+
+        var propertiesTag = obj.get("Properties");
+        if (propertiesTag != null && propertiesTag.isJsonObject()) {
+            var properties = new HashMap<String, String>();
+            for (var entry : propertiesTag.getAsJsonObject().entrySet()) {
+                properties.put(entry.getKey(), entry.getValue().getAsString());
+            }
+            if (!properties.isEmpty()) {
+                block = block.withProperties(properties);
+            }
+        }
+
+        return block;
     }
 
-    private record ProcessorListData(List<Codec.RawValue> processors) {
+    /**
+     * The datapack tags used here are plain {@code #tag} or {@code tag}
+     * strings referencing block tags.
+     */
+    private static Key parseTag(JsonElement json) {
+        var value = json.getAsString();
+        return Key.key(value.startsWith("#") ? value.substring(1) : value);
     }
 
-    private record RuleProcessorData(List<Codec.RawValue> rules) {
+    /**
+     * Capped limits in the vanilla datapack are constant ints (an int provider
+     * in general; constants never draw from the random).
+     */
+    private static int parseIntLimit(JsonElement json) {
+        if (json.isJsonPrimitive()) {
+            return json.getAsInt();
+        }
+        if (json.isJsonObject() && json.getAsJsonObject().has("value")) {
+            return json.getAsJsonObject().get("value").getAsInt();
+        }
+        LOGGER.warn("Unsupported capped limit provider: {}", json);
+        return 0;
     }
 
-    private record ProcessorRuleData(Codec.RawValue inputPredicate, Codec.RawValue locationPredicate, Block outputState) {
+    private static float getFloat(JsonObject obj, String key, float defaultValue) {
+        return obj.has(key) ? obj.get(key).getAsFloat() : defaultValue;
     }
 
-    private record BlockStateMatchData(Block state) {
-    }
-
-    private record BlockMatchData(Key block) {
-    }
-
-    private record RandomBlockMatchData(Key block, float probability) {
-    }
-
-    private record TagMatchData(Key tag) {
+    private static int getInt(JsonObject obj, String key, int defaultValue) {
+        return obj.has(key) ? obj.get(key).getAsInt() : defaultValue;
     }
 }

@@ -1,8 +1,6 @@
 package rocks.minestom.worldgen.structure.loader;
 
 import net.kyori.adventure.key.Key;
-import net.minestom.server.codec.Codec;
-import net.minestom.server.codec.Transcoder;
 import rocks.minestom.worldgen.datapack.DataPack;
 import rocks.minestom.worldgen.structure.Structure;
 import rocks.minestom.worldgen.structure.StructureSet;
@@ -67,8 +65,11 @@ public final class StructureLoader {
         return this.processorListCache.computeIfAbsent(id, this::loadProcessorList);
     }
 
-    public StructureProcessorList resolveProcessors(Codec.RawValue processors) {
-        var json = processors.convertTo(Transcoder.JSON).orElseThrow();
+    public StructureProcessorList resolveProcessors(com.google.gson.JsonElement json) {
+        if (json == null) {
+            return StructureProcessorList.EMPTY;
+        }
+
         if (json.isJsonPrimitive()) {
             var processorKey = Key.key(json.getAsString());
             return this.getProcessorList(processorKey);

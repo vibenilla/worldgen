@@ -8,7 +8,7 @@ public final class SimpleBlockFeature implements Feature<SimpleBlockConfiguratio
     @Override
     public <T extends Block.Getter & Block.Setter> boolean place(FeaturePlaceContext<SimpleBlockConfiguration, T> context) {
         var targetPosition = context.origin();
-        var toPlace = context.config().toPlace().getState(context.random(), targetPosition);
+        var toPlace = context.config().toPlace().getState(context.accessor(), context.random(), targetPosition);
         if (!this.canSurvive(context.accessor(), targetPosition, toPlace)) {
             return false;
         }
@@ -28,24 +28,23 @@ public final class SimpleBlockFeature implements Feature<SimpleBlockConfiguratio
         return true;
     }
 
+    /**
+     * Approximation of vanilla's {@code state.canSurvive(level, pos)}: plants
+     * need plant ground below, other non-solid blocks need support, and full
+     * blocks survive anywhere. Vanilla does not require the target position to
+     * be empty here; that gating comes from the placement block predicates.
+     */
     private boolean canSurvive(Block.Getter accessor, BlockVec position, Block toPlace) {
-        var atPosition = accessor.getBlock(position);
-        if (!atPosition.isAir()) {
-            return false;
-        }
-
-        var below = accessor.getBlock(position.sub(0, 1, 0));
         var key = toPlace.key().asString();
-
         if (this.requiresPlantGround(key)) {
-            return this.isPlantGround(below);
+            return this.isPlantGround(accessor.getBlock(position.sub(0, 1, 0)));
         }
 
-        if (key.endsWith("_mushroom")) {
-            return below.registry().isSolid();
+        if (toPlace.registry().isSolid()) {
+            return true;
         }
 
-        return below.registry().isSolid();
+        return accessor.getBlock(position.sub(0, 1, 0)).registry().isSolid();
     }
 
     private boolean isDoublePlant(Block block) {

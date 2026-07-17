@@ -21,22 +21,20 @@ public record TreeConfiguration(
         TrunkPlacer trunkPlacer,
         BlockStateProvider foliageProvider,
         FoliagePlacer foliagePlacer,
-        BlockStateProvider dirtProvider,
+        BlockStateProvider belowTrunkProvider,
         FeatureSize minimumSize,
         List<TreeDecorator> decorators,
-        boolean ignoreVines,
-        boolean forceDirt
+        boolean ignoreVines
 ) implements FeatureConfiguration {
     public static final Codec<TreeConfiguration> CODEC = StructCodec.struct(
             "trunk_provider", BlockStateProviders.CODEC, TreeConfiguration::trunkProvider,
             "trunk_placer", TrunkPlacers.CODEC, TreeConfiguration::trunkPlacer,
             "foliage_provider", BlockStateProviders.CODEC, TreeConfiguration::foliageProvider,
             "foliage_placer", FoliagePlacers.CODEC, TreeConfiguration::foliagePlacer,
-            "dirt_provider", BlockStateProviders.CODEC, TreeConfiguration::dirtProvider,
+            "below_trunk_provider", BlockStateProviders.CODEC.optional(), TreeConfiguration::belowTrunkProvider,
             "minimum_size", FeatureSizes.CODEC, TreeConfiguration::minimumSize,
             "decorators", TreeDecorators.CODEC.list().optional(List.of()), TreeConfiguration::decorators,
             "ignore_vines", Codec.BOOLEAN.optional(false), TreeConfiguration::ignoreVines,
-            "force_dirt", Codec.BOOLEAN.optional(false), TreeConfiguration::forceDirt,
             TreeConfiguration::new
     );
 }

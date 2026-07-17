@@ -1,6 +1,5 @@
 package rocks.minestom.worldgen.terrain;
 
-import net.minestom.server.instance.generator.GenerationUnit;
 import rocks.minestom.worldgen.NoiseChunk;
 import rocks.minestom.worldgen.NoiseGeneratorSettingsRuntime;
 
@@ -15,17 +14,43 @@ import rocks.minestom.worldgen.NoiseGeneratorSettingsRuntime;
  */
 public final class TerrainGenerator {
     private final NoiseGeneratorSettingsRuntime settings;
+    private Aquifer aquifer;
 
     public TerrainGenerator(NoiseGeneratorSettingsRuntime settings) {
         this.settings = settings;
     }
 
-    public TerrainData generate(GenerationUnit unit) {
-        var startX = unit.absoluteStart().blockX();
-        var startY = unit.absoluteStart().blockY();
-        var startZ = unit.absoluteStart().blockZ();
-        var sizeX = unit.size().blockX();
-        var sizeZ = unit.size().blockZ();
+    /**
+     * The aquifer built for the last {@link #generate(int, int)} call. Carving
+     * reuses it (with its position caches) the same way vanilla shares the
+     * chunk's NoiseChunk aquifer between the noise fill and the carvers stage.
+     */
+    public Aquifer aquifer() {
+        return this.aquifer;
+    }
+
+    /**
+     * {@link #generate(int, int, Beardifier)} without structure terrain
+     * adaptation - the un-bearded terrain vanilla exposes before the noise
+     * stage (structure start height probes, tests).
+     */
+    public TerrainData generate(int chunkX, int chunkZ) {
+        return this.generate(chunkX, chunkZ, Beardifier.EMPTY);
+    }
+
+    /**
+     * Pure function of the chunk position: computes base terrain (density, aquifers,
+     * ore veins) into a {@link TerrainData} without touching any generation unit,
+     * so results can be memoized and neighbor chunks queried during decoration.
+     * The beardifier contribution is added per block to the interpolated density
+     * before the solid/air decision, matching vanilla's
+     * {@code cacheAllInCell(add(finalDensity, beardifier))} filler.
+     */
+    public TerrainData generate(int chunkX, int chunkZ, Beardifier beardifier) {
+        var startX = chunkX * 16;
+        var startZ = chunkZ * 16;
+        var sizeX = 16;
+        var sizeZ = 16;
 
         var minY = this.settings.minY();
         var maxY = this.settings.maxYInclusive();
@@ -43,14 +68,48 @@ public final class TerrainGenerator {
         var surfaceHeights = data.surfaceHeights();
         var waterHeights = data.waterHeights();
         var stoneMask = data.stoneMask();
-        var modifier = unit.modifier();
+        var blocks = data.blocks();
 
         // Initialize NoiseChunk for efficient interpolation
         var noiseChunk = new NoiseChunk(startX, startZ, cellWidth, cellHeight, minY, height,
-                this.settings.finalDensity());
+                this.settings.finalDensity(), this.settings.preliminarySurfaceLevel());
         var cellCountXZ = noiseChunk.cellCountXZ();
         var cellCountY = noiseChunk.cellCountY();
         var minCellY = noiseChunk.minCellY();
+
+        // Aquifer + ore veins must wrap their density functions through the NoiseChunk
+        // (matching vanilla router.mapAll(this::wrap)) before interpolation starts so
+        // interpolated channels (vein_toggle/vein_ridged/vein_gap) join the fill loop.
+        var randomState = this.settings.randomState();
+        var fluidPicker = Aquifer.createGlobalFluidPicker(seaLevel, defaultFluid);
+        Aquifer aquifer;
+        if (this.settings.aquifersEnabled()) {
+            var climateSampler = this.settings.climateSampler();
+            aquifer = Aquifer.create(
+                    noiseChunk,
+                    startX,
+                    startZ,
+                    noiseChunk.wrap(this.settings.barrier()),
+                    noiseChunk.wrap(this.settings.fluidLevelFloodedness()),
+                    noiseChunk.wrap(this.settings.fluidLevelSpread()),
+                    noiseChunk.wrap(this.settings.lava()),
+                    noiseChunk.wrap(climateSampler.erosion()),
+                    noiseChunk.wrap(climateSampler.depth()),
+                    randomState.aquiferRandom(),
+                    minY,
+                    height,
+                    fluidPicker);
+        } else {
+            aquifer = Aquifer.createDisabled(fluidPicker);
+        }
+        this.aquifer = aquifer;
+        var oreVeinifier = this.settings.oreVeinsEnabled()
+                ? OreVeinifier.create(
+                        noiseChunk.wrap(this.settings.veinToggle()),
+                        noiseChunk.wrap(this.settings.veinRidged()),
+                        noiseChunk.wrap(this.settings.veinGap()),
+                        randomState.oreRandom())
+                : null;
 
         noiseChunk.initializeForFirstCellX();
 
@@ -87,23 +146,36 @@ public final class TerrainGenerator {
                                 var deltaZ = (double) inCellZ / (double) cellWidth;
                                 noiseChunk.updateForZ(blockZ, deltaZ);
 
-                                var density = noiseChunk.getInterpolatedDensity();
+                                var density = noiseChunk.getInterpolatedDensity()
+                                        + beardifier.compute(blockX, blockY, blockZ);
                                 var surfaceIndex = localX * sizeZ + localZ;
                                 var yIndex = blockY - minY;
                                 var maskIndex = surfaceIndex * height;
 
-                                if (density > 0.0D) {
+                                // Vanilla block state chain: the aquifer decides the substance
+                                // for non-solid density (air/water/lava, or null for a pressure
+                                // barrier turned solid); solid positions may be overridden by
+                                // ore veins, otherwise fall back to the default block.
+                                var state = aquifer.computeSubstance(noiseChunk, density);
+                                if (state == null) {
                                     // Solid Ground
-                                    modifier.setRelative(localX, blockY - startY, localZ, defaultBlock);
+                                    var veinState = oreVeinifier != null ? oreVeinifier.calculate(noiseChunk) : null;
+                                    if (veinState != null) {
+                                        stoneMask[maskIndex + yIndex] = TerrainData.SOLID_OTHER;
+                                        blocks[maskIndex + yIndex] = veinState;
+                                    } else {
+                                        stoneMask[maskIndex + yIndex] = TerrainData.SOLID;
+                                        blocks[maskIndex + yIndex] = defaultBlock;
+                                    }
 
                                     // Capture surface height (first solid from top)
                                     if (surfaceHeights[surfaceIndex] == Integer.MIN_VALUE) {
                                         surfaceHeights[surfaceIndex] = blockY;
                                     }
-                                    stoneMask[maskIndex + yIndex] = 1;
-                                } else if (blockY < seaLevel) {
-                                    // Ocean/Liquid
-                                    modifier.setRelative(localX, blockY - startY, localZ, defaultFluid);
+                                } else if (!state.isAir()) {
+                                    // Ocean/Aquifer Liquid
+                                    stoneMask[maskIndex + yIndex] = TerrainData.FLUID;
+                                    blocks[maskIndex + yIndex] = state;
 
                                     // Capture water level (first liquid from top)
                                     if (waterHeights[surfaceIndex] == Integer.MIN_VALUE) {

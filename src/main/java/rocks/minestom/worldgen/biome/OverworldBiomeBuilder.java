@@ -785,6 +785,16 @@ public final class OverworldBiomeBuilder {
       this.addUndergroundBiome(
          consumer, this.FULL_RANGE, Climate.Parameter.span(0.7F, 1.0F), this.FULL_RANGE, this.FULL_RANGE, this.FULL_RANGE, 0.0F, Key.key("minecraft:lush_caves")
       );
+      this.addUndergroundBiome(
+         consumer,
+         this.FULL_RANGE,
+         this.FULL_RANGE,
+         Climate.Parameter.span(this.coastContinentalness, this.inlandContinentalness),
+         Climate.Parameter.span(this.erosions[5], this.erosions[6]),
+         Climate.Parameter.span(-1.1F, -0.85F),
+         0.0F,
+         Key.key("minecraft:sulfur_caves")
+      );
       this.addBottomBiome(
          consumer,
          this.FULL_RANGE,

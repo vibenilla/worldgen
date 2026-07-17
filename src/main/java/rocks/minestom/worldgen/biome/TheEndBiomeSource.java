@@ -3,6 +3,8 @@ package rocks.minestom.worldgen.biome;
 import net.kyori.adventure.key.Key;
 import rocks.minestom.worldgen.density.DensityFunction;
 
+import java.util.List;
+
 public final class TheEndBiomeSource implements BiomeSource {
     private static final Key THE_END = Key.key("minecraft:the_end");
     private static final Key END_HIGHLANDS = Key.key("minecraft:end_highlands");
@@ -11,11 +13,14 @@ public final class TheEndBiomeSource implements BiomeSource {
     private static final Key END_BARRENS = Key.key("minecraft:end_barrens");
 
     private final ClimateSampler climateSampler;
-    private final DensityFunction.Context context;
 
     public TheEndBiomeSource(ClimateSampler climateSampler) {
         this.climateSampler = climateSampler;
-        this.context = new SinglePointContext();
+    }
+
+    @Override
+    public List<Key> possibleBiomes() {
+        return List.of(THE_END, END_HIGHLANDS, END_MIDLANDS, SMALL_END_ISLANDS, END_BARRENS);
     }
 
     @Override
@@ -31,8 +36,8 @@ public final class TheEndBiomeSource implements BiomeSource {
         } else {
             var centerBlockX = (sectionX * 2 + 1) * 8;
             var centerBlockZ = (sectionZ * 2 + 1) * 8;
-            ((SinglePointContext) this.context).setBlock(centerBlockX, blockY, centerBlockZ);
-            var erosion = this.climateSampler.erosion().compute(this.context);
+            var context = new DensityFunction.SinglePointContext(centerBlockX, blockY, centerBlockZ);
+            var erosion = this.climateSampler.erosion().compute(context);
 
             if (erosion > 0.25D) {
                 return END_HIGHLANDS;
@@ -44,30 +49,4 @@ public final class TheEndBiomeSource implements BiomeSource {
         }
     }
 
-    private static final class SinglePointContext implements DensityFunction.Context {
-        private int blockX;
-        private int blockY;
-        private int blockZ;
-
-        private void setBlock(int blockX, int blockY, int blockZ) {
-            this.blockX = blockX;
-            this.blockY = blockY;
-            this.blockZ = blockZ;
-        }
-
-        @Override
-        public int blockX() {
-            return this.blockX;
-        }
-
-        @Override
-        public int blockY() {
-            return this.blockY;
-        }
-
-        @Override
-        public int blockZ() {
-            return this.blockZ;
-        }
-    }
 }

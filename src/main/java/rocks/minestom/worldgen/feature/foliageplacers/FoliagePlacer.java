@@ -30,8 +30,14 @@ public interface FoliagePlacer {
             TreeConfiguration config,
             BlockVec position
     ) {
-        if (Feature.isValidTreePosition(getter, position)) {
-            var blockState = config.foliageProvider().getState(random, position);
+        var current = getter.getBlock(position);
+        var persistent = "true".equals(current.getProperty("persistent"));
+        if (!persistent && Feature.isValidTreePosition(getter, position)) {
+            var blockState = config.foliageProvider().getState(getter, random, position);
+            if (blockState.getProperty("waterlogged") != null) {
+                var inWater = current.compare(Block.WATER) || "true".equals(current.getProperty("waterlogged"));
+                blockState = blockState.withProperty("waterlogged", inWater ? "true" : "false");
+            }
             setter.set(position, blockState);
             return true;
         }

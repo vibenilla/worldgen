@@ -30,6 +30,7 @@ public interface IntProvider {
                 var typeKey = Codec.KEY.decode(coder, map.getValue("type").orElseThrow()).orElseThrow();
                 return switch (typeKey.asString()) {
                     case "minecraft:uniform" -> UniformIntProvider.CODEC.decode(coder, value).mapResult(provider -> (IntProvider) provider);
+                    case "minecraft:trapezoid" -> TrapezoidIntProvider.CODEC.decode(coder, value).mapResult(provider -> (IntProvider) provider);
                     case "minecraft:weighted_list" -> WeightedListIntProvider.CODEC.decode(coder, value).mapResult(provider -> (IntProvider) provider);
                     case "minecraft:biased_to_bottom" -> BiasedToBottomIntProvider.CODEC.decode(coder, value).mapResult(provider -> (IntProvider) provider);
                     case "minecraft:clamped" -> ClampedIntProvider.CODEC.decode(coder, value).mapResult(provider -> (IntProvider) provider);
@@ -49,6 +50,12 @@ public interface IntProvider {
     Key type();
 
     int sample(RandomSource random);
+
+    /** Smallest value this provider can produce (vanilla {@code getMinValue}). */
+    int minValue();
+
+    /** Largest value this provider can produce (vanilla {@code getMaxValue}). */
+    int maxValue();
 
     static IntProvider fromJson(JsonElement json) {
         return CODEC.decode(Transcoder.JSON, json).orElseThrow();

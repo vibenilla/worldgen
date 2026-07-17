@@ -5,6 +5,7 @@ import rocks.minestom.worldgen.density.DensityFunctions;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -26,8 +27,12 @@ public final class NoiseChunk implements DensityFunction.Context {
     private final int firstCellX;
     private final int firstCellZ;
     private final DensityFunction finalDensity;
+    private final DensityFunction preliminarySurfaceLevel;
     private final List<NoiseInterpolator> interpolators = new ArrayList<>();
-    private final Map<DensityFunction, DensityFunction> wrapped = new HashMap<>();
+    // Identity semantics match vanilla (its node classes use reference equality),
+    // and skip deep structural hashing of density trees on every chunk
+    private final Map<DensityFunction, DensityFunction> wrapped = new IdentityHashMap<>();
+    private final Map<Long, Integer> preliminarySurfaceLevelCache = new HashMap<>();
 
     private int cellStartBlockX;
     private int cellStartBlockY;
@@ -45,7 +50,8 @@ public final class NoiseChunk implements DensityFunction.Context {
             int cellHeight,
             int minY,
             int height,
-            DensityFunction finalDensity) {
+            DensityFunction finalDensity,
+            DensityFunction preliminarySurfaceLevel) {
         this.cellWidth = cellWidth;
         this.cellHeight = cellHeight;
         this.cellCountXZ = 16 / cellWidth;
@@ -54,6 +60,39 @@ public final class NoiseChunk implements DensityFunction.Context {
         this.firstCellX = Math.floorDiv(chunkStartX, cellWidth);
         this.firstCellZ = Math.floorDiv(chunkStartZ, cellWidth);
         this.finalDensity = this.wrap(finalDensity);
+        this.preliminarySurfaceLevel = this.wrap(preliminarySurfaceLevel);
+    }
+
+    /**
+     * Highest preliminary surface level over the given block area, sampled every 4 blocks.
+     * Mirrors vanilla {@code NoiseChunk.maxPreliminarySurfaceLevel}.
+     */
+    public int maxPreliminarySurfaceLevel(int minBlockX, int minBlockZ, int maxBlockX, int maxBlockZ) {
+        var maxY = Integer.MIN_VALUE;
+        for (var blockZ = minBlockZ; blockZ <= maxBlockZ; blockZ += 4) {
+            for (var blockX = minBlockX; blockX <= maxBlockX; blockX += 4) {
+                var surfaceLevel = this.preliminarySurfaceLevel(blockX, blockZ);
+                if (surfaceLevel > maxY) {
+                    maxY = surfaceLevel;
+                }
+            }
+        }
+        return maxY;
+    }
+
+    /**
+     * Estimated terrain surface height for the column, quantized to quart positions and
+     * cached per column. Mirrors vanilla {@code NoiseChunk.preliminarySurfaceLevel}.
+     */
+    public int preliminarySurfaceLevel(int blockX, int blockZ) {
+        var quantizedX = (blockX >> 2) << 2;
+        var quantizedZ = (blockZ >> 2) << 2;
+        var key = ((long) quantizedX << 32) | (quantizedZ & 0xFFFFFFFFL);
+        return this.preliminarySurfaceLevelCache.computeIfAbsent(key, columnKey -> {
+            var x = (int) (columnKey >> 32);
+            var z = (int) columnKey.longValue();
+            return VMath.floor(this.preliminarySurfaceLevel.compute(new SinglePointContext(x, 0, z)));
+        });
     }
 
     @Override
@@ -95,11 +134,14 @@ public final class NoiseChunk implements DensityFunction.Context {
      * Wraps density functions to use our interpolation and caching system.
      * The Interpolated marker is the key - it tells us to sample corners and
      * interpolate.
+     * Callers wrapping additional functions (aquifer noises, ore vein channels)
+     * must do so before {@link #initializeForFirstCellX()} so any interpolators
+     * they create are included in the slice fill.
      * Note: Cannot use computeIfAbsent here because wrapNew recursively calls wrap,
      * which would modify the map during computation and cause
      * ConcurrentModificationException.
      */
-    private DensityFunction wrap(DensityFunction function) {
+    public DensityFunction wrap(DensityFunction function) {
         var existing = this.wrapped.get(function);
         if (existing != null) {
             return existing;
@@ -190,6 +232,12 @@ public final class NoiseChunk implements DensityFunction.Context {
                     this.wrap(input),
                     noise,
                     rarityValueMapper);
+        }
+        if (function instanceof DensityFunctions.IntervalSelect(var input, var thresholds, var functions)) {
+            return new DensityFunctions.IntervalSelect(
+                    this.wrap(input),
+                    thresholds,
+                    functions.stream().map(this::wrap).toList());
         }
 
         // Leaf nodes that don't need wrapping
@@ -497,8 +545,10 @@ public final class NoiseChunk implements DensityFunction.Context {
 
         @Override
         public double compute(Context context) {
-            var quartX = context.blockX() / 4 - this.firstNoiseX;
-            var quartZ = context.blockZ() / 4 - this.firstNoiseZ;
+            // >> 2 (floor) rather than / 4 (truncation) to match vanilla QuartPos.fromBlock
+            // for negative coordinates
+            var quartX = (context.blockX() >> 2) - this.firstNoiseX;
+            var quartZ = (context.blockZ() >> 2) - this.firstNoiseZ;
             if (quartX >= 0 && quartZ >= 0 && quartX < this.sizeXZ && quartZ < this.sizeXZ) {
                 return this.values[quartX + quartZ * this.sizeXZ];
             }

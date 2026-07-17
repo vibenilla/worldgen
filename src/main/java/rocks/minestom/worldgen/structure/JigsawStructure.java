@@ -1,44 +1,65 @@
 package rocks.minestom.worldgen.structure;
 
 import net.kyori.adventure.key.Key;
-import rocks.minestom.worldgen.structure.assembly.JigsawAssembler;
+import org.jetbrains.annotations.Nullable;
+import rocks.minestom.worldgen.random.RandomSource;
 import rocks.minestom.worldgen.structure.context.StructurePlaceContext;
-import rocks.minestom.worldgen.structure.pool.TemplatePool;
+import rocks.minestom.worldgen.structure.pool.PoolAliasBinding;
+import rocks.minestom.worldgen.structure.template.LiquidSettings;
+
+import java.util.List;
 
 /**
- * A structure assembled from multiple pieces connected via jigsaw blocks.
+ * A structure assembled from multiple pieces connected via jigsaw blocks,
+ * mirroring vanilla's {@code JigsawStructure} configuration.
  *
- * <p>Jigsaw structures are the most complex structure type, used for villages,
- * bastions, ancient cities, and other multi-piece structures. They work by:
- * <ol>
- *   <li>Starting with an initial piece from {@link #startPool}
- *   <li>Finding jigsaw blocks in placed pieces
- *   <li>Connecting new pieces from referenced pools at those jigsaw positions
- *   <li>Repeating until {@link #size} depth is reached or no more connections fit
- * </ol>
- *
- * <p>Key parameters:
- * <ul>
- *   <li>{@link #size} - Maximum depth of jigsaw expansion (not physical size)
- *   <li>{@link #startHeight} - Y offset for structure placement
- *   <li>{@link #projectToHeightmap} - Whether to place relative to terrain surface
- *   <li>{@link #maxDistanceFromCenter} - Bounds limit for piece placement
- * </ul>
- *
- * @see JigsawAssembler for the assembly algorithm
- * @see TemplatePool for the pools that provide pieces
+ * @param startJigsawName       jigsaw name the start piece is anchored on
+ *                              (ancient cities), or null
+ * @param size                  maximum expansion depth
+ * @param startHeight           height provider sampled from the assembly random
+ * @param projectToHeightmap    whether the start Y is offset by the world
+ *                              surface (villages, outposts, trail ruins)
+ * @param maxDistanceFromCenter horizontal/vertical piece distance limit
+ * @param poolAliases           pool alias bindings (trial chamber spawners)
+ * @param dimensionPaddingBottom min distance of the start piece from the world bottom
+ * @param dimensionPaddingTop    min distance of the start piece from the world top
+ * @param terrainAdaptation     how the noise terrain molds around the pieces
  */
 public record JigsawStructure(
         StructureBiomes biomes,
         Key startPool,
+        @Nullable Key startJigsawName,
         int size,
-        int startHeight,
+        StartHeight startHeight,
         boolean projectToHeightmap,
-        int maxDistanceFromCenter
+        boolean useExpansionHack,
+        int maxDistanceFromCenter,
+        List<PoolAliasBinding> poolAliases,
+        int dimensionPaddingBottom,
+        int dimensionPaddingTop,
+        LiquidSettings liquidSettings,
+        TerrainAdjustment terrainAdaptation
 ) implements Structure {
+    /**
+     * Minimal vanilla {@code HeightProvider} covering the forms jigsaw
+     * structures use: constant anchors and uniform ranges between absolute
+     * anchors. Uniform sampling draws exactly one {@code nextInt}.
+     */
+    public record StartHeight(int min, int max) {
+        public int sample(RandomSource random) {
+            if (this.min == this.max) {
+                return this.min;
+            }
+            if (this.min > this.max) {
+                return this.min;
+            }
+            return random.nextInt(this.max - this.min + 1) + this.min;
+        }
+    }
+
     @Override
     public void place(StructurePlaceContext context) {
-        var assembler = new JigsawAssembler(context, this.size, this.maxDistanceFromCenter);
-        assembler.assemble(this.startPool);
+        // Jigsaw structures are assembled and placed by the StructurePlacer,
+        // which threads the vanilla sequential assembly random.
     }
 }

@@ -41,6 +41,7 @@ public final class WorldGenerators {
                 this.structureLoader,
                 this.featureLoader,
                 List.of(
+                        Key.key("minecraft:mineshafts"),
                         Key.key("minecraft:villages"),
                         Key.key("minecraft:igloos"),
                         Key.key("minecraft:shipwrecks"),
@@ -96,6 +97,10 @@ public final class WorldGenerators {
 
     public StructureLoader structureLoader() {
         return this.structureLoader;
+    }
+
+    public FeatureLoader featureLoader() {
+        return this.featureLoader;
     }
 
     public NoiseGeneratorSettingsRuntime overworldSettings() {

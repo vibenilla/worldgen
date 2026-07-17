@@ -44,7 +44,7 @@ public final class NoiseGeneratorSettingsLoader {
         var seaLevel = settings.seaLevel();
         var defaultBlock = settings.defaultBlock();
         var defaultFluid = settings.defaultFluid();
-        var surfaceSystem = new SurfaceSystem(randomState, defaultBlock, seaLevel, randomState.getOrCreateRandomFactory(Key.key("minecraft:surface")));
+        var surfaceSystem = new SurfaceSystem(randomState, defaultBlock, seaLevel, randomState.random());
 
         return new NoiseGeneratorSettingsRuntime(
                 minY,
@@ -52,9 +52,19 @@ public final class NoiseGeneratorSettingsLoader {
                 cellWidth,
                 cellHeight,
                 seaLevel,
+                settings.aquifersEnabled(),
+                settings.oreVeinsEnabled(),
                 defaultBlock,
                 defaultFluid,
                 finalDensity,
+                decodeDensity(densityResolver, settings.noiseRouter().barrier()),
+                decodeDensity(densityResolver, settings.noiseRouter().fluidLevelFloodedness()),
+                decodeDensity(densityResolver, settings.noiseRouter().fluidLevelSpread()),
+                decodeDensity(densityResolver, settings.noiseRouter().lava()),
+                decodeDensity(densityResolver, settings.noiseRouter().preliminarySurfaceLevel()),
+                decodeDensity(densityResolver, settings.noiseRouter().veinToggle()),
+                decodeDensity(densityResolver, settings.noiseRouter().veinRidged()),
+                decodeDensity(densityResolver, settings.noiseRouter().veinGap()),
                 climateSampler,
                 randomState,
                 surfaceSystem,

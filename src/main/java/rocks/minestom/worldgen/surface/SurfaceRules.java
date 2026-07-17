@@ -8,7 +8,9 @@ import net.minestom.server.codec.Transcoder;
 import net.minestom.server.instance.block.Block;
 import rocks.minestom.worldgen.BlockCodec;
 import rocks.minestom.worldgen.RandomState;
+import rocks.minestom.worldgen.VMath;
 import rocks.minestom.worldgen.biome.BiomeZoomer;
+import rocks.minestom.worldgen.density.DensityFunction;
 
 import java.util.List;
 
@@ -97,7 +99,7 @@ public final class SurfaceRules {
     private static StructCodec<? extends ConditionSource> structForCondition(Key type, Codec<ConditionSource> self) {
         return switch (type.asString()) {
             case "minecraft:biome" -> StructCodec.struct(
-                    "biome_is", Codec.KEY.list(), condition -> {
+                    "biome_is", Codec.KEY.listOrSingle(), condition -> {
                         throw new UnsupportedOperationException("Encoding is not supported");
                     },
                     BiomeConditionSource::new
@@ -110,6 +112,9 @@ public final class SurfaceRules {
                         throw new UnsupportedOperationException("Encoding is not supported");
                     },
                     "max_threshold", Codec.DOUBLE, condition -> {
+                        throw new UnsupportedOperationException("Encoding is not supported");
+                    },
+                    "is_3d", Codec.BOOLEAN.optional(false), condition -> {
                         throw new UnsupportedOperationException("Encoding is not supported");
                     },
                     NoiseThresholdConditionSource::new
@@ -208,46 +213,54 @@ public final class SurfaceRules {
         private final RandomState randomState;
         private final BiomeResolver biomeResolver;
         private final BiomeZoomer biomeZoomer;
+        private final DensityFunction preliminarySurfaceLevel;
         private final int minY;
         private final int maxYInclusive;
 
         private Key biome;
+        private boolean biomeDirty;
         private int blockX;
         private int blockZ;
         private int blockY;
 
         private int surfaceDepth;
         private double surfaceSecondary;
+        private boolean surfaceSecondaryDirty;
         private int minSurfaceLevel;
+        private boolean minSurfaceLevelDirty;
+        private long lastPreliminarySurfaceCellOrigin = Long.MAX_VALUE;
+        private final int[] preliminarySurfaceCache = new int[4];
         private int waterHeight;
         private int stoneDepthBelow;
         private int stoneDepthAbove;
         private boolean steep;
 
-        public Context(SurfaceSystem system, RandomState randomState, BiomeResolver biomeResolver, BiomeZoomer biomeZoomer, int minY, int maxYInclusive) {
+        public Context(SurfaceSystem system, RandomState randomState, BiomeResolver biomeResolver, BiomeZoomer biomeZoomer,
+                DensityFunction preliminarySurfaceLevel, int minY, int maxYInclusive) {
             this.system = system;
             this.randomState = randomState;
             this.biomeResolver = biomeResolver;
             this.biomeZoomer = biomeZoomer;
+            this.preliminarySurfaceLevel = preliminarySurfaceLevel;
             this.minY = minY;
             this.maxYInclusive = maxYInclusive;
         }
 
-        public void updateXZ(int blockX, int blockZ, int preliminarySurfaceLevel, boolean steep, int waterHeight) {
+        public void updateXZ(int blockX, int blockZ, boolean steep) {
             this.blockX = blockX;
             this.blockZ = blockZ;
-            this.waterHeight = waterHeight;
             this.steep = steep;
             this.surfaceDepth = this.system.getSurfaceDepth(blockX, blockZ);
-            this.surfaceSecondary = this.system.getSurfaceSecondary(blockX, blockZ);
-            this.minSurfaceLevel = preliminarySurfaceLevel + this.surfaceDepth - HOW_FAR_BELOW_PRELIMINARY_SURFACE_LEVEL_TO_BUILD_SURFACE;
+            this.surfaceSecondaryDirty = true;
+            this.minSurfaceLevelDirty = true;
         }
 
-        public void updateY(int blockY, int stoneDepthAbove, int stoneDepthBelow) {
+        public void updateY(int blockY, int stoneDepthAbove, int stoneDepthBelow, int waterHeight) {
             this.blockY = blockY;
             this.stoneDepthAbove = stoneDepthAbove;
             this.stoneDepthBelow = stoneDepthBelow;
-            this.biome = this.biomeZoomer.biome(this.blockX, blockY, this.blockZ);
+            this.waterHeight = waterHeight;
+            this.biomeDirty = true;
         }
 
         public SurfaceSystem system() {
@@ -271,6 +284,10 @@ public final class SurfaceRules {
         }
 
         public Key biome() {
+            if (this.biomeDirty) {
+                this.biomeDirty = false;
+                this.biome = this.biomeZoomer.biome(this.blockX, this.blockY, this.blockZ);
+            }
             return this.biome;
         }
 
@@ -291,11 +308,44 @@ public final class SurfaceRules {
         }
 
         public double surfaceSecondary() {
+            if (this.surfaceSecondaryDirty) {
+                this.surfaceSecondaryDirty = false;
+                this.surfaceSecondary = this.system.getSurfaceSecondary(this.blockX, this.blockZ);
+            }
             return this.surfaceSecondary;
         }
 
         public int minSurfaceLevel() {
+            if (this.minSurfaceLevelDirty) {
+                this.minSurfaceLevelDirty = false;
+                var cellX = this.blockX >> 4;
+                var cellZ = this.blockZ >> 4;
+                var cellOrigin = (long) cellX << 32 | (cellZ & 0xFFFFFFFFL);
+                if (this.lastPreliminarySurfaceCellOrigin != cellOrigin) {
+                    this.lastPreliminarySurfaceCellOrigin = cellOrigin;
+                    this.preliminarySurfaceCache[0] = this.samplePreliminarySurface(cellX << 4, cellZ << 4);
+                    this.preliminarySurfaceCache[1] = this.samplePreliminarySurface((cellX + 1) << 4, cellZ << 4);
+                    this.preliminarySurfaceCache[2] = this.samplePreliminarySurface(cellX << 4, (cellZ + 1) << 4);
+                    this.preliminarySurfaceCache[3] = this.samplePreliminarySurface((cellX + 1) << 4, (cellZ + 1) << 4);
+                }
+
+                var preliminarySurface = (int) Math.floor(VMath.lerp2(
+                        (this.blockX & 15) / 16.0,
+                        (this.blockZ & 15) / 16.0,
+                        this.preliminarySurfaceCache[0],
+                        this.preliminarySurfaceCache[1],
+                        this.preliminarySurfaceCache[2],
+                        this.preliminarySurfaceCache[3]));
+                this.minSurfaceLevel = preliminarySurface + this.surfaceDepth - HOW_FAR_BELOW_PRELIMINARY_SURFACE_LEVEL_TO_BUILD_SURFACE;
+            }
             return this.minSurfaceLevel;
+        }
+
+        private int samplePreliminarySurface(int blockX, int blockZ) {
+            var quartX = (blockX >> 2) << 2;
+            var quartZ = (blockZ >> 2) << 2;
+            return (int) Math.floor(this.preliminarySurfaceLevel.compute(
+                    new DensityFunction.SinglePointContext(quartX, 0, quartZ)));
         }
 
         public int waterHeight() {
@@ -359,11 +409,13 @@ public final class SurfaceRules {
         }
     }
 
-    private record NoiseThresholdConditionSource(Key noise, double minThreshold, double maxThreshold) implements ConditionSource {
+    private record NoiseThresholdConditionSource(Key noise, double minThreshold, double maxThreshold, boolean is3d) implements ConditionSource {
         @Override
         public boolean test(Context context) {
             var normalNoise = context.randomState().getOrCreateNoise(this.noise);
-            var value = normalNoise.getValue((double) context.blockX(), 0.0D, (double) context.blockZ());
+            var value = this.is3d
+                    ? normalNoise.getValue((double) context.blockX(), (double) context.blockY(), (double) context.blockZ())
+                    : normalNoise.getValue((double) context.blockX(), 0.0D, (double) context.blockZ());
             return value >= this.minThreshold && value <= this.maxThreshold;
         }
     }
