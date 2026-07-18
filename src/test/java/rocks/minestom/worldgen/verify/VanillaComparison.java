@@ -17,9 +17,6 @@ import java.util.TreeMap;
  * <p>Usage: VanillaComparison &lt;vanillaWorldDir&gt; &lt;datapackDir&gt; &lt;seed&gt; &lt;chunkRadius&gt;
  */
 public final class VanillaComparison {
-    private static final int MIN_Y = -64;
-    private static final int MAX_Y = 319;
-
     public static void main(String[] args) throws Exception {
         var worldDir = Path.of(args[0]);
         var datapackDir = Path.of(args[1]);
@@ -31,18 +28,26 @@ public final class VanillaComparison {
         var instance = MinecraftServer.getInstanceManager().createInstanceContainer();
         var dimension = System.getProperty("compare.dimension", "overworld");
         rocks.minestom.worldgen.biome.BiomeSource sourceBiomes;
+        int minY;
+        int maxY;
         switch (dimension) {
             case "nether" -> {
                 instance.setGenerator(generators.nether());
                 sourceBiomes = generators.netherBiomes();
+                minY = 0;
+                maxY = 255;
             }
             case "end" -> {
                 instance.setGenerator(generators.end());
                 sourceBiomes = generators.endBiomes();
+                minY = 0;
+                maxY = 255;
             }
             default -> {
                 instance.setGenerator(generators.overworld());
                 sourceBiomes = generators.overworldBiomes();
+                minY = -64;
+                maxY = 319;
             }
         }
 
@@ -108,12 +113,12 @@ public final class VanillaComparison {
 
                 var chunk = instance.loadChunk(chunkX, chunkZ).join();
                 var beforeMismatch = stats.totalBlocks - stats.matchedBlocks;
-                compareChunk(chunk, vanillaChunk, stats);
+                compareChunk(chunk, vanillaChunk, stats, minY, maxY);
                 var chunkMismatch = stats.totalBlocks - stats.matchedBlocks - beforeMismatch;
                 if (chunkMismatch > 0) {
                     stats.chunkMismatches.put(chunkX + "," + chunkZ, chunkMismatch);
                 }
-                compareSourceBiomes(sourceBiomes, chunkX, chunkZ, vanillaChunk, stats);
+                compareSourceBiomes(sourceBiomes, chunkX, chunkZ, vanillaChunk, stats, minY, maxY);
             }
         }
 
@@ -173,9 +178,9 @@ public final class VanillaComparison {
         return order;
     }
 
-    private static void compareChunk(Chunk chunk, VanillaChunk vanillaChunk, Stats stats) {
+    private static void compareChunk(Chunk chunk, VanillaChunk vanillaChunk, Stats stats, int minY, int maxY) {
         stats.chunks++;
-        for (var y = MIN_Y; y <= MAX_Y; y++) {
+        for (var y = minY; y <= maxY; y++) {
             for (var z = 0; z < 16; z++) {
                 for (var x = 0; x < 16; x++) {
                     var expected = vanillaChunk.block(x, y, z);
@@ -201,7 +206,7 @@ public final class VanillaComparison {
             }
         }
 
-        for (var quartY = MIN_Y / 4; quartY < (MAX_Y + 1) / 4; quartY++) {
+        for (var quartY = Math.floorDiv(minY, 4); quartY < Math.floorDiv(maxY + 1, 4); quartY++) {
             for (var quartZ = 0; quartZ < 4; quartZ++) {
                 for (var quartX = 0; quartX < 4; quartX++) {
                     var expected = vanillaChunk.biome(quartX, quartY, quartZ);
@@ -230,8 +235,8 @@ public final class VanillaComparison {
     }
 
     private static void compareSourceBiomes(rocks.minestom.worldgen.biome.BiomeSource source, int chunkX, int chunkZ,
-            VanillaChunk vanillaChunk, Stats stats) {
-        for (var quartY = MIN_Y / 4; quartY < (MAX_Y + 1) / 4; quartY++) {
+            VanillaChunk vanillaChunk, Stats stats, int minY, int maxY) {
+        for (var quartY = Math.floorDiv(minY, 4); quartY < Math.floorDiv(maxY + 1, 4); quartY++) {
             for (var quartZ = 0; quartZ < 4; quartZ++) {
                 for (var quartX = 0; quartX < 4; quartX++) {
                     var expected = vanillaChunk.biome(quartX, quartY, quartZ);

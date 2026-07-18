@@ -10,11 +10,10 @@ import java.util.Map;
  * A parsed vanilla chunk: canonical block state strings by position and biome keys by quart.
  */
 public final class VanillaChunk {
-    private static final int MIN_SECTION_Y = -4;
-    private static final int SECTION_COUNT = 24;
-
-    private final String[][] sectionBlocks = new String[SECTION_COUNT][];
-    private final String[][] sectionBiomes = new String[SECTION_COUNT][];
+    private final int minSectionY;
+    private final int sectionCount;
+    private final String[][] sectionBlocks;
+    private final String[][] sectionBiomes;
 
     public static VanillaChunk parse(CompoundBinaryTag chunkTag) {
         var status = chunkTag.getString("Status");
@@ -24,12 +23,31 @@ public final class VanillaChunk {
         return new VanillaChunk(chunkTag);
     }
 
+    /**
+     * The dimension's vertical section range is read from the chunk data
+     * itself (every section, even empty ones, has a {@code Y} entry) rather
+     * than assumed, since the overworld's -64..319 range does not hold for
+     * the nether (0..255) or the end (0..255).
+     */
     private VanillaChunk(CompoundBinaryTag chunkTag) {
-        for (var sectionTag : chunkTag.getList("sections")) {
+        var sections = chunkTag.getList("sections");
+        var minY = Integer.MAX_VALUE;
+        var maxY = Integer.MIN_VALUE;
+        for (var sectionTag : sections) {
+            var sectionY = ((CompoundBinaryTag) sectionTag).getByte("Y");
+            minY = Math.min(minY, sectionY);
+            maxY = Math.max(maxY, sectionY);
+        }
+        this.minSectionY = sections.size() == 0 ? 0 : minY;
+        this.sectionCount = sections.size() == 0 ? 0 : maxY - minY + 1;
+        this.sectionBlocks = new String[this.sectionCount][];
+        this.sectionBiomes = new String[this.sectionCount][];
+
+        for (var sectionTag : sections) {
             var section = (CompoundBinaryTag) sectionTag;
             var sectionY = section.getByte("Y");
-            var sectionIndex = sectionY - MIN_SECTION_Y;
-            if (sectionIndex < 0 || sectionIndex >= SECTION_COUNT) {
+            var sectionIndex = sectionY - this.minSectionY;
+            if (sectionIndex < 0 || sectionIndex >= this.sectionCount) {
                 continue;
             }
 
@@ -49,8 +67,8 @@ public final class VanillaChunk {
      * Returns the canonical block state string at local coordinates, or null if the section is absent.
      */
     public String block(int localX, int y, int localZ) {
-        var sectionIndex = Math.floorDiv(y, 16) - MIN_SECTION_Y;
-        if (sectionIndex < 0 || sectionIndex >= SECTION_COUNT || this.sectionBlocks[sectionIndex] == null) {
+        var sectionIndex = Math.floorDiv(y, 16) - this.minSectionY;
+        if (sectionIndex < 0 || sectionIndex >= this.sectionCount || this.sectionBlocks[sectionIndex] == null) {
             return null;
         }
         var localY = Math.floorMod(y, 16);
@@ -61,8 +79,8 @@ public final class VanillaChunk {
      * Returns the biome key at quart coordinates (localQuartX/Z in 0..3), or null if absent.
      */
     public String biome(int localQuartX, int quartY, int localQuartZ) {
-        var sectionIndex = Math.floorDiv(quartY, 4) - MIN_SECTION_Y;
-        if (sectionIndex < 0 || sectionIndex >= SECTION_COUNT || this.sectionBiomes[sectionIndex] == null) {
+        var sectionIndex = Math.floorDiv(quartY, 4) - this.minSectionY;
+        if (sectionIndex < 0 || sectionIndex >= this.sectionCount || this.sectionBiomes[sectionIndex] == null) {
             return null;
         }
         var localY = Math.floorMod(quartY, 4);
