@@ -148,6 +148,10 @@ public final class TerrainGenerator {
 
                                 var density = noiseChunk.getInterpolatedDensity()
                                         + beardifier.compute(blockX, blockY, blockZ);
+                                var densityProbe = System.getProperty("worldgen.densityProbe");
+                                if (densityProbe != null && densityProbe.equals(blockX + "," + blockZ)) {
+                                    System.out.println("DENSITY " + blockX + " " + blockY + " " + blockZ + " " + density);
+                                }
                                 var surfaceIndex = localX * sizeZ + localZ;
                                 var yIndex = blockY - minY;
                                 var maskIndex = surfaceIndex * height;

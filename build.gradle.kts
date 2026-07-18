@@ -171,6 +171,7 @@ tasks.register<JavaExec>("compareVanilla") {
     systemProperty("compare.diffcap", providers.gradleProperty("diffcap").getOrElse("25"))
     systemProperty("compare.chunkcap", providers.gradleProperty("chunkcap").getOrElse("10"))
     providers.gradleProperty("groundDebug").orNull?.let { systemProperty("worldgen.groundDebug", it) }
+    providers.gradleProperty("densityProbe").orNull?.let { systemProperty("worldgen.densityProbe", it) }
     systemProperty("compare.biomediffpos", providers.gradleProperty("biomediffpos").getOrElse("false"))
     systemProperty("compare.dimension", providers.gradleProperty("dimension").getOrElse("overworld"))
     systemProperty("compare.pregenRadius", providers.gradleProperty("pregenRadius").getOrElse("16"))
@@ -327,6 +328,8 @@ tasks.register<JavaExec>("terrainBlockPeek") {
     classpath = sourceSets.test.get().runtimeClasspath
     mainClass = "rocks.minestom.worldgen.verify.TerrainBlockPeek"
     jvmArgs("-Xmx4G")
+    providers.gradleProperty("densityProbe").orNull?.let { systemProperty("worldgen.densityProbe", it) }
+    providers.gradleProperty("beardDebug").orNull?.let { systemProperty("worldgen.beardDebug", it) }
     args((providers.gradleProperty("peekArgs").getOrElse("")).split(" "))
 }
 
@@ -565,4 +568,11 @@ tasks.register<JavaExec>("structureCensus") {
 tasks.register<JavaExec>("shapeCheck") {
     classpath = sourceSets.test.get().runtimeClasspath
     mainClass = "rocks.minestom.worldgen.verify.ShapeCheck"
+}
+
+tasks.register<JavaExec>("densityPoint") {
+    classpath = sourceSets.test.get().runtimeClasspath
+    jvmArgs("-Xmx3G")
+    mainClass = "rocks.minestom.worldgen.verify.DensityPoint"
+    args((providers.gradleProperty("peekArgs").getOrElse("")).split(" "))
 }

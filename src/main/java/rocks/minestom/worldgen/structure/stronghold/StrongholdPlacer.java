@@ -157,7 +157,12 @@ public final class StrongholdPlacer {
         for (var sourceX = chunkX - REFERENCE_RADIUS; sourceX <= chunkX + REFERENCE_RADIUS; sourceX++) {
             for (var sourceZ = chunkZ - REFERENCE_RADIUS; sourceZ <= chunkZ + REFERENCE_RADIUS; sourceZ++) {
                 var start = this.startAt(sourceX, sourceZ, structureSet, settings, biomeZoomer);
-                if (start == null || !intersectsColumn(start.bounds(), chunkStartBlockX, chunkStartBlockZ)) {
+                // Vanilla StructureStart.getBoundingBox is inflated by 12 for
+                // terrain-adapting structures, so the reference test reaches
+                // 12 blocks beyond the raw bounds
+                if (start == null || !intersectsXZ(start.bounds(),
+                        chunkStartBlockX - BEARD_CLOSE_DISTANCE, chunkStartBlockZ - BEARD_CLOSE_DISTANCE,
+                        chunkStartBlockX + 15 + BEARD_CLOSE_DISTANCE, chunkStartBlockZ + 15 + BEARD_CLOSE_DISTANCE)) {
                     continue;
                 }
 

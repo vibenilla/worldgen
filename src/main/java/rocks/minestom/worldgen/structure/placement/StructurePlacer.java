@@ -498,10 +498,12 @@ public final class StructurePlacer {
                         continue;
                     }
 
-                    // Vanilla reference semantics: only starts whose overall
-                    // bounds reach the chunk itself contribute.
-                    if (!intersectsXZ(start.bounds(), chunkStartBlockX, chunkStartBlockZ,
-                            chunkStartBlockX + 15, chunkStartBlockZ + 15)) {
+                    // Vanilla reference semantics: StructureStart.getBoundingBox
+                    // is inflated by 12 for terrain-adapting structures
+                    // (Structure.adjustBoundingBox), so starts reaching within
+                    // 12 blocks of the chunk contribute.
+                    if (!intersectsXZ(start.bounds(), chunkStartBlockX - 12, chunkStartBlockZ - 12,
+                            chunkStartBlockX + 15 + 12, chunkStartBlockZ + 15 + 12)) {
                         continue;
                     }
 
@@ -531,6 +533,13 @@ public final class StructurePlacer {
             }
         }
 
+        if ((chunkX + "," + chunkZ).equals(System.getProperty("worldgen.beardDebug"))) {
+            for (var rigid : rigids) {
+                System.out.println("BEARDRIGID " + chunkX + "," + chunkZ + " " + rigid.box()
+                        + " " + rigid.terrainAdjustment() + " delta=" + rigid.groundLevelDelta());
+            }
+            System.out.println("BEARDJUNCTIONS " + junctions.size());
+        }
         return Beardifier.create(rigids, junctions);
     }
 

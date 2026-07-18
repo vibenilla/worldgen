@@ -175,16 +175,17 @@ public final class NetherFossilPlacer {
         for (var sourceX = chunkX - REFERENCE_RADIUS; sourceX <= chunkX + REFERENCE_RADIUS; sourceX++) {
             for (var sourceZ = chunkZ - REFERENCE_RADIUS; sourceZ <= chunkZ + REFERENCE_RADIUS; sourceZ++) {
                 var start = this.startAt(sourceX, sourceZ, structureSet, settings, biomeZoomer);
-                if (start == null || !intersectsXZ(start.bounds(), chunkStartBlockX, chunkStartBlockZ,
-                        chunkStartBlockX + 15, chunkStartBlockZ + 15)) {
+                // Vanilla StructureStart.getBoundingBox is inflated by 12 for
+                // terrain-adapting structures, so the reference test reaches
+                // 12 blocks beyond the raw bounds; the per-piece kernel then
+                // has the same reach for the single fossil piece
+                if (start == null || !intersectsXZ(start.bounds(), chunkStartBlockX - BEARD_CLOSE_DISTANCE,
+                        chunkStartBlockZ - BEARD_CLOSE_DISTANCE,
+                        chunkStartBlockX + 15 + BEARD_CLOSE_DISTANCE, chunkStartBlockZ + 15 + BEARD_CLOSE_DISTANCE)) {
                     continue;
                 }
 
-                if (intersectsXZ(start.bounds(), chunkStartBlockX - BEARD_CLOSE_DISTANCE,
-                        chunkStartBlockZ - BEARD_CLOSE_DISTANCE,
-                        chunkStartBlockX + 15 + BEARD_CLOSE_DISTANCE, chunkStartBlockZ + 15 + BEARD_CLOSE_DISTANCE)) {
-                    rigids.add(new Beardifier.Rigid(start.bounds(), TerrainAdjustment.BEARD_THIN, 0));
-                }
+                rigids.add(new Beardifier.Rigid(start.bounds(), TerrainAdjustment.BEARD_THIN, 0));
             }
         }
     }
