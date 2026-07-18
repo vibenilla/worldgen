@@ -169,6 +169,8 @@ tasks.register<JavaExec>("compareVanilla") {
     systemProperty("compare.sequential", providers.gradleProperty("sequential").getOrElse("false"))
     systemProperty("compare.diffblock", providers.gradleProperty("diffblock").getOrElse(""))
     systemProperty("compare.diffcap", providers.gradleProperty("diffcap").getOrElse("25"))
+    systemProperty("compare.chunkcap", providers.gradleProperty("chunkcap").getOrElse("10"))
+    providers.gradleProperty("groundDebug").orNull?.let { systemProperty("worldgen.groundDebug", it) }
     systemProperty("compare.biomediffpos", providers.gradleProperty("biomediffpos").getOrElse("false"))
     systemProperty("compare.dimension", providers.gradleProperty("dimension").getOrElse("overworld"))
     systemProperty("compare.pregenRadius", providers.gradleProperty("pregenRadius").getOrElse("16"))

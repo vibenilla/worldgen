@@ -76,12 +76,22 @@ public class VegetationPatchFeature implements Feature<VegetationPatchConfigurat
                 var belowY = y + inwards;
                 var belowBlock = level.getBlock(x, belowY, z);
                 var sturdyFace = config.ceiling() ? BlockFace.BOTTOM : BlockFace.TOP;
+                var groundDebug = ((origin.blockX() >> 4) + "," + (origin.blockZ() >> 4))
+                        .equals(System.getProperty("worldgen.groundDebug"));
+                if (groundDebug) {
+                    System.out.println("VPROBE " + origin.blockX() + "," + origin.blockY() + "," + origin.blockZ()
+                            + " d=" + dx + "," + dz + " pos=" + x + "," + y + "," + z
+                            + " block=" + level.getBlock(x, y, z).name() + " below=" + belowBlock.name());
+                }
                 if (level.getBlock(x, y, z).isAir() && hasFullFace(belowBlock, sturdyFace)) {
                     var depth = config.depth().sample(random)
                             + (config.extraBottomBlockChance() > 0.0F && random.nextFloat() < config.extraBottomBlockChance() ? 1 : 0);
                     var groundPos = new VanillaPos(x, belowY, z);
                     if (this.placeGround(level, config, random, x, belowY, z, inwards, depth)) {
                         surface.add(groundPos);
+                        if (groundDebug) {
+                            System.out.println("VGROUND " + x + "," + belowY + "," + z + " depth=" + depth);
+                        }
                     }
                 }
             }

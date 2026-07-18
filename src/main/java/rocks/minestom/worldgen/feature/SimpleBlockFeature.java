@@ -40,6 +40,13 @@ public final class SimpleBlockFeature implements Feature<SimpleBlockConfiguratio
             return this.isPlantGround(accessor.getBlock(position.sub(0, 1, 0)));
         }
 
+        // Ceiling-hanging blocks survive on support ABOVE (vanilla
+        // SporeBlossomBlock/HangingRootsBlock canSurvive checks
+        // canSupportCenter of the block above, not below)
+        if (key.equals("minecraft:spore_blossom") || key.equals("minecraft:hanging_roots")) {
+            return accessor.getBlock(position.add(0, 1, 0)).registry().isSolid();
+        }
+
         if (toPlace.registry().isSolid()) {
             return true;
         }

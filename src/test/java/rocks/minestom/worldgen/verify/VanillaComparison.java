@@ -305,7 +305,7 @@ public final class VanillaComparison {
             System.out.println("--- Worst chunks ---");
             this.chunkMismatches.entrySet().stream()
                     .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
-                    .limit(10)
+                    .limit(Integer.getInteger("compare.chunkcap", 10))
                     .forEach(entry -> System.out.printf("%10d  chunk %s%n", entry.getValue(), entry.getKey()));
 
             System.out.println("--- Top biome mismatches ---");
