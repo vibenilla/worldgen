@@ -382,8 +382,13 @@ public final class WorldGenerator implements Generator {
         var sizeX = unit.size().blockX();
         var sizeZ = unit.size().blockZ();
         var forkPadding = 16;
-        var forkStart = new BlockVec(startX - forkPadding, this.settings.minY(), startZ - forkPadding);
-        var forkEnd = new BlockVec(startX + sizeX + forkPadding, this.settings.maxYInclusive() + 1,
+        // The fork spans the full instance Y range, not just the generator
+        // settings range: vanilla decorates above the generation height too
+        // (mushrooms and roots on top of the nether bedrock roof at y 128)
+        var unitMinY = unit.absoluteStart().blockY();
+        var unitMaxY = unitMinY + unit.size().blockY();
+        var forkStart = new BlockVec(startX - forkPadding, unitMinY, startZ - forkPadding);
+        var forkEnd = new BlockVec(startX + sizeX + forkPadding, unitMaxY,
                 startZ + sizeZ + forkPadding);
         var featureUnit = unit.fork(forkStart, forkEnd);
         var levelAdapter = new GenerationUnitAdapter(
