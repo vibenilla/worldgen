@@ -158,9 +158,9 @@ public final class BoundingBox {
 
     public BlockVec getCenter() {
         return new BlockVec(
-                (this.minX + this.maxX) / 2,
-                (this.minY + this.maxY) / 2,
-                (this.minZ + this.maxZ) / 2
+                this.minX + (this.maxX - this.minX + 1) / 2,
+                this.minY + (this.maxY - this.minY + 1) / 2,
+                this.minZ + (this.maxZ - this.minZ + 1) / 2
         );
     }
 
