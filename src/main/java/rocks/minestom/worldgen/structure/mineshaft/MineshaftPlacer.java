@@ -17,6 +17,7 @@ import rocks.minestom.worldgen.structure.StructureSet;
 import rocks.minestom.worldgen.structure.StructureWrites;
 import rocks.minestom.worldgen.structure.loader.StructureLoader;
 import rocks.minestom.worldgen.structure.template.BoundingBox;
+import rocks.minestom.worldgen.structure.template.StructureShapeUpdater;
 import rocks.minestom.worldgen.surface.DataPackBiomeResolver;
 import rocks.minestom.worldgen.terrain.TerrainGenerator;
 
@@ -117,15 +118,22 @@ public final class MineshaftPlacer {
         var forkUnit = unit.fork(
                 new BlockVec(startX, settings.minY(), startZ),
                 new BlockVec(startX + 16, settings.maxYInclusive() + 1, startZ + 16));
-        var forkAdapter = new GenerationUnitAdapter(forkUnit);
+        // The connection shape pass (fences) reads neighbors across chunk
+        // boundaries, so the adapter needs the same live cross-chunk terrain
+        // access as regular feature decoration, not just an unbacked getter
+        // that always reads air.
+        var forkAdapter = new GenerationUnitAdapter(forkUnit, startX, startZ, 16, 16, settings.minY(),
+                chunkBlocks, settings.height(), StructureWrites.terrainLookup());
 
         // Writing into the live buffer already makes the blocks visible to
         // this chunk's decoration and to later neighbors; the fallback
         // snapshot needs the StructureWrites replay instead.
         var replayHandle = usingLiveBuffer ? null : surfaceHeights;
         var blockingBiomes = this.structureLoader.biomeTags().biomes(MINESHAFT_BLOCKING_TAG);
+        var shapeUpdatePositions = new ArrayList<BlockVec>();
         var level = new MineshaftLevel(forkAdapter, chunkBlocks, startX, startZ,
-                settings.minY(), settings.maxYInclusive(), biomeZoomer, blockingBiomes, replayHandle);
+                settings.minY(), settings.maxYInclusive(), biomeZoomer, blockingBiomes, replayHandle,
+                shapeUpdatePositions);
         var chunkBB = new BoundingBox(startX, settings.minY() + 1, startZ,
                 startX + 15, settings.maxYInclusive(), startZ + 15);
 
@@ -154,6 +162,10 @@ public final class MineshaftPlacer {
                     }
                 }
             }
+        }
+
+        if (!shapeUpdatePositions.isEmpty()) {
+            StructureShapeUpdater.update(forkAdapter, this.structureLoader.blockTags(), shapeUpdatePositions);
         }
     }
 

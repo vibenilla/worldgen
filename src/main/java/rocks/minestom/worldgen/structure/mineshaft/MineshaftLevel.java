@@ -1,11 +1,13 @@
 package rocks.minestom.worldgen.structure.mineshaft;
 
 import net.kyori.adventure.key.Key;
+import net.minestom.server.coordinate.BlockVec;
 import net.minestom.server.instance.block.Block;
 import rocks.minestom.worldgen.biome.BiomeZoomer;
 import rocks.minestom.worldgen.feature.GenerationUnitAdapter;
 import rocks.minestom.worldgen.structure.StructureWrites;
 
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -26,9 +28,11 @@ final class MineshaftLevel {
     private final BiomeZoomer biomeZoomer;
     private final Set<Key> blockingBiomes;
     private final int[] chunkHandle;
+    private final List<BlockVec> shapeUpdatePositions;
 
     MineshaftLevel(GenerationUnitAdapter adapter, Block[] blocks, int startX, int startZ,
-            int minY, int maxY, BiomeZoomer biomeZoomer, Set<Key> blockingBiomes, int[] chunkHandle) {
+            int minY, int maxY, BiomeZoomer biomeZoomer, Set<Key> blockingBiomes, int[] chunkHandle,
+            List<BlockVec> shapeUpdatePositions) {
         this.adapter = adapter;
         this.blocks = blocks;
         this.startX = startX;
@@ -39,6 +43,7 @@ final class MineshaftLevel {
         this.biomeZoomer = biomeZoomer;
         this.blockingBiomes = blockingBiomes;
         this.chunkHandle = chunkHandle;
+        this.shapeUpdatePositions = shapeUpdatePositions;
     }
 
     Block getBlock(int x, int y, int z) {
@@ -58,6 +63,20 @@ final class MineshaftLevel {
         this.blocks[index] = block;
         this.adapter.setBlock(x, y, z, block);
         StructureWrites.record(this.chunkHandle, x, y, z, block);
+        if (isShapeCheckBlock(block)) {
+            this.shapeUpdatePositions.add(new BlockVec(x, y, z));
+        }
+    }
+
+    /**
+     * Vanilla {@code StructurePiece.SHAPE_CHECK_BLOCKS}, restricted to the
+     * families mineshaft pieces actually place (fences): a position marked
+     * here has its connection shape recomputed against its final neighbors
+     * once every piece in the chunk has been placed.
+     */
+    private static boolean isShapeCheckBlock(Block block) {
+        var key = block.key().value();
+        return key.endsWith("_fence") && !key.endsWith("_fence_gate");
     }
 
     /**
