@@ -17,7 +17,9 @@ import rocks.minestom.worldgen.structure.mineshaft.MineshaftType;
 import rocks.minestom.worldgen.structure.pool.PoolAliasBinding;
 import rocks.minestom.worldgen.structure.mansion.WoodlandMansionStructure;
 import rocks.minestom.worldgen.structure.monument.OceanMonumentStructure;
+import rocks.minestom.worldgen.structure.oceanruin.OceanRuinStructure;
 import rocks.minestom.worldgen.structure.scattered.BuriedTreasureStructure;
+import rocks.minestom.worldgen.structure.shipwreck.ShipwreckStructure;
 import rocks.minestom.worldgen.structure.stronghold.StrongholdStructure;
 import rocks.minestom.worldgen.structure.scattered.ScatteredFeatureKind;
 import rocks.minestom.worldgen.structure.scattered.ScatteredFeatureStructure;
@@ -82,7 +84,35 @@ public final class Structures {
             return parseEndCityStructure(json);
         }
 
+        if (typeStr.equals("minecraft:ocean_ruin")) {
+            return parseOceanRuinStructure(json);
+        }
+
+        if (typeStr.equals("minecraft:shipwreck")) {
+            return parseShipwreckStructure(json);
+        }
+
         return parseSimpleStructure(typeStr, json);
+    }
+
+    private static Structure parseOceanRuinStructure(JsonElement json) {
+        var decoded = SIMPLE_CODEC.decode(Transcoder.JSON, json).orElseThrow();
+        var biomes = parseBiomes(decoded.biomes().convertTo(Transcoder.JSON).orElseThrow());
+        var obj = json.getAsJsonObject();
+        var biomeTemp = obj.get("biome_temp").getAsString().equals("cold")
+                ? OceanRuinStructure.BiomeTemp.COLD
+                : OceanRuinStructure.BiomeTemp.WARM;
+        var largeProbability = obj.get("large_probability").getAsFloat();
+        var clusterProbability = obj.get("cluster_probability").getAsFloat();
+        return new OceanRuinStructure(biomes, biomeTemp, largeProbability, clusterProbability);
+    }
+
+    private static Structure parseShipwreckStructure(JsonElement json) {
+        var decoded = SIMPLE_CODEC.decode(Transcoder.JSON, json).orElseThrow();
+        var biomes = parseBiomes(decoded.biomes().convertTo(Transcoder.JSON).orElseThrow());
+        var obj = json.getAsJsonObject();
+        var isBeached = obj.has("is_beached") && obj.get("is_beached").getAsBoolean();
+        return new ShipwreckStructure(biomes, isBeached);
     }
 
     private static Structure parseEndCityStructure(JsonElement json) {
@@ -202,74 +232,6 @@ public final class Structures {
     private static List<Key> getTemplatesForType(String type) {
         return switch (type) {
             case "minecraft:igloo" -> List.of(Key.key("minecraft:igloo/top"));
-            case "minecraft:shipwreck" -> List.of(
-                    Key.key("minecraft:shipwreck/rightsideup_full"),
-                    Key.key("minecraft:shipwreck/rightsideup_full_degraded"),
-                    Key.key("minecraft:shipwreck/rightsideup_backhalf"),
-                    Key.key("minecraft:shipwreck/rightsideup_backhalf_degraded"),
-                    Key.key("minecraft:shipwreck/rightsideup_fronthalf"),
-                    Key.key("minecraft:shipwreck/rightsideup_fronthalf_degraded"),
-                    Key.key("minecraft:shipwreck/sideways_full"),
-                    Key.key("minecraft:shipwreck/sideways_full_degraded"),
-                    Key.key("minecraft:shipwreck/sideways_backhalf"),
-                    Key.key("minecraft:shipwreck/sideways_backhalf_degraded"),
-                    Key.key("minecraft:shipwreck/sideways_fronthalf"),
-                    Key.key("minecraft:shipwreck/sideways_fronthalf_degraded"),
-                    Key.key("minecraft:shipwreck/upsidedown_full"),
-                    Key.key("minecraft:shipwreck/upsidedown_full_degraded"),
-                    Key.key("minecraft:shipwreck/upsidedown_backhalf"),
-                    Key.key("minecraft:shipwreck/upsidedown_backhalf_degraded"),
-                    Key.key("minecraft:shipwreck/upsidedown_fronthalf"),
-                    Key.key("minecraft:shipwreck/upsidedown_fronthalf_degraded"),
-                    Key.key("minecraft:shipwreck/with_mast"),
-                    Key.key("minecraft:shipwreck/with_mast_degraded")
-            );
-            case "minecraft:shipwreck_beached" -> List.of(
-                    Key.key("minecraft:shipwreck/rightsideup_full"),
-                    Key.key("minecraft:shipwreck/rightsideup_full_degraded"),
-                    Key.key("minecraft:shipwreck/rightsideup_backhalf"),
-                    Key.key("minecraft:shipwreck/rightsideup_backhalf_degraded"),
-                    Key.key("minecraft:shipwreck/rightsideup_fronthalf"),
-                    Key.key("minecraft:shipwreck/rightsideup_fronthalf_degraded"),
-                    Key.key("minecraft:shipwreck/with_mast"),
-                    Key.key("minecraft:shipwreck/with_mast_degraded")
-            );
-            case "minecraft:ocean_ruin_cold" -> List.of(
-                    Key.key("minecraft:underwater_ruin/brick_1"),
-                    Key.key("minecraft:underwater_ruin/brick_2"),
-                    Key.key("minecraft:underwater_ruin/brick_3"),
-                    Key.key("minecraft:underwater_ruin/brick_4"),
-                    Key.key("minecraft:underwater_ruin/brick_5"),
-                    Key.key("minecraft:underwater_ruin/brick_6"),
-                    Key.key("minecraft:underwater_ruin/brick_7"),
-                    Key.key("minecraft:underwater_ruin/brick_8"),
-                    Key.key("minecraft:underwater_ruin/cracked_1"),
-                    Key.key("minecraft:underwater_ruin/cracked_2"),
-                    Key.key("minecraft:underwater_ruin/cracked_3"),
-                    Key.key("minecraft:underwater_ruin/cracked_4"),
-                    Key.key("minecraft:underwater_ruin/cracked_5"),
-                    Key.key("minecraft:underwater_ruin/cracked_6"),
-                    Key.key("minecraft:underwater_ruin/cracked_7"),
-                    Key.key("minecraft:underwater_ruin/cracked_8"),
-                    Key.key("minecraft:underwater_ruin/mossy_1"),
-                    Key.key("minecraft:underwater_ruin/mossy_2"),
-                    Key.key("minecraft:underwater_ruin/mossy_3"),
-                    Key.key("minecraft:underwater_ruin/mossy_4"),
-                    Key.key("minecraft:underwater_ruin/mossy_5"),
-                    Key.key("minecraft:underwater_ruin/mossy_6"),
-                    Key.key("minecraft:underwater_ruin/mossy_7"),
-                    Key.key("minecraft:underwater_ruin/mossy_8")
-            );
-            case "minecraft:ocean_ruin_warm" -> List.of(
-                    Key.key("minecraft:underwater_ruin/warm_1"),
-                    Key.key("minecraft:underwater_ruin/warm_2"),
-                    Key.key("minecraft:underwater_ruin/warm_3"),
-                    Key.key("minecraft:underwater_ruin/warm_4"),
-                    Key.key("minecraft:underwater_ruin/warm_5"),
-                    Key.key("minecraft:underwater_ruin/warm_6"),
-                    Key.key("minecraft:underwater_ruin/warm_7"),
-                    Key.key("minecraft:underwater_ruin/warm_8")
-            );
             case "minecraft:ruined_portal" -> List.of(
                     Key.key("minecraft:ruined_portal/portal_1"),
                     Key.key("minecraft:ruined_portal/portal_2"),

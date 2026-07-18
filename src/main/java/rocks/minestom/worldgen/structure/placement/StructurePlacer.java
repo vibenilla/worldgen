@@ -24,7 +24,9 @@ import rocks.minestom.worldgen.structure.loader.StructureLoader;
 import rocks.minestom.worldgen.structure.mineshaft.MineshaftPlacer;
 import rocks.minestom.worldgen.structure.mansion.MansionPlacer;
 import rocks.minestom.worldgen.structure.monument.MonumentPlacer;
+import rocks.minestom.worldgen.structure.oceanruin.OceanRuinPlacer;
 import rocks.minestom.worldgen.structure.pool.*;
+import rocks.minestom.worldgen.structure.shipwreck.ShipwreckPlacer;
 import rocks.minestom.worldgen.structure.stronghold.StrongholdPlacer;
 import rocks.minestom.worldgen.structure.processor.StructureProcessorContext;
 import rocks.minestom.worldgen.structure.processor.StructureProcessorList;
@@ -87,6 +89,8 @@ public final class StructurePlacer {
     private final MonumentPlacer monumentPlacer;
     private final StrongholdPlacer strongholdPlacer;
     private final MansionPlacer mansionPlacer;
+    private final OceanRuinPlacer oceanRuinPlacer;
+    private final ShipwreckPlacer shipwreckPlacer;
 
     public StructurePlacer(StructureLoader structureLoader, FeatureLoader featureLoader, List<Key> structureSets) {
         this.structureLoader = structureLoader;
@@ -102,6 +106,8 @@ public final class StructurePlacer {
         this.monumentPlacer = new MonumentPlacer(structureLoader, featureLoader);
         this.strongholdPlacer = new StrongholdPlacer(structureLoader, featureLoader);
         this.mansionPlacer = new MansionPlacer(structureLoader);
+        this.oceanRuinPlacer = new OceanRuinPlacer(structureLoader);
+        this.shipwreckPlacer = new ShipwreckPlacer(structureLoader, featureLoader);
     }
 
     public void placeStructures(GenerationUnit unit, int[] surfaceHeights, BiomeZoomer biomeZoomer,
@@ -163,6 +169,24 @@ public final class StructurePlacer {
                 // The woodland mansion is a single grid-solved template
                 // structure with its own multi-chunk placement path.
                 this.mansionPlacer.place(unit, biomeZoomer, settings, structureSet, surfaceHeights);
+                continue;
+            }
+
+            if (this.oceanRuinPlacer.isOceanRuinSet(structureSet)) {
+                // Ocean ruins draw a large/cluster roll and resolve each
+                // piece's own floor height, unlike the generic template path,
+                // so - like the scattered features - this placer fully
+                // replaces the generic path for its set.
+                this.oceanRuinPlacer.place(unit, biomeZoomer, settings, structureSet, surfaceHeights);
+                continue;
+            }
+
+            if (this.shipwreckPlacer.isShipwreckSet(structureSet)) {
+                // Shipwrecks pick from a beached/ocean-specific template pool,
+                // rotate around a non-zero pivot and resolve their own
+                // height, so this placer also fully replaces the generic
+                // path for its set.
+                this.shipwreckPlacer.place(unit, biomeZoomer, settings, structureSet, surfaceHeights);
                 continue;
             }
 
