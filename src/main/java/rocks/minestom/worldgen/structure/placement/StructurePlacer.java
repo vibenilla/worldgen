@@ -24,9 +24,11 @@ import rocks.minestom.worldgen.structure.loader.StructureLoader;
 import rocks.minestom.worldgen.structure.mineshaft.MineshaftPlacer;
 import rocks.minestom.worldgen.structure.mansion.MansionPlacer;
 import rocks.minestom.worldgen.structure.monument.MonumentPlacer;
+import rocks.minestom.worldgen.structure.igloo.IglooPlacer;
 import rocks.minestom.worldgen.structure.netherfossil.NetherFossilPlacer;
 import rocks.minestom.worldgen.structure.oceanruin.OceanRuinPlacer;
 import rocks.minestom.worldgen.structure.pool.*;
+import rocks.minestom.worldgen.structure.ruinedportal.RuinedPortalPlacer;
 import rocks.minestom.worldgen.structure.shipwreck.ShipwreckPlacer;
 import rocks.minestom.worldgen.structure.stronghold.StrongholdPlacer;
 import rocks.minestom.worldgen.structure.processor.StructureProcessorContext;
@@ -93,6 +95,8 @@ public final class StructurePlacer {
     private final MansionPlacer mansionPlacer;
     private final OceanRuinPlacer oceanRuinPlacer;
     private final ShipwreckPlacer shipwreckPlacer;
+    private final RuinedPortalPlacer ruinedPortalPlacer;
+    private final IglooPlacer iglooPlacer;
     private final NetherFossilPlacer netherFossilPlacer;
 
     public StructurePlacer(StructureLoader structureLoader, FeatureLoader featureLoader, List<Key> structureSets) {
@@ -111,6 +115,8 @@ public final class StructurePlacer {
         this.mansionPlacer = new MansionPlacer(structureLoader);
         this.oceanRuinPlacer = new OceanRuinPlacer(structureLoader);
         this.shipwreckPlacer = new ShipwreckPlacer(structureLoader, featureLoader);
+        this.ruinedPortalPlacer = new RuinedPortalPlacer(structureLoader, featureLoader);
+        this.iglooPlacer = new IglooPlacer(structureLoader);
         this.netherFossilPlacer = new NetherFossilPlacer(structureLoader);
     }
 
@@ -192,6 +198,24 @@ public final class StructurePlacer {
                 // height, so this placer also fully replaces the generic
                 // path for its set.
                 this.shipwreckPlacer.place(unit, biomeZoomer, settings, structureSet, surfaceHeights);
+                continue;
+            }
+
+            if (this.ruinedPortalPlacer.isRuinedPortalSet(structureSet)) {
+                // Ruined portals pick a weighted setup, resolve a buried or
+                // surface Y, apply weathering processors and then spread
+                // netherrack once in the center chunk, so this placer fully
+                // replaces the generic path for its set.
+                this.ruinedPortalPlacer.place(unit, biomeZoomer, settings, structureSet, surfaceHeights);
+                continue;
+            }
+
+            if (this.iglooPlacer.isIglooSet(structureSet)) {
+                // Igloos roll a 50% basement (an igloo/bottom laboratory plus
+                // an igloo/middle ladder shaft) and each piece resolves its own
+                // surface height, so this placer fully replaces the generic
+                // path for its set.
+                this.iglooPlacer.place(unit, biomeZoomer, settings, structureSet, surfaceHeights);
                 continue;
             }
 

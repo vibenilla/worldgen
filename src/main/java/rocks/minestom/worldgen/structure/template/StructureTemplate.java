@@ -177,7 +177,36 @@ public final class StructureTemplate {
             boolean terrainMatching,
             LiquidSettings liquidSettings,
             boolean updateConnectionShapes) {
-        var palette = this.palettes.get(this.paletteIndex(position));
+        this.place(context, position, position, rotation, mirror, processors, legacy, terrainMatching,
+                liquidSettings, updateConnectionShapes);
+    }
+
+    public void place(
+            PlacementContext context,
+            BlockVec position,
+            BlockVec paletteSeedPosition,
+            Rotation rotation,
+            StructureProcessorList processors,
+            boolean legacy,
+            boolean terrainMatching,
+            LiquidSettings liquidSettings,
+            boolean updateConnectionShapes) {
+        this.place(context, position, paletteSeedPosition, rotation, Mirror.NONE, processors, legacy,
+                terrainMatching, liquidSettings, updateConnectionShapes);
+    }
+
+    public void place(
+            PlacementContext context,
+            BlockVec position,
+            BlockVec paletteSeedPosition,
+            Rotation rotation,
+            Mirror mirror,
+            StructureProcessorList processors,
+            boolean legacy,
+            boolean terrainMatching,
+            LiquidSettings liquidSettings,
+            boolean updateConnectionShapes) {
+        var palette = this.palettes.get(this.paletteIndex(paletteSeedPosition));
 
         // Vanilla processor chain order (SinglePoolElement.getSettings /
         // LegacySinglePoolElement.getSettings).

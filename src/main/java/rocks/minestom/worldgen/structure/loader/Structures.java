@@ -13,6 +13,7 @@ import rocks.minestom.worldgen.structure.Structure;
 import rocks.minestom.worldgen.structure.TerrainAdjustment;
 import rocks.minestom.worldgen.structure.endcity.EndCityStructure;
 import rocks.minestom.worldgen.structure.fortress.FortressStructure;
+import rocks.minestom.worldgen.structure.igloo.IglooStructure;
 import rocks.minestom.worldgen.structure.mineshaft.MineshaftStructure;
 import rocks.minestom.worldgen.structure.mineshaft.MineshaftType;
 import rocks.minestom.worldgen.structure.pool.PoolAliasBinding;
@@ -20,6 +21,7 @@ import rocks.minestom.worldgen.structure.mansion.WoodlandMansionStructure;
 import rocks.minestom.worldgen.structure.monument.OceanMonumentStructure;
 import rocks.minestom.worldgen.structure.netherfossil.NetherFossilStructure;
 import rocks.minestom.worldgen.structure.oceanruin.OceanRuinStructure;
+import rocks.minestom.worldgen.structure.ruinedportal.RuinedPortalStructure;
 import rocks.minestom.worldgen.structure.scattered.BuriedTreasureStructure;
 import rocks.minestom.worldgen.structure.shipwreck.ShipwreckStructure;
 import rocks.minestom.worldgen.structure.stronghold.StrongholdStructure;
@@ -99,8 +101,16 @@ public final class Structures {
             return parseShipwreckStructure(json);
         }
 
+        if (typeStr.equals("minecraft:igloo")) {
+            return parseIglooStructure(json);
+        }
+
         if (typeStr.equals("minecraft:nether_fossil")) {
             return parseNetherFossilStructure(json);
+        }
+
+        if (typeStr.equals("minecraft:ruined_portal")) {
+            return parseRuinedPortalStructure(json);
         }
 
         return parseSimpleStructure(typeStr, json);
@@ -130,12 +140,38 @@ public final class Structures {
         return new OceanRuinStructure(biomes, biomeTemp, largeProbability, clusterProbability);
     }
 
+    private static Structure parseRuinedPortalStructure(JsonElement json) {
+        var decoded = SIMPLE_CODEC.decode(Transcoder.JSON, json).orElseThrow();
+        var biomes = parseBiomes(decoded.biomes().convertTo(Transcoder.JSON).orElseThrow());
+        var obj = json.getAsJsonObject();
+        var setups = new ArrayList<RuinedPortalStructure.Setup>();
+        for (var element : obj.getAsJsonArray("setups")) {
+            var setup = element.getAsJsonObject();
+            setups.add(new RuinedPortalStructure.Setup(
+                    RuinedPortalStructure.VerticalPlacement.fromName(setup.get("placement").getAsString()),
+                    setup.get("air_pocket_probability").getAsFloat(),
+                    setup.get("mossiness").getAsFloat(),
+                    setup.get("overgrown").getAsBoolean(),
+                    setup.get("vines").getAsBoolean(),
+                    setup.get("can_be_cold").getAsBoolean(),
+                    setup.get("replace_with_blackstone").getAsBoolean(),
+                    setup.get("weight").getAsFloat()));
+        }
+        return new RuinedPortalStructure(biomes, List.copyOf(setups));
+    }
+
     private static Structure parseShipwreckStructure(JsonElement json) {
         var decoded = SIMPLE_CODEC.decode(Transcoder.JSON, json).orElseThrow();
         var biomes = parseBiomes(decoded.biomes().convertTo(Transcoder.JSON).orElseThrow());
         var obj = json.getAsJsonObject();
         var isBeached = obj.has("is_beached") && obj.get("is_beached").getAsBoolean();
         return new ShipwreckStructure(biomes, isBeached);
+    }
+
+    private static Structure parseIglooStructure(JsonElement json) {
+        var decoded = SIMPLE_CODEC.decode(Transcoder.JSON, json).orElseThrow();
+        var biomes = parseBiomes(decoded.biomes().convertTo(Transcoder.JSON).orElseThrow());
+        return new IglooStructure(biomes);
     }
 
     private static Structure parseEndCityStructure(JsonElement json) {
@@ -260,36 +296,6 @@ public final class Structures {
 
     private static List<Key> getTemplatesForType(String type) {
         return switch (type) {
-            case "minecraft:igloo" -> List.of(Key.key("minecraft:igloo/top"));
-            case "minecraft:ruined_portal" -> List.of(
-                    Key.key("minecraft:ruined_portal/portal_1"),
-                    Key.key("minecraft:ruined_portal/portal_2"),
-                    Key.key("minecraft:ruined_portal/portal_3"),
-                    Key.key("minecraft:ruined_portal/portal_4"),
-                    Key.key("minecraft:ruined_portal/portal_5"),
-                    Key.key("minecraft:ruined_portal/portal_6"),
-                    Key.key("minecraft:ruined_portal/portal_7"),
-                    Key.key("minecraft:ruined_portal/portal_8"),
-                    Key.key("minecraft:ruined_portal/portal_9"),
-                    Key.key("minecraft:ruined_portal/portal_10")
-            );
-            case "minecraft:ruined_portal_desert", "minecraft:ruined_portal_jungle",
-                 "minecraft:ruined_portal_mountain", "minecraft:ruined_portal_nether",
-                 "minecraft:ruined_portal_ocean", "minecraft:ruined_portal_swamp" -> List.of(
-                    Key.key("minecraft:ruined_portal/portal_1"),
-                    Key.key("minecraft:ruined_portal/portal_2"),
-                    Key.key("minecraft:ruined_portal/portal_3"),
-                    Key.key("minecraft:ruined_portal/portal_4"),
-                    Key.key("minecraft:ruined_portal/portal_5"),
-                    Key.key("minecraft:ruined_portal/portal_6"),
-                    Key.key("minecraft:ruined_portal/portal_7"),
-                    Key.key("minecraft:ruined_portal/portal_8"),
-                    Key.key("minecraft:ruined_portal/portal_9"),
-                    Key.key("minecraft:ruined_portal/portal_10"),
-                    Key.key("minecraft:ruined_portal/giant_portal_1"),
-                    Key.key("minecraft:ruined_portal/giant_portal_2"),
-                    Key.key("minecraft:ruined_portal/giant_portal_3")
-            );
             case "minecraft:nether_fossil" -> List.of(
                     Key.key("minecraft:nether_fossils/fossil_1"),
                     Key.key("minecraft:nether_fossils/fossil_2"),
