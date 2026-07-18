@@ -40,6 +40,12 @@ public final class SimpleBlockFeature implements Feature<SimpleBlockConfiguratio
             return this.isPlantGround(accessor.getBlock(position.sub(0, 1, 0)));
         }
 
+        // 26.x per-block supports_<name> tags carry most plant survival rules
+        var supported = BlockSupports.supportsOf(toPlace);
+        if (supported != null) {
+            return supported.contains(accessor.getBlock(position.sub(0, 1, 0)).key());
+        }
+
         // Ceiling-hanging blocks survive on support ABOVE (vanilla
         // SporeBlossomBlock/HangingRootsBlock canSurvive checks
         // canSupportCenter of the block above, not below)

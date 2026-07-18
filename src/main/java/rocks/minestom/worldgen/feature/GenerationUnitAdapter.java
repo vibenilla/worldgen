@@ -125,6 +125,11 @@ public final class GenerationUnitAdapter implements Block.Getter, Block.Setter {
     }
 
     public void setBlock(BlockVec position, Block block) {
+        var writeTrace = System.getProperty("worldgen.writeTrace");
+        if (writeTrace != null && writeTrace.equals(position.blockX() + "," + position.blockY() + "," + position.blockZ())) {
+            System.out.println("WRITETRACE " + position + " " + block.name());
+            Thread.dumpStack();
+        }
         if (!this.isInBounds(position)) {
             return;
         }

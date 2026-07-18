@@ -586,13 +586,9 @@ public final class PlacementModifiers {
 
                 // 26.x moved most plant survival rules to per-block
                 // supports_<name> block tags; prefer those when present
-                var blockTags = currentBlockTags();
-                if (blockTags != null) {
-                    var supportTag = Key.key("minecraft:supports_" + this.state.key().value());
-                    var supported = resolveTag(supportTag, blockTags);
-                    if (!supported.isEmpty()) {
-                        return supported.contains(below.key());
-                    }
+                var supported = rocks.minestom.worldgen.feature.BlockSupports.supportsOf(this.state);
+                if (supported != null) {
+                    return supported.contains(below.key());
                 }
 
                 if (this.state.compare(Block.CACTUS)) {

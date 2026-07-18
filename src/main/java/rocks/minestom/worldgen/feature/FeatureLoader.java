@@ -39,6 +39,7 @@ public final class FeatureLoader {
     public FeatureLoader(DataPack dataPack) {
         this.dataPack = dataPack;
         this.blockTags = new BlockTagManager(dataPack.rootPath());
+        BlockSupports.install(this.blockTags);
         this.configuredFeatureCache = new ConcurrentHashMap<>();
         this.placedFeatureCache = new ConcurrentHashMap<>();
         this.biomeFeatureCache = new ConcurrentHashMap<>();
