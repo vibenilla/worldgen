@@ -55,6 +55,7 @@ public final class WorldGenerator implements Generator {
     // only switches to the live (fork) path once decoration is fully done
     private final Set<Long> fullyDecorated = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final Map<Long, Map<Integer, Block>> pendingCrossWrites = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<Long, List<BlockVec>> pendingFluidTicks = new java.util.concurrent.ConcurrentHashMap<>();
 
     private final GenerationUnitAdapter.TerrainLookup terrainAccess = new GenerationUnitAdapter.TerrainLookup() {
         @Override
@@ -119,6 +120,15 @@ public final class WorldGenerator implements Generator {
         var surfaceHeights = terrainData.surfaceHeights();
         var terrainBlocks = terrainData.blocks();
 
+        // Aquifer-boundary water placed by the noise fill and carvers gets a
+        // scheduled fluid tick in vanilla; queue those ahead of any feature
+        // water so the emulated single tick round preserves schedule order
+        if (!terrainData.fluidTicks().isEmpty()) {
+            this.pendingFluidTicks
+                    .computeIfAbsent(chunkKey, unused -> java.util.Collections.synchronizedList(new java.util.ArrayList<>()))
+                    .addAll(terrainData.fluidTicks());
+        }
+
         // Earlier-decorated neighbors' spill-over writes land chronologically
         // before this chunk's own decoration, exactly like vanilla proto-chunks
         var pending = this.pendingCrossWrites.remove(chunkKey);
@@ -152,6 +162,73 @@ public final class WorldGenerator implements Generator {
         // would
         this.fullyDecorated.add(chunkKey);
         this.applyLateSpillWrites(unit, chunkKey, height);
+        this.flushFluidTicks(unit, terrainData);
+    }
+
+    /**
+     * Runs the single-round water tick emulation (see {@link WaterSpread})
+     * for every chunk whose full 3x3 neighborhood has finished decorating,
+     * mirroring vanilla's scheduled fluid ticks firing once the chunk itself
+     * is promoted to FULL and starts block-ticking.
+     */
+    private void flushFluidTicks(GenerationUnit unit, TerrainData terrainData) {
+        if (this.pendingFluidTicks.isEmpty()) {
+            return;
+        }
+
+        GenerationUnitAdapter adapter = null;
+        var iterator = this.pendingFluidTicks.entrySet().iterator();
+        while (iterator.hasNext()) {
+            var entry = iterator.next();
+            var pendingChunkX = (int) (entry.getKey() >> 32);
+            var pendingChunkZ = (int) (long) entry.getKey();
+            if (!this.neighborhoodDecorated(pendingChunkX, pendingChunkZ)) {
+                continue;
+            }
+
+            if (adapter == null) {
+                var startX = unit.absoluteStart().blockX();
+                var startZ = unit.absoluteStart().blockZ();
+                var sizeX = unit.size().blockX();
+                var sizeZ = unit.size().blockZ();
+                var forkPadding = 128;
+                var forkStart = new BlockVec(startX - forkPadding, this.settings.minY(), startZ - forkPadding);
+                var forkEnd = new BlockVec(startX + sizeX + forkPadding, this.settings.maxYInclusive() + 1,
+                        startZ + sizeZ + forkPadding);
+                adapter = new GenerationUnitAdapter(
+                        unit.fork(forkStart, forkEnd),
+                        startX,
+                        startZ,
+                        sizeX,
+                        sizeZ,
+                        this.settings.minY(),
+                        terrainData.blocks(),
+                        this.settings.height(),
+                        this.terrainAccess);
+            }
+
+            List<BlockVec> positions;
+            var pending = entry.getValue();
+            synchronized (pending) {
+                positions = new java.util.ArrayList<>(pending);
+            }
+            for (var position : positions) {
+                WaterSpread.tick(adapter, position);
+            }
+            iterator.remove();
+        }
+    }
+
+    private boolean neighborhoodDecorated(int chunkX, int chunkZ) {
+        for (var offsetX = -1; offsetX <= 1; offsetX++) {
+            for (var offsetZ = -1; offsetZ <= 1; offsetZ++) {
+                var key = (long) (chunkX + offsetX) << 32 | ((chunkZ + offsetZ) & 0xFFFFFFFFL);
+                if (!this.fullyDecorated.contains(key)) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /**

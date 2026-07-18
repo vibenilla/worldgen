@@ -20,7 +20,8 @@ public record TerrainData(
         int[] surfaceHeights,
         int[] waterHeights,
         byte[] stoneMask,
-        net.minestom.server.instance.block.Block[] blocks) {
+        net.minestom.server.instance.block.Block[] blocks,
+        java.util.List<net.minestom.server.coordinate.BlockVec> fluidTicks) {
     /**
      * Nothing was placed at this position.
      */
@@ -45,6 +46,6 @@ public record TerrainData(
         var blocks = new net.minestom.server.instance.block.Block[sizeX * sizeZ * height];
         Arrays.fill(surfaceHeights, Integer.MIN_VALUE);
         Arrays.fill(waterHeights, Integer.MIN_VALUE);
-        return new TerrainData(surfaceHeights, waterHeights, stoneMask, blocks);
+        return new TerrainData(surfaceHeights, waterHeights, stoneMask, blocks, new java.util.ArrayList<>());
     }
 }

@@ -180,6 +180,9 @@ public final class TerrainGenerator {
                                     // Ocean/Aquifer Liquid
                                     stoneMask[maskIndex + yIndex] = TerrainData.FLUID;
                                     blocks[maskIndex + yIndex] = state;
+                                    if (aquifer.shouldScheduleFluidUpdate() && state.compare(net.minestom.server.instance.block.Block.WATER)) {
+                                        data.fluidTicks().add(new net.minestom.server.coordinate.BlockVec(blockX, blockY, blockZ));
+                                    }
 
                                     // Capture water level (first liquid from top)
                                     if (waterHeights[surfaceIndex] == Integer.MIN_VALUE) {

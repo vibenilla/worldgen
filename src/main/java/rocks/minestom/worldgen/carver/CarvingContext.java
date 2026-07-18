@@ -71,6 +71,14 @@ public final class CarvingContext {
         return this.chunkZ;
     }
 
+    /**
+     * Mirror of vanilla marking a carver-placed fluid for a post-generation
+     * scheduled fluid tick when the aquifer requested one.
+     */
+    public void recordFluidTick(int blockX, int blockY, int blockZ) {
+        this.data.fluidTicks().add(new net.minestom.server.coordinate.BlockVec(blockX, blockY, blockZ));
+    }
+
     public Aquifer aquifer() {
         return this.aquifer;
     }

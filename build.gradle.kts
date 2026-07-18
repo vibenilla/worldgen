@@ -178,6 +178,7 @@ tasks.register<JavaExec>("compareVanilla") {
     providers.gradleProperty("debugchunk").orNull?.let { systemProperty("worldgen.debugchunk", it) }
     providers.gradleProperty("debugFilter").orNull?.let { systemProperty("worldgen.debugFilter", it) }
     providers.gradleProperty("writeTrace").orNull?.let { systemProperty("worldgen.writeTrace", it) }
+    providers.gradleProperty("waterDebug").orNull?.let { systemProperty("worldgen.waterDebug", it) }
     providers.gradleProperty("oreProbeDebug").orNull?.let { systemProperty("worldgen.oreProbeDebug", it) }
     providers.gradleProperty("decorTrace").orNull?.let { systemProperty("worldgen.decorTrace", it) }
     providers.gradleProperty("decorTraceFeature").orNull?.let { systemProperty("worldgen.decorTraceFeature", it) }

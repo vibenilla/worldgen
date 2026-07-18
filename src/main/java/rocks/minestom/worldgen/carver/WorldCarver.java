@@ -110,6 +110,9 @@ public abstract class WorldCarver<C> {
         }
 
         context.setCarved(blockX, blockY, blockZ, state);
+        if (context.aquifer().shouldScheduleFluidUpdate() && state.compare(Block.WATER)) {
+            context.recordFluidTick(blockX, blockY, blockZ);
+        }
         if (hasGrass.value) {
             var below = context.getBlock(blockX, blockY - 1, blockZ);
             if (below.compare(Block.DIRT)) {
