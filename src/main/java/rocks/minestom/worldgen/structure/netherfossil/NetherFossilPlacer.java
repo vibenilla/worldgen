@@ -127,6 +127,38 @@ public final class NetherFossilPlacer {
         var processors = new StructureProcessorList(List.of(BlockIgnoreProcessor.STRUCTURE_AND_AIR));
         template.place(placementContext, start.position(), start.rotation(), processors, false, false,
                 LiquidSettings.APPLY_WATERLOGGING, true);
+        this.placeDriedGhast(start, adapter, settings);
+    }
+
+    /**
+     * Vanilla {@code NetherFossilPieces.NetherFossilPiece.placeDriedGhast}: a
+     * positional random seeded at the fossil bounding box center sometimes
+     * drops a dried ghast on the fossil floor. Vanilla runs this once per
+     * intersecting chunk against the chunk box encapsulated with the fossil
+     * box, which makes its in-box check always pass; the air check makes the
+     * repeated runs idempotent, and the adapter drops writes outside the
+     * current unit, so the chunk that owns the target position places it.
+     */
+    private void placeDriedGhast(NetherFossilStart start, GenerationUnitAdapter adapter,
+            NoiseGeneratorSettingsRuntime settings) {
+        var bounds = start.bounds();
+        var positionalRandom = new LegacyRandomSource(settings.randomState().seed())
+                .forkPositional()
+                .at(bounds.getCenter().blockX(), bounds.getCenter().blockY(), bounds.getCenter().blockZ());
+        if (positionalRandom.nextFloat() >= 0.5F) {
+            return;
+        }
+
+        var x = bounds.minX() + positionalRandom.nextInt(bounds.getXSpan());
+        var y = bounds.minY();
+        var z = bounds.minZ() + positionalRandom.nextInt(bounds.getZSpan());
+        if (!adapter.getBlock(x, y, z).isAir()) {
+            return;
+        }
+
+        var rotation = Rotation.getRandom(positionalRandom);
+        adapter.setBlock(new BlockVec(x, y, z),
+                StructureTemplate.rotateBlockState(Block.DRIED_GHAST, rotation));
     }
 
     /**
