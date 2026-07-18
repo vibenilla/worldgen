@@ -96,14 +96,25 @@ public final class MansionPlacer {
 
         // Deferred so every piece placed in this chunk (across all
         // intersecting starts) is committed before any connection shape
-        // (fence, wall, leaves) is recomputed against its neighbors.
+        // (fence, wall, stair) is recomputed against its neighbors.
         var connectionShapeUpdates = new ArrayList<BlockVec>();
         for (var start : intersecting) {
             this.placeStart(start, adapter, chunkBounds, settings, connectionShapeUpdates);
         }
 
         if (!connectionShapeUpdates.isEmpty()) {
+            // Leaves distance has to wait for this chunk's own vegetation
+            // decoration to plant whatever natural trees end up near the
+            // mansion, so it is queued separately instead of settling now.
+            var leaves = StructureShapeUpdater.collectLeaves(adapter, connectionShapeUpdates);
             StructureShapeUpdater.update(adapter, this.structureLoader.blockTags(), connectionShapeUpdates);
+            if (!leaves.isEmpty()) {
+                if (surfaceHeights != null) {
+                    StructureWrites.queueLeavesUpdate(surfaceHeights, this.structureLoader.blockTags(), leaves);
+                } else {
+                    StructureShapeUpdater.updateLeavesDistance(adapter, this.structureLoader.blockTags(), leaves);
+                }
+            }
         }
     }
 

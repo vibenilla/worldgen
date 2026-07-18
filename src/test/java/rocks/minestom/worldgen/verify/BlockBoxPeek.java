@@ -34,11 +34,15 @@ public final class BlockBoxPeek {
             }
         }
 
+        var perPosition = Boolean.getBoolean("blockbox.perPosition");
         var counts = new TreeMap<String, Integer>();
         for (var x = minX; x <= maxX; x++) {
             for (var y = minY; y <= maxY; y++) {
                 for (var z = minZ; z <= maxZ; z++) {
                     var block = instance.getBlock(x, y, z);
+                    if (perPosition) {
+                        System.out.println(x + "," + y + "," + z + " " + block);
+                    }
                     counts.merge(block.key().asString(), 1, Integer::sum);
                 }
             }

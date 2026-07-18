@@ -17,6 +17,7 @@ import rocks.minestom.worldgen.feature.placement.PlacementContext;
 import rocks.minestom.worldgen.random.RandomSource;
 import rocks.minestom.worldgen.random.WorldgenRandom;
 import rocks.minestom.worldgen.random.XoroshiroRandomSource;
+import rocks.minestom.worldgen.structure.StructureWrites;
 import rocks.minestom.worldgen.structure.placement.StructurePlacer;
 import rocks.minestom.worldgen.surface.BiomeResolver;
 import rocks.minestom.worldgen.surface.SurfaceRules;
@@ -507,6 +508,30 @@ public final class WorldGenerator implements Generator {
                 }
             }
         }
+
+        // Structure-placed leaves settle their distance here, once this
+        // chunk's own vegetation decoration has planted whatever natural
+        // trees end up near the structure, mirroring vanilla only ever
+        // resolving that distance through scheduled ticks that fire after
+        // decoration. A wider fork than regular feature placement: a
+        // structure's canopy can reach further than the usual 16-block
+        // neighbor margin from whichever chunk happens to finish it off.
+        var leavesForkPadding = 128;
+        var leavesForkStart = new BlockVec(startX - leavesForkPadding, this.settings.minY(), startZ - leavesForkPadding);
+        var leavesForkEnd = new BlockVec(startX + sizeX + leavesForkPadding, this.settings.maxYInclusive() + 1,
+                startZ + sizeZ + leavesForkPadding);
+        var leavesUnit = unit.fork(leavesForkStart, leavesForkEnd);
+        var leavesAdapter = new GenerationUnitAdapter(
+                leavesUnit,
+                startX,
+                startZ,
+                sizeX,
+                sizeZ,
+                this.settings.minY(),
+                terrainData.blocks(),
+                this.settings.height(),
+                this.terrainAccess);
+        StructureWrites.flushLeavesUpdates(surfaceHeights, leavesAdapter);
     }
 
     /** Debug-only wrapper counting draws consumed by a single traced placed-feature call. */

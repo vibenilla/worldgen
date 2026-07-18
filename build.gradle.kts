@@ -410,12 +410,72 @@ tasks.register<JavaExec>("strongholdOurPieceDump") {
     )
 }
 
+tasks.register<JavaExec>("mansionVerify") {
+    group = "verification"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass = "rocks.minestom.worldgen.verify.MansionVerify"
+    jvmArgs("-Xmx4G")
+    systemProperty("mansion.diffFilter", providers.gradleProperty("diffFilter").getOrElse(""))
+    systemProperty("mansion.diffLimit", providers.gradleProperty("diffLimit").getOrElse("60"))
+    args(
+        providers.gradleProperty("vanillaWorld").getOrElse("data/vanilla-mansion/world/dimensions/minecraft/overworld"),
+        providers.gradleProperty("datapack").getOrElse("data/mc/datapack"),
+        providers.gradleProperty("seed").getOrElse("123456789"),
+        providers.gradleProperty("minChunkX").getOrElse("25"),
+        providers.gradleProperty("minChunkZ").getOrElse("8"),
+        providers.gradleProperty("maxChunkX").getOrElse("55"),
+        providers.gradleProperty("maxChunkZ").getOrElse("38")
+    )
+}
+
+tasks.register<JavaExec>("mansionPieceDump") {
+    group = "verification"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass = "rocks.minestom.worldgen.structure.mansion.MansionPieceDump"
+    args(
+        providers.gradleProperty("vanillaWorld").getOrElse("data/vanilla-mansion/world/dimensions/minecraft/overworld"),
+        providers.gradleProperty("datapack").getOrElse("data/mc/datapack"),
+        providers.gradleProperty("seed").getOrElse("123456789"),
+        providers.gradleProperty("chunkX").getOrElse("39"),
+        providers.gradleProperty("chunkZ").getOrElse("21")
+    )
+}
+
+tasks.register<JavaExec>("endCityScan") {
+    group = "verification"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass = "rocks.minestom.worldgen.verify.EndCityScan"
+    jvmArgs("-Xmx4G")
+    args(
+        providers.gradleProperty("vanillaWorld").getOrElse("data/vanilla-r64/end/world/dimensions/minecraft/the_end"),
+        providers.gradleProperty("minChunkX").getOrElse("-10"),
+        providers.gradleProperty("minChunkZ").getOrElse("-10"),
+        providers.gradleProperty("maxChunkX").getOrElse("10"),
+        providers.gradleProperty("maxChunkZ").getOrElse("10"),
+        providers.gradleProperty("nameFilter").getOrElse("end_city"),
+        providers.gradleProperty("dumpChildrenFor").getOrElse("")
+    )
+}
+
+tasks.register<JavaExec>("endCityOurPieceDump") {
+    group = "verification"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass = "rocks.minestom.worldgen.verify.EndCityOurPieceDump"
+    args(
+        providers.gradleProperty("datapack").getOrElse("data/mc/datapack"),
+        providers.gradleProperty("seed").getOrElse("123456789"),
+        providers.gradleProperty("chunkX").getOrElse("63"),
+        providers.gradleProperty("chunkZ").getOrElse("-14")
+    )
+}
+
 tasks.register<JavaExec>("blockBoxPeek") {
     group = "verification"
     classpath = sourceSets.test.get().runtimeClasspath
     mainClass = "rocks.minestom.worldgen.verify.BlockBoxPeek"
     jvmArgs("-Xmx4G")
     systemProperty("stronghold.debug", providers.gradleProperty("strongholdDebug").getOrElse(""))
+    systemProperty("blockbox.perPosition", providers.gradleProperty("perPosition").getOrElse("false"))
     args(
         providers.gradleProperty("datapack").getOrElse("data/mc/datapack"),
         providers.gradleProperty("seed").getOrElse("123456789"),

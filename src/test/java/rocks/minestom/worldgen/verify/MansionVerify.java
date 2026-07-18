@@ -186,7 +186,10 @@ public final class MansionVerify {
                             } else {
                                 chunkMismatchCount++;
                                 mismatches.merge(strip(expected) + " -> " + strip(actual), 1, Integer::sum);
-                                if (printed < 60) {
+                                var filter = System.getProperty("mansion.diffFilter");
+                                var matchesFilter = filter == null || expected.contains(filter) || actual.contains(filter);
+                                var printLimit = Integer.getInteger("mansion.diffLimit", 60);
+                                if (matchesFilter && printed < printLimit) {
                                     printed++;
                                     System.out.printf("DIFF %d,%d,%d %s -> %s%n", worldX, y, worldZ, expected, actual);
                                 }

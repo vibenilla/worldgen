@@ -1,7 +1,10 @@
 package rocks.minestom.worldgen.structure;
 
+import net.minestom.server.coordinate.BlockVec;
 import net.minestom.server.instance.block.Block;
 import rocks.minestom.worldgen.feature.GenerationUnitAdapter;
+import rocks.minestom.worldgen.structure.context.BlockTagManager;
+import rocks.minestom.worldgen.structure.template.StructureShapeUpdater;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -22,7 +25,16 @@ import java.util.WeakHashMap;
  */
 public final class StructureWrites {
     private static final Map<int[], List<Write>> PENDING = Collections.synchronizedMap(new WeakHashMap<>());
+    // Not keyed per chunk: a structure's leaves commonly span several chunks,
+    // and each one only settles correctly once every chunk touching that
+    // canopy (and whatever natural vegetation grew alongside it) has placed
+    // its blocks. Every flush relaxes the whole accumulated set again with
+    // that chunk's live cross-chunk view, so the last chunk to decorate ends
+    // up converging the whole canopy, mirroring vanilla leaves eventually
+    // settling once enough real time (and ticks) has passed nearby.
+    private static final List<BlockVec> PENDING_LEAVES = Collections.synchronizedList(new ArrayList<>());
     private static volatile GenerationUnitAdapter.TerrainLookup terrainLookup;
+    private static volatile BlockTagManager leavesBlockTags;
 
     private StructureWrites() {
     }
@@ -74,5 +86,40 @@ public final class StructureWrites {
                 adapter.setBlock(write.x(), write.y(), write.z(), write.block());
             }
         }
+    }
+
+    /**
+     * Queues leaves placed by structure generation for a distance relaxation
+     * that has to wait until this chunk's own vegetation decoration has run,
+     * mirroring vanilla settling leaves distance through scheduled ticks that
+     * only fire once natural trees near the structure already exist.
+     */
+    public static void queueLeavesUpdate(int[] chunkHandle, BlockTagManager blockTags, List<BlockVec> positions) {
+        if (chunkHandle == null || positions.isEmpty()) {
+            return;
+        }
+        leavesBlockTags = blockTags;
+        PENDING_LEAVES.addAll(positions);
+    }
+
+    /**
+     * Re-relaxes every leaf queued so far (from this chunk and any other
+     * chunk a structure's canopy has touched) against this chunk's live
+     * cross-chunk view, now that its own decoration has finished planting
+     * whatever natural trees end up nearby.
+     */
+    public static void flushLeavesUpdates(int[] chunkHandle, GenerationUnitAdapter level) {
+        if (chunkHandle == null || leavesBlockTags == null) {
+            return;
+        }
+        List<BlockVec> seeds;
+        synchronized (PENDING_LEAVES) {
+            if (PENDING_LEAVES.isEmpty()) {
+                return;
+            }
+            seeds = new ArrayList<>(PENDING_LEAVES);
+        }
+        var positions = StructureShapeUpdater.expandConnectedLeaves(level, seeds);
+        StructureShapeUpdater.updateLeavesDistance(level, leavesBlockTags, positions);
     }
 }

@@ -8,8 +8,9 @@ import net.minestom.server.utils.Direction;
 import rocks.minestom.worldgen.feature.GenerationUnitAdapter;
 import rocks.minestom.worldgen.structure.context.BlockTagManager;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -19,23 +20,20 @@ import java.util.Map;
  * leaves connection properties against the neighbors actually present after
  * placement, run whenever {@code StructurePlaceSettings.knownShape} is false.
  *
- * <p>Vanilla drives this through {@code Block.updateShape} and, for leaves,
- * a scheduled tick that eventually converges to a shortest-path distance from
- * the nearest {@code minecraft:prevents_nearby_leaf_decay} block. This port has
- * no tick scheduler during worldgen, so the pass is restructured into a direct
- * fixed-point computation that reaches the same converged result:
- * <ul>
- * <li>Fence/pane and wall side connections depend only on a neighbor's block
- * identity (never on the neighbor's own connection state), so they are
- * computed directly from the final placed blocks in a single pass.
- * <li>A wall's {@code up} (post) property additionally depends on whether the
- * block directly above is itself a wall with {@code up} already resolved, so
- * walls are finalized top-down (highest Y first) after every wall's sides are
- * known.
- * <li>Leaves {@code distance} is a shortest-path value, computed with
- * bounded relaxation (distance is capped at 7, so 8 passes always reach the
- * fixed point).
- * </ul>
+ * <p>Vanilla drives this through {@code Block.updateShape}: fence/pane and
+ * wall side connections depend only on a neighbor's block identity (never on
+ * the neighbor's own connection state), so they are computed directly from
+ * the final placed blocks; a stair's {@code shape} depends only on the
+ * facing and half of the stair behind and in front of it. A wall's
+ * {@code up} (post) property additionally depends on whatever is directly
+ * above it, resolved by reprocessing walls in their placement order with a
+ * single downward reactive hop, mirroring {@code level.updateNeighborsAt}.
+ *
+ * <p>Leaves {@code distance} is handled separately by {@link #collectLeaves}
+ * and {@link #updateLeavesDistance}: vanilla only settles it through
+ * scheduled ticks that run after vegetation decoration has planted whatever
+ * natural trees end up near the structure, so callers defer that part of the
+ * pass until after the chunk's own decoration instead of running it here.
  */
 public final class StructureShapeUpdater {
     private static final Key TAG_WALLS = Key.key("minecraft:walls");
@@ -51,38 +49,96 @@ public final class StructureShapeUpdater {
 
     public static void update(GenerationUnitAdapter level, BlockTagManager blockTags, List<BlockVec> placedPositions) {
         var walls = new ArrayList<BlockVec>();
-        var leaves = new ArrayList<BlockVec>();
+        var stairs = new ArrayList<BlockVec>();
 
         for (var position : placedPositions) {
             var block = level.getBlock(position.blockX(), position.blockY(), position.blockZ());
             switch (classify(block)) {
                 case FENCE, PANE -> updateCrossCollisionSides(level, blockTags, position, block);
                 case WALL -> walls.add(position);
-                case LEAVES -> leaves.add(position);
-                case NONE -> {
+                case STAIRS -> stairs.add(position);
+                case LEAVES, NONE -> {
                 }
             }
         }
 
-        // A wall's side (none/low/tall) and post (up) both depend on whatever
-        // is directly above it. Vanilla's reactive per-direction propagation
-        // (Block.updateFromNeighbourShapes threading WEST, EAST, NORTH, SOUTH,
-        // DOWN, UP, plus further level.updateNeighborsAt cascades) does not
-        // reduce to a single deterministic pass order in general, but
-        // resolving tall stacked columns top-down (so a lower wall sees the
-        // already-finalized state of the wall above it) matches vanilla for
-        // the common case of a wall continuing unbroken into what is above it.
-        walls.sort(Comparator.comparingInt(BlockVec::blockY).reversed());
-        for (var position : walls) {
-            updateWall(level, blockTags, position);
+        // Stairs first: a wall's connection to a neighboring stair depends on
+        // that stair's actual (rotated, mirrored) collision shape, which in
+        // turn depends on its shape property - so the raw placed shape has to
+        // be corrected before any wall queries it.
+        for (var position : stairs) {
+            updateStairShape(level, position);
         }
 
-        if (!leaves.isEmpty()) {
-            updateLeavesDistance(level, blockTags, leaves);
+        // A wall's side (none/low/tall) and post (up) both depend on whatever
+        // is directly above it. Vanilla resolves this through
+        // Block.updateFromNeighbourShapes (a single threaded pass over one
+        // block's own six neighbor directions) plus level.updateNeighborsAt
+        // notifying real neighbors afterward - applied once per placed block,
+        // in the structure's own block list order (bottom-to-top within a
+        // palette). Reprocessing in that same order, so a wall sees whatever
+        // is directly above it exactly as it stood at that point (either
+        // already finalized by an earlier entry, or still the raw placed
+        // state if its own turn has not come up yet), reproduces vanilla's
+        // order-dependent result; the reactive notification to the real
+        // neighbor below is replayed as a single, non-recursive hop, matching
+        // updateNeighborsAt touching a block outside this pass's own list
+        // without re-triggering that block's full explicit update.
+        for (var position : walls) {
+            updateWall(level, blockTags, position);
+            cascadeWallBelow(level, blockTags, position);
         }
     }
 
-    private enum Family { FENCE, PANE, WALL, LEAVES, NONE }
+    /**
+     * The leaves among {@code placedPositions}, for a caller that wants to
+     * defer their distance relaxation (see {@link #updateLeavesDistance})
+     * until after the chunk has finished decorating.
+     */
+    public static List<BlockVec> collectLeaves(GenerationUnitAdapter level, List<BlockVec> placedPositions) {
+        var leaves = new ArrayList<BlockVec>();
+        for (var position : placedPositions) {
+            var block = level.getBlock(position.blockX(), position.blockY(), position.blockZ());
+            if (classify(block) == Family.LEAVES) {
+                leaves.add(position);
+            }
+        }
+        return leaves;
+    }
+
+    /**
+     * Every leaf reachable from {@code seeds} by walking connected leaf
+     * blocks, structure-placed or natural. Vanilla settles leaves distance
+     * through scheduled ticks that chain across a whole connected canopy
+     * regardless of which feature or structure placed which leaf, so a
+     * structure's own leaves cannot be relaxed as an isolated set: a shorter
+     * path routed through a naturally grown leaf needs that leaf relaxed
+     * too, not just read as a fixed input.
+     */
+    public static List<BlockVec> expandConnectedLeaves(GenerationUnitAdapter level, List<BlockVec> seeds) {
+        var seen = new LinkedHashSet<BlockVec>();
+        var queue = new ArrayDeque<BlockVec>(seeds);
+        seen.addAll(seeds);
+        while (!queue.isEmpty()) {
+            var position = queue.poll();
+            for (var direction : Direction.values()) {
+                var neighborPos = new BlockVec(
+                        position.blockX() + direction.normalX(),
+                        position.blockY() + direction.normalY(),
+                        position.blockZ() + direction.normalZ());
+                if (seen.contains(neighborPos)) {
+                    continue;
+                }
+                if (classify(level.getBlock(neighborPos.blockX(), neighborPos.blockY(), neighborPos.blockZ())) == Family.LEAVES) {
+                    seen.add(neighborPos);
+                    queue.add(neighborPos);
+                }
+            }
+        }
+        return new ArrayList<>(seen);
+    }
+
+    private enum Family { FENCE, PANE, WALL, STAIRS, LEAVES, NONE }
 
     private static Family classify(Block block) {
         var key = block.key().value();
@@ -94,6 +150,9 @@ public final class StructureShapeUpdater {
         }
         if (key.endsWith("_pane") || key.equals("iron_bars")) {
             return Family.PANE;
+        }
+        if (key.endsWith("_stairs")) {
+            return Family.STAIRS;
         }
         if (block.getProperty("distance") != null && block.getProperty("persistent") != null) {
             return Family.LEAVES;
@@ -247,13 +306,32 @@ public final class StructureShapeUpdater {
     }
 
     /**
+     * Vanilla {@code level.updateNeighborsAt} notifying the real neighbor
+     * below a just-updated wall (direction {@code UP} from that neighbor's
+     * point of view), replayed as a single non-recursive hop: that neighbor
+     * reacts once, but (since a reactive notification is not itself an
+     * explicit placed-block update) does not go on to notify whatever is
+     * below it in turn. A wall further down the same column still gets
+     * its own explicit update from this pass when its own turn comes up in
+     * {@code placedPositions}.
+     */
+    private static void cascadeWallBelow(GenerationUnitAdapter level, BlockTagManager blockTags, BlockVec position) {
+        var below = new BlockVec(position.blockX(), position.blockY() - 1, position.blockZ());
+        var belowBlock = level.getBlock(below.blockX(), below.blockY(), below.blockZ());
+        if (classify(belowBlock) == Family.WALL) {
+            updateWall(level, blockTags, below);
+        }
+    }
+
+    /**
      * Vanilla {@code WallBlock.makeWallState}: {@code NONE} if the side does
      * not connect; otherwise {@code TALL} when the block above fully covers
      * that side's test column, else {@code LOW}. When the block above is
-     * itself a wall, its own (already-resolved, since walls are finalized
-     * top-down) connection for the same direction stands in for vanilla's
-     * exact voxel-shape coverage test: a wall arm reaching down from above
-     * covers the column below it exactly when it also connects that way.
+     * itself a wall, its own connection for the same direction (whatever it
+     * currently is, since walls are not resolved in a fixed top-down order
+     * any more) stands in for vanilla's exact voxel-shape coverage test: a
+     * wall arm reaching down from above covers the column below it exactly
+     * when it also connects that way.
      */
     private static String wallSide(boolean connects, Block above, Direction direction) {
         if (!connects) {
@@ -265,7 +343,58 @@ public final class StructureShapeUpdater {
         return coveredAbove ? "tall" : "low";
     }
 
-    private static void updateLeavesDistance(GenerationUnitAdapter level, BlockTagManager blockTags, List<BlockVec> positions) {
+    /**
+     * Vanilla {@code StairBlock.getStairsShape}: depends only on the facing
+     * and half of the stair directly behind and in front of this one (never
+     * on their own shape), so unlike walls this needs no particular pass
+     * order.
+     */
+    private static void updateStairShape(GenerationUnitAdapter level, BlockVec position) {
+        var block = neighbor(level, position, null);
+        var facing = parseHorizontalDirection(block.getProperty("facing"));
+        var half = block.getProperty("half");
+        if (facing == null || half == null) {
+            return;
+        }
+
+        var behind = neighbor(level, position, facing);
+        if (isStairs(behind) && half.equals(behind.getProperty("half"))) {
+            var behindFacing = parseHorizontalDirection(behind.getProperty("facing"));
+            if (behindFacing != null && axis(behindFacing) != axis(facing)
+                    && canTakeStairShape(level, position, behindFacing.opposite(), facing, half)) {
+                var shape = behindFacing == counterClockwise(facing) ? "outer_left" : "outer_right";
+                level.setBlock(position, block.withProperty("shape", shape));
+                return;
+            }
+        }
+
+        var front = neighbor(level, position, facing.opposite());
+        if (isStairs(front) && half.equals(front.getProperty("half"))) {
+            var frontFacing = parseHorizontalDirection(front.getProperty("facing"));
+            if (frontFacing != null && axis(frontFacing) != axis(facing)
+                    && canTakeStairShape(level, position, frontFacing, facing, half)) {
+                var shape = frontFacing == counterClockwise(facing) ? "inner_left" : "inner_right";
+                level.setBlock(position, block.withProperty("shape", shape));
+                return;
+            }
+        }
+
+        level.setBlock(position, block.withProperty("shape", "straight"));
+    }
+
+    private static boolean isStairs(Block block) {
+        return block.key().value().endsWith("_stairs");
+    }
+
+    /** Vanilla {@code StairBlock.canTakeShape}. */
+    private static boolean canTakeStairShape(GenerationUnitAdapter level, BlockVec position, Direction towardCorner,
+            Direction facing, String half) {
+        var corner = neighbor(level, position, towardCorner);
+        return !isStairs(corner) || !facing.name().toLowerCase().equals(corner.getProperty("facing"))
+                || !half.equals(corner.getProperty("half"));
+    }
+
+    public static void updateLeavesDistance(GenerationUnitAdapter level, BlockTagManager blockTags, List<BlockVec> positions) {
         for (var pass = 0; pass < 8; pass++) {
             var changed = false;
             for (var position : positions) {
@@ -353,6 +482,16 @@ public final class StructureShapeUpdater {
             case EAST -> Direction.SOUTH;
             case SOUTH -> Direction.WEST;
             case WEST -> Direction.NORTH;
+            default -> direction;
+        };
+    }
+
+    private static Direction counterClockwise(Direction direction) {
+        return switch (direction) {
+            case NORTH -> Direction.WEST;
+            case WEST -> Direction.SOUTH;
+            case SOUTH -> Direction.EAST;
+            case EAST -> Direction.NORTH;
             default -> direction;
         };
     }
