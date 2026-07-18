@@ -456,6 +456,25 @@ public final class WorldGenerator implements Generator {
                 var debugChunk = System.getProperty("worldgen.debugchunk");
                 var debugThis = debugChunk != null && debugChunk.equals((startX >> 4) + "," + (startZ >> 4));
                 var debugStep = stepIndex;
+                if (debugThis) {
+                    var state = "?";
+                    try {
+                        var sourceField = random.getClass().getDeclaredField("randomSource");
+                        sourceField.setAccessible(true);
+                        var source = sourceField.get(random);
+                        var generatorField = source.getClass().getDeclaredField("randomNumberGenerator");
+                        generatorField.setAccessible(true);
+                        var generator = generatorField.get(source);
+                        var loField = generator.getClass().getDeclaredField("seedLo");
+                        var hiField = generator.getClass().getDeclaredField("seedHi");
+                        loField.setAccessible(true);
+                        hiField.setAccessible(true);
+                        state = loField.getLong(generator) + "," + hiField.getLong(generator);
+                    } catch (ReflectiveOperationException ignored) {
+                    }
+                    System.out.println("FEATSTART idx=" + featureIndex + " step=" + stepIndex + " rng=" + state
+                            + " " + placedFeatureKey.asString());
+                }
 
                 var decorTraceChunk = System.getProperty("worldgen.decorTrace", "");
                 var decorTraceFeature = System.getProperty("worldgen.decorTraceFeature", "");

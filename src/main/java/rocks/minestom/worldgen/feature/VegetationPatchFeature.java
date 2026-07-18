@@ -41,6 +41,25 @@ public class VegetationPatchFeature implements Feature<VegetationPatchConfigurat
         return !surface.isEmpty();
     }
 
+
+    private static String rngState(RandomSource random) {
+        try {
+            var f = rocks.minestom.worldgen.random.WorldgenRandom.class.getDeclaredField("randomSource");
+            f.setAccessible(true);
+            var rs = f.get(random);
+            var g = rs.getClass().getDeclaredField("randomNumberGenerator");
+            g.setAccessible(true);
+            var gen = g.get(rs);
+            var lo = gen.getClass().getDeclaredField("seedLo");
+            var hi = gen.getClass().getDeclaredField("seedHi");
+            lo.setAccessible(true);
+            hi.setAccessible(true);
+            return lo.getLong(gen) + "," + hi.getLong(gen);
+        } catch (Exception e) {
+            return "?";
+        }
+    }
+
     protected <T extends Block.Getter & Block.Setter> Set<VanillaPos> placeGroundPatch(T level,
             VegetationPatchConfiguration config, RandomSource random, BlockVec origin, int xRadius, int zRadius) {
         var inwards = config.ceiling() ? 1 : -1;
@@ -81,7 +100,8 @@ public class VegetationPatchFeature implements Feature<VegetationPatchConfigurat
                 if (groundDebug) {
                     System.out.println("VPROBE " + origin.blockX() + "," + origin.blockY() + "," + origin.blockZ()
                             + " d=" + dx + "," + dz + " pos=" + x + "," + y + "," + z
-                            + " block=" + level.getBlock(x, y, z).name() + " below=" + belowBlock.name());
+                            + " block=" + level.getBlock(x, y, z).name() + " below=" + belowBlock.name()
+                            + " s=" + rngState(random));
                 }
                 if (level.getBlock(x, y, z).isAir() && hasFullFace(belowBlock, sturdyFace)) {
                     var depth = config.depth().sample(random)
@@ -90,7 +110,8 @@ public class VegetationPatchFeature implements Feature<VegetationPatchConfigurat
                     if (this.placeGround(level, config, random, x, belowY, z, inwards, depth)) {
                         surface.add(groundPos);
                         if (groundDebug) {
-                            System.out.println("VGROUND " + x + "," + belowY + "," + z + " depth=" + depth);
+                            System.out.println("VGROUND " + x + "," + belowY + "," + z + " depth=" + depth
+                                    + " s=" + rngState(random));
                         }
                     }
                 }
@@ -102,6 +123,14 @@ public class VegetationPatchFeature implements Feature<VegetationPatchConfigurat
 
     /** Vanilla's {@code BlockState.isFaceSturdy} (default {@code SupportType.FULL}), approximated with the collision shape. */
     private static boolean hasFullFace(Block block, BlockFace face) {
+        // Minestom's face fullness misses multi-box collision shapes whose
+        // face-adjacent box spans the full square (azalea tops, hopper rims,
+        // scaffolding); vanilla's isFaceSturdy reports those as sturdy
+        if (face == BlockFace.TOP
+                && (block.compare(Block.AZALEA) || block.compare(Block.FLOWERING_AZALEA)
+                        || block.compare(Block.HOPPER) || block.compare(Block.SCAFFOLDING))) {
+            return true;
+        }
         return block.registry().collisionShape().isFaceFull(face);
     }
 
@@ -127,8 +156,15 @@ public class VegetationPatchFeature implements Feature<VegetationPatchConfigurat
     protected <T extends Block.Getter & Block.Setter> void distributeVegetation(
             FeaturePlaceContext<VegetationPatchConfiguration, T> context, T level,
             VegetationPatchConfiguration config, RandomSource random, Set<VanillaPos> surface) {
+        var origin = context.origin();
+        var groundDebug = ((origin.blockX() >> 4) + "," + (origin.blockZ() >> 4))
+                .equals(System.getProperty("worldgen.groundDebug"));
         for (var surfacePos : surface) {
             if (config.vegetationChance() > 0.0F && random.nextFloat() < config.vegetationChance()) {
+                if (groundDebug) {
+                    System.out.println("VVEG " + surfacePos.x() + "," + surfacePos.y() + "," + surfacePos.z()
+                            + " s=" + rngState(random));
+                }
                 this.placeVegetation(context, level, config, random, surfacePos);
             }
         }

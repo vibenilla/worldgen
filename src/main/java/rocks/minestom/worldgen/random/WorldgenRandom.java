@@ -8,9 +8,15 @@ package rocks.minestom.worldgen.random;
  */
 public final class WorldgenRandom implements RandomSource {
     private final RandomSource randomSource;
+    private int count;
 
     public WorldgenRandom(RandomSource randomSource) {
         this.randomSource = randomSource;
+    }
+
+    /** Draws consumed so far, mirroring vanilla {@code WorldgenRandom.getCount()} for diagnostics. */
+    public int getCount() {
+        return this.count;
     }
 
     public long setDecorationSeed(long seed, int minBlockX, int minBlockZ) {
@@ -39,6 +45,7 @@ public final class WorldgenRandom implements RandomSource {
     }
 
     private int next(int bits) {
+        this.count++;
         // Vanilla WorldgenRandom pulls bits straight from a legacy source
         // (one LCG step per call) instead of composing them from nextLong.
         if (this.randomSource instanceof LegacyRandomSource legacySource) {

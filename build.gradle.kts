@@ -561,3 +561,8 @@ tasks.register<JavaExec>("structureCensus") {
         )
     }
 }
+
+tasks.register<JavaExec>("shapeCheck") {
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass = "rocks.minestom.worldgen.verify.ShapeCheck"
+}
