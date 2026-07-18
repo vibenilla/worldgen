@@ -58,9 +58,11 @@ public final class CachedBiomeSource implements BiomeSource {
         var startQuartX = chunkX << 2;
         var startQuartZ = chunkZ << 2;
 
-        // Vanilla fill order (y ascending, then z, then x) so the climate R-tree's
-        // last-result hint sees the same query sequence: distance TIES resolve to
-        // the previous result, so matching the order matches vanilla's tie outcomes
+        // Vanilla fills one 4x4x4-quart chunk section at a time (sections bottom to
+        // top), and within each section the nesting is x outer, y middle, z inner.
+        // The climate R-tree keeps a last-result hint across calls, and distance
+        // TIES resolve to whatever that hint was, so matching vanilla's exact
+        // per-section x/y/z query order matches its tie outcomes too.
         var contexts = new ColumnCacheContext[16];
         for (var localX = 0; localX < 4; localX++) {
             for (var localZ = 0; localZ < 4; localZ++) {
@@ -70,14 +72,17 @@ public final class CachedBiomeSource implements BiomeSource {
             }
         }
 
-        for (var yIndex = 0; yIndex < this.quartHeight; yIndex++) {
-            var quartY = this.minQuartY + yIndex;
-            for (var localZ = 0; localZ < 4; localZ++) {
-                for (var localX = 0; localX < 4; localX++) {
-                    var context = contexts[localX * 4 + localZ];
-                    context.blockY(quartY << 2);
-                    column[(localX * 4 + localZ) * this.quartHeight + yIndex] =
-                            this.source.biome(startQuartX + localX, quartY, startQuartZ + localZ, context);
+        for (var sectionStart = 0; sectionStart < this.quartHeight; sectionStart += 4) {
+            for (var localX = 0; localX < 4; localX++) {
+                for (var localY = 0; localY < 4; localY++) {
+                    var yIndex = sectionStart + localY;
+                    var quartY = this.minQuartY + yIndex;
+                    for (var localZ = 0; localZ < 4; localZ++) {
+                        var context = contexts[localX * 4 + localZ];
+                        context.blockY(quartY << 2);
+                        column[(localX * 4 + localZ) * this.quartHeight + yIndex] =
+                                this.source.biome(startQuartX + localX, quartY, startQuartZ + localZ, context);
+                    }
                 }
             }
         }
