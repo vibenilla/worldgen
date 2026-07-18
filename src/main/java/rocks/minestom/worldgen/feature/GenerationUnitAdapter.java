@@ -257,8 +257,7 @@ public final class GenerationUnitAdapter implements Block.Getter, Block.Setter {
         abstract boolean isOpaque(Block block);
 
         private static boolean isFluid(Block block) {
-            return block.compare(Block.WATER) || block.compare(Block.LAVA)
-                    || "true".equals(block.getProperty("waterlogged"));
+            return block.compare(Block.LAVA) || WaterStates.hasWaterFluid(block);
         }
     }
 

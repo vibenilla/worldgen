@@ -503,7 +503,12 @@ public final class PlacementModifiers {
 
         @Override
             public List<BlockVec> apply(PlacementContext context, RandomSource random, BlockVec position) {
-                return this.predicate.test(context, position) ? List.of(position) : List.of();
+                var pass = this.predicate.test(context, position);
+                if (!pass && System.getProperty("worldgen.debugFilter") != null) {
+                    System.out.println("FILTERREJ " + context.currentFeature() + " at " + position
+                            + " block=" + context.accessor().getBlock(position.blockX(), position.blockY(), position.blockZ()).name());
+                }
+                return pass ? List.of(position) : List.of();
             }
         }
 
@@ -544,9 +549,10 @@ public final class PlacementModifiers {
                 var block = context.accessor().getBlock(targetPosition);
                 // Vanilla tests the block's FluidState, which is water for
                 // waterlogged blocks too (fences, slabs, sea pickles, and so
-                // on), not only for the literal water block.
+                // on) and for inherently waterlogged blocks like seagrass and
+                // kelp, not only for the literal water block.
                 if (this.fluids.contains(Key.key("minecraft:water"))
-                        && (block.compare(Block.WATER) || "true".equals(block.getProperty("waterlogged")))) {
+                        && rocks.minestom.worldgen.feature.WaterStates.hasWaterFluid(block)) {
                     return true;
                 }
                 return this.fluids.contains(Key.key("minecraft:lava")) && block.compare(Block.LAVA);

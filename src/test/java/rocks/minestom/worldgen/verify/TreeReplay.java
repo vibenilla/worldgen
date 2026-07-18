@@ -155,6 +155,23 @@ public final class TreeReplay {
         private final int maxY;
         private final Map<Long, Integer> frozenHeights;
         private Object randomHolder;
+        private Object stubChunk;
+
+        private Object stubChunk() {
+            if (this.stubChunk == null) {
+                var sections = new net.minecraft.world.level.chunk.LevelChunkSection[24];
+                for (var index = 0; index < sections.length; index++) {
+                    var strategy = net.minecraft.world.level.chunk.Strategy
+                            .createForBlockStates(net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY);
+                    sections[index] = new net.minecraft.world.level.chunk.LevelChunkSection(
+                            new net.minecraft.world.level.chunk.PalettedContainer<>(
+                                    Blocks.AIR.defaultBlockState(), strategy), null);
+                }
+                this.stubChunk = new OreFeatureABTest.OreChunkAccess(
+                        new net.minecraft.world.level.ChunkPos(0, 0), sections);
+            }
+            return this.stubChunk;
+        }
 
         Handler(Map<BlockPos, BlockState> world, int minY, int maxY) {
             this.world = world;
@@ -265,6 +282,11 @@ public final class TreeReplay {
                 case "scheduleTick", "markPosForPostProcessing", "blockUpdated", "updateNeighborsAt" -> {
                     return null;
                 }
+                case "getChunk" -> {
+                    // Only used by Feature.markAboveForPostProcessing, which
+                    // needs a real ChunkAccess to record post-processing marks
+                    return this.stubChunk();
+                }
                 case "ensureCanWrite" -> {
                     return true;
                 }
@@ -280,9 +302,6 @@ public final class TreeReplay {
                 case "getRandom" -> {
                     return this.randomHolder != null ? this.randomHolder
                             : (this.randomHolder = net.minecraft.util.RandomSource.create(0L));
-                }
-                case "getChunk" -> {
-                    return null;
                 }
                 case "getBiome" -> {
                     return biomeManager != null ? biomeManager.getBiome((BlockPos) args[0]) : biomeHolder;

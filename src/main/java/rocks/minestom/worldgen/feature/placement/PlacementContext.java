@@ -63,6 +63,10 @@ public final class PlacementContext {
      * Marks the placed feature currently running through the modifier pipeline,
      * consulted by the biome placement modifier.
      */
+    public Key currentFeature() {
+        return this.currentFeature;
+    }
+
     public void currentFeature(Key placedFeatureId) {
         this.currentFeature = placedFeatureId;
     }
