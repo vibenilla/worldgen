@@ -106,13 +106,17 @@ public final class PlacementContext {
         // everything non-air, which is what makes the surface-water-depth
         // filter reject tree positions on littered or planted ground.
         if (this.accessor instanceof GenerationUnitAdapter adapter) {
-            var adapterType = switch (type) {
-                case WORLD_SURFACE_WG, WORLD_SURFACE -> GenerationUnitAdapter.HeightmapType.WORLD_SURFACE;
-                case OCEAN_FLOOR_WG, OCEAN_FLOOR -> GenerationUnitAdapter.HeightmapType.OCEAN_FLOOR;
-                case MOTION_BLOCKING -> GenerationUnitAdapter.HeightmapType.MOTION_BLOCKING;
-                case MOTION_BLOCKING_NO_LEAVES -> GenerationUnitAdapter.HeightmapType.MOTION_BLOCKING_NO_LEAVES;
+            // The WG heightmaps are frozen post-carver terrain in vanilla
+            // (decoration-stage writes stop updating them once a chunk passes
+            // CARVERS); only the non-WG maps are live over generated blocks.
+            var height = switch (type) {
+                case WORLD_SURFACE_WG -> adapter.frozenWorldSurface(blockX, blockZ);
+                case OCEAN_FLOOR_WG -> adapter.frozenOceanFloor(blockX, blockZ);
+                case WORLD_SURFACE -> adapter.heightmap(GenerationUnitAdapter.HeightmapType.WORLD_SURFACE, blockX, blockZ);
+                case OCEAN_FLOOR -> adapter.heightmap(GenerationUnitAdapter.HeightmapType.OCEAN_FLOOR, blockX, blockZ);
+                case MOTION_BLOCKING -> adapter.heightmap(GenerationUnitAdapter.HeightmapType.MOTION_BLOCKING, blockX, blockZ);
+                case MOTION_BLOCKING_NO_LEAVES -> adapter.heightmap(GenerationUnitAdapter.HeightmapType.MOTION_BLOCKING_NO_LEAVES, blockX, blockZ);
             };
-            var height = adapter.heightmap(adapterType, blockX, blockZ);
             if (height != Integer.MAX_VALUE) {
                 return height;
             }

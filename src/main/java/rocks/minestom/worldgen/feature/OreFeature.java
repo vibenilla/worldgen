@@ -45,9 +45,15 @@ public final class OreFeature implements Feature<OreConfiguration> {
         var sizeXZ = 2 * (ceil(spreadXY) + maxRadius);
         var sizeY = 2 * (2 + maxRadius);
 
+        var debugProbe = System.getProperty("worldgen.oreProbeDebug") != null;
         for (var xprobe = xStart; xprobe <= xStart + sizeXZ; xprobe++) {
             for (var zprobe = zStart; zprobe <= zStart + sizeXZ; zprobe++) {
                 if (yStart <= getHeight(level, context, xprobe, zprobe)) {
+                    if (debugProbe) {
+                        System.out.println("OREPROBE origin=" + origin + " yStart=" + yStart
+                                + " pass=" + xprobe + "," + zprobe
+                                + " height=" + getHeight(level, context, xprobe, zprobe));
+                    }
                     return this.doPlace(level, random, context, config,
                             x0, x1, z0, z1, y0, y1,
                             xStart, yStart, zStart, sizeXZ, sizeY);
@@ -55,6 +61,9 @@ public final class OreFeature implements Feature<OreConfiguration> {
             }
         }
 
+        if (debugProbe) {
+            System.out.println("OREPROBE origin=" + origin + " yStart=" + yStart + " SKIP");
+        }
         return false;
     }
 
@@ -196,7 +205,13 @@ public final class OreFeature implements Feature<OreConfiguration> {
     }
 
     private static int getHeight(Block.Getter level, FeaturePlaceContext<?, ?> context, int x, int z) {
+        // Vanilla OCEAN_FLOOR_WG: frozen post-carver terrain, blind to
+        // structure and feature writes
         if (level instanceof GenerationUnitAdapter adapter) {
+            var frozen = adapter.frozenOceanFloor(x, z);
+            if (frozen != Integer.MAX_VALUE) {
+                return frozen;
+            }
             return adapter.getHeight(x, z);
         }
 

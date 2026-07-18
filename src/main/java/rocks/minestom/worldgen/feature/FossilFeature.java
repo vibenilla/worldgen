@@ -198,7 +198,12 @@ public final class FossilFeature implements Feature<FossilFeatureConfiguration> 
     }
 
     private static <T extends Block.Getter & Block.Setter> int oceanFloorHeight(T level, int x, int z) {
+        // Vanilla OCEAN_FLOOR_WG: frozen post-carver terrain
         if (level instanceof GenerationUnitAdapter adapter) {
+            var frozen = adapter.frozenOceanFloor(x, z);
+            if (frozen != Integer.MAX_VALUE) {
+                return frozen;
+            }
             return adapter.getHeight(x, z);
         }
 

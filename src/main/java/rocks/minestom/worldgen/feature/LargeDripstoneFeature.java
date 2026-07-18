@@ -91,7 +91,12 @@ public final class LargeDripstoneFeature implements Feature<LargeDripstoneConfig
     }
 
     private static <T extends Block.Getter & Block.Setter> int worldSurfaceHeight(T level, int x, int z) {
+        // Vanilla WORLD_SURFACE_WG: frozen post-carver terrain
         if (level instanceof GenerationUnitAdapter adapter) {
+            var frozen = adapter.frozenWorldSurface(x, z);
+            if (frozen != Integer.MAX_VALUE) {
+                return frozen;
+            }
             return adapter.getHeight(x, z);
         }
 

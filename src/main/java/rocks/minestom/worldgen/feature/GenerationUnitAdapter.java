@@ -159,11 +159,44 @@ public final class GenerationUnitAdapter implements Block.Getter, Block.Setter {
     }
 
     /**
-     * Equivalent of vanilla's {@code OCEAN_FLOOR_WG} heightmap lookup: the Y
+     * Equivalent of vanilla's {@code OCEAN_FLOOR} heightmap lookup: the Y
      * coordinate one above the highest solid block, live over generated blocks.
      */
     public int getHeight(int x, int z) {
         return this.heightmap(HeightmapType.OCEAN_FLOOR, x, z);
+    }
+
+    /**
+     * Vanilla's {@code OCEAN_FLOOR_WG} heightmap: one above the highest solid
+     * block of the post-carver terrain. Vanilla stops updating the WG
+     * heightmaps once a chunk passes the carvers stage
+     * ({@code ChunkStatus.CARVERS} switches {@code heightmapsAfter} to the
+     * final set), so structure and feature writes never show up in them.
+     */
+    public int frozenOceanFloor(int x, int z) {
+        if (this.terrainLookup == null) {
+            return Integer.MAX_VALUE;
+        }
+        var terrain = this.terrainLookup.terrain(x >> 4, z >> 4);
+        var solidTop = terrain.surfaceHeights()[(x & 15) * 16 + (z & 15)];
+        return solidTop == Integer.MIN_VALUE ? this.terrainMinY : solidTop + 1;
+    }
+
+    /**
+     * Vanilla's {@code WORLD_SURFACE_WG} heightmap: one above the highest
+     * non-air (solid or fluid) block of the post-carver terrain, frozen for
+     * the same reason as {@link #frozenOceanFloor(int, int)}.
+     */
+    public int frozenWorldSurface(int x, int z) {
+        if (this.terrainLookup == null) {
+            return Integer.MAX_VALUE;
+        }
+        var terrain = this.terrainLookup.terrain(x >> 4, z >> 4);
+        var index = (x & 15) * 16 + (z & 15);
+        var solidTop = terrain.surfaceHeights()[index];
+        var fluidTop = terrain.waterHeights()[index];
+        var surface = Math.max(solidTop == Integer.MIN_VALUE ? Integer.MIN_VALUE : solidTop + 1, fluidTop);
+        return surface == Integer.MIN_VALUE ? this.terrainMinY : surface;
     }
 
     /**
