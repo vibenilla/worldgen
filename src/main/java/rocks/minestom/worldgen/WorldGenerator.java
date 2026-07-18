@@ -70,19 +70,14 @@ public final class WorldGenerator implements Generator {
                 return false;
             }
 
-            // Only replace-style writes (a feature overwriting an already
-            // solid block, like the granite/andesite/diorite blobs replacing
-            // stone or each other) need deferred replay so the target's own
-            // decoration can still land on top of them. Placement-style
-            // writes onto air (foliage, vines) keep the original immediate
-            // write: deferring those only delays their first appearance,
-            // which double-applies fine but was measured to lose ground in
-            // foliage-heavy biomes since the target chunk's own reads during
-            // decoration already see the immediate write either way
-            if (previousBlock == null || previousBlock.isAir()) {
-                return false;
-            }
-
+            // Every spill into a not-yet-decorated chunk defers to that
+            // chunk's blit: Minestom applies queued forks only after the
+            // target's whole generate pass, which would re-assert this
+            // (older) write on top of the target's own decoration. The
+            // pending queue also survives terrain cache eviction, which is
+            // what actually broke the earlier unconditional-deferral
+            // attempt (placement-style writes then lived only in the
+            // evictable buffer)
             WorldGenerator.this.pendingCrossWrites
                     .computeIfAbsent(key, mapKey -> new java.util.concurrent.ConcurrentHashMap<>())
                     .put(bufferIndex, block);
