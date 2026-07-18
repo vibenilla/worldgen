@@ -249,6 +249,18 @@ public final class StructurePlacer {
      */
     public BlockVec locateNearest(Key structureKey, int centerChunkX, int centerChunkZ, int radiusChunks,
             BiomeZoomer biomeZoomer, NoiseGeneratorSettingsRuntime settings) {
+        return this.locateNearest(structureKey, centerChunkX, centerChunkZ, radiusChunks, java.util.Set.of(),
+                biomeZoomer, settings);
+    }
+
+    /**
+     * Same as {@link #locateNearest(Key, int, int, int, BiomeZoomer, NoiseGeneratorSettingsRuntime)}, but
+     * skips any start chunk packed into {@code excludedChunkKeys} (as {@code (long) chunkX << 32 | chunkZ &
+     * 0xffffffffL}), letting callers enumerate the nearest N instances of a structure by excluding starts
+     * already found.
+     */
+    public BlockVec locateNearest(Key structureKey, int centerChunkX, int centerChunkZ, int radiusChunks,
+            java.util.Set<Long> excludedChunkKeys, BiomeZoomer biomeZoomer, NoiseGeneratorSettingsRuntime settings) {
         var candidateSets = new ArrayList<Map.Entry<Key, StructureSet>>();
         for (var structureSetId : this.structureSets) {
             var structureSet = this.structureLoader.getStructureSet(structureSetId);
@@ -272,6 +284,10 @@ public final class StructurePlacer {
             for (var chunkX = centerChunkX - ring; chunkX <= centerChunkX + ring; chunkX++) {
                 for (var chunkZ = centerChunkZ - ring; chunkZ <= centerChunkZ + ring; chunkZ++) {
                     if (Math.max(Math.abs(chunkX - centerChunkX), Math.abs(chunkZ - centerChunkZ)) != ring) {
+                        continue;
+                    }
+                    var chunkKey = ((long) chunkX << 32) | (chunkZ & 0xffffffffL);
+                    if (excludedChunkKeys.contains(chunkKey)) {
                         continue;
                     }
                     var candidate = this.startCandidate(structureKey, candidateSets, chunkX, chunkZ,

@@ -427,3 +427,38 @@ tasks.register<JavaExec>("blockBoxPeek") {
         providers.gradleProperty("maxZ").getOrElse("0")
     )
 }
+
+tasks.register<JavaExec>("structureCensus") {
+    group = "verification"
+    description = "Runs the structure census harness's locate or verify phase (set with -Pmode=locate|verify)"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass = "rocks.minestom.worldgen.verify.StructureCensus"
+    jvmArgs("-Xmx8G")
+
+    val mode = providers.gradleProperty("mode").getOrElse("locate")
+    val datapack = providers.gradleProperty("datapack").getOrElse("data/mc/datapack")
+    val seed = providers.gradleProperty("seed").getOrElse("123456789")
+    val types = providers.gradleProperty("types").getOrElse("all")
+
+    if (mode == "verify") {
+        args(
+            "verify",
+            datapack,
+            seed,
+            providers.gradleProperty("manifest").getOrElse("data/census/manifest.json"),
+            providers.gradleProperty("vanillaOverworld").getOrElse("data/vanilla-census/world/dimensions/minecraft/overworld"),
+            providers.gradleProperty("vanillaNether").getOrElse("data/vanilla-census/world/dimensions/minecraft/the_nether"),
+            providers.gradleProperty("vanillaEnd").getOrElse("data/vanilla-census/world/dimensions/minecraft/the_end")
+        )
+    } else {
+        args(
+            "locate",
+            datapack,
+            seed,
+            providers.gradleProperty("plan").getOrElse("data/census/plan.txt"),
+            providers.gradleProperty("manifest").getOrElse("data/census/manifest.json"),
+            providers.gradleProperty("instances").getOrElse("2"),
+            types
+        )
+    }
+}

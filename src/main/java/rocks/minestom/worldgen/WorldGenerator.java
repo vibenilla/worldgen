@@ -258,11 +258,21 @@ public final class WorldGenerator implements Generator {
      * if none is found (or this dimension places no structures).
      */
     public BlockVec locateStructure(Key structureKey, int centerX, int centerZ, int radiusChunks) {
+        return this.locateStructure(structureKey, centerX, centerZ, radiusChunks, java.util.Set.of());
+    }
+
+    /**
+     * Same as {@link #locateStructure(Key, int, int, int)}, but skips any start chunk packed into
+     * {@code excludedChunkKeys} (as {@code (long) chunkX << 32 | chunkZ & 0xffffffffL}), letting callers
+     * enumerate the nearest N instances of a structure by excluding starts already found.
+     */
+    public BlockVec locateStructure(Key structureKey, int centerX, int centerZ, int radiusChunks,
+            java.util.Set<Long> excludedChunkKeys) {
         if (this.structurePlacer == null) {
             return null;
         }
         return this.structurePlacer.locateNearest(structureKey, centerX >> 4, centerZ >> 4, radiusChunks,
-                this.biomeZoomer, this.settings);
+                excludedChunkKeys, this.biomeZoomer, this.settings);
     }
 
     /**
