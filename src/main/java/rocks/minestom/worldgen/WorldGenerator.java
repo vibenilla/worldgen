@@ -705,17 +705,23 @@ public final class WorldGenerator implements Generator {
         var endX = startX + unit.size().blockX() - 1;
         var endZ = startZ + unit.size().blockZ() - 1;
 
+        var startY = unit.absoluteStart().blockY();
+        var endY = startY + unit.size().blockY() - 1;
+
         var startQuartX = Math.floorDiv(startX, 4);
         var endQuartX = Math.floorDiv(endX, 4);
         var startQuartZ = Math.floorDiv(startZ, 4);
         var endQuartZ = Math.floorDiv(endZ, 4);
-        var startQuartY = Math.floorDiv(minY, 4);
-        var endQuartY = Math.floorDiv(maxY, 4);
+        var startQuartY = Math.floorDiv(startY, 4);
+        var endQuartY = Math.floorDiv(endY, 4);
+        var minSampleQuartY = Math.floorDiv(minY, 4);
+        var maxSampleQuartY = Math.floorDiv(maxY, 4);
 
         for (var quartX = startQuartX; quartX <= endQuartX; quartX++) {
             for (var quartZ = startQuartZ; quartZ <= endQuartZ; quartZ++) {
                 for (var quartY = startQuartY; quartY <= endQuartY; quartY++) {
-                    var biome = biomes.biome(quartX, quartY, quartZ);
+                    var sampleQuartY = Math.min(Math.max(quartY, minSampleQuartY), maxSampleQuartY);
+                    var biome = biomes.biome(quartX, sampleQuartY, quartZ);
                     var biomeKey = RegistryKey.<Biome>unsafeOf(biome);
 
                     // Fill all 4x4x4 positions in the biome palette for this quart
