@@ -2,6 +2,7 @@ package rocks.minestom.worldgen.feature;
 
 import net.minestom.server.coordinate.BlockVec;
 import net.minestom.server.instance.block.Block;
+import net.minestom.server.instance.block.BlockFace;
 import rocks.minestom.worldgen.feature.configurations.VegetationPatchConfiguration;
 import rocks.minestom.worldgen.random.RandomSource;
 
@@ -35,15 +36,16 @@ public final class WaterloggedVegetationPatchFeature extends VegetationPatchFeat
     }
 
     private static <T extends Block.Getter & Block.Setter> boolean isExposed(T level, VanillaPos pos) {
-        return isExposedDirection(level, pos.x(), pos.y(), pos.z() - 1)
-                || isExposedDirection(level, pos.x() + 1, pos.y(), pos.z())
-                || isExposedDirection(level, pos.x(), pos.y(), pos.z() + 1)
-                || isExposedDirection(level, pos.x() - 1, pos.y(), pos.z())
-                || isExposedDirection(level, pos.x(), pos.y() - 1, pos.z());
+        return isExposedDirection(level, pos.x(), pos.y(), pos.z() - 1, BlockFace.SOUTH)
+                || isExposedDirection(level, pos.x() + 1, pos.y(), pos.z(), BlockFace.WEST)
+                || isExposedDirection(level, pos.x(), pos.y(), pos.z() + 1, BlockFace.NORTH)
+                || isExposedDirection(level, pos.x() - 1, pos.y(), pos.z(), BlockFace.EAST)
+                || isExposedDirection(level, pos.x(), pos.y() - 1, pos.z(), BlockFace.TOP);
     }
 
-    private static <T extends Block.Getter & Block.Setter> boolean isExposedDirection(T level, int x, int y, int z) {
-        return !level.getBlock(x, y, z).isSolid();
+    /** Vanilla's {@code BlockState.isFaceSturdy} (default {@code SupportType.FULL}), approximated with the collision shape. */
+    private static <T extends Block.Getter & Block.Setter> boolean isExposedDirection(T level, int x, int y, int z, BlockFace faceTowardOrigin) {
+        return !level.getBlock(x, y, z).registry().collisionShape().isFaceFull(faceTowardOrigin);
     }
 
     @Override

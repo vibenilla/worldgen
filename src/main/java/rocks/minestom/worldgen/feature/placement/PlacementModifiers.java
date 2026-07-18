@@ -7,6 +7,7 @@ import net.kyori.adventure.key.Key;
 import net.minestom.server.codec.Transcoder;
 import net.minestom.server.coordinate.BlockVec;
 import net.minestom.server.instance.block.Block;
+import net.minestom.server.instance.block.BlockFace;
 import rocks.minestom.worldgen.BlockCodec;
 import rocks.minestom.worldgen.VMath;
 import rocks.minestom.worldgen.feature.valueproviders.IntProvider;
@@ -654,10 +655,11 @@ public final class PlacementModifiers {
 
         @Override
             public boolean test(PlacementContext context, BlockVec position) {
-                // Vanilla: the block AT position+offset must have a sturdy face in
-                // the given direction (isFaceSturdy); solid full blocks approximate it.
+                // Vanilla's BlockState.isFaceSturdy (default SupportType.FULL),
+                // approximated with the collision shape like the other face checks.
                 var targetPosition = position.add(this.offset.blockX(), this.offset.blockY(), this.offset.blockZ());
-                return context.accessor().getBlock(targetPosition).registry().isSolid();
+                var block = context.accessor().getBlock(targetPosition);
+                return block.registry().collisionShape().isFaceFull(this.direction.blockFace());
             }
         }
 
@@ -681,6 +683,17 @@ public final class PlacementModifiers {
 
         private static Direction fromString(String value) {
             return Direction.valueOf(value.toUpperCase());
+        }
+
+        private BlockFace blockFace() {
+            return switch (this) {
+                case UP -> BlockFace.TOP;
+                case DOWN -> BlockFace.BOTTOM;
+                case NORTH -> BlockFace.NORTH;
+                case SOUTH -> BlockFace.SOUTH;
+                case WEST -> BlockFace.WEST;
+                case EAST -> BlockFace.EAST;
+            };
         }
     }
 
