@@ -62,8 +62,8 @@ public final class ChorusPlantFeature implements Feature<NoneFeatureConfiguratio
             }
 
             for (var branchIndex = 0; branchIndex < branchCount; branchIndex++) {
-                var direction = HorizontalDirection.random(random);
-                var branchPos = current.add(0, height, 0).add(direction.stepX, 0, direction.stepZ);
+                var direction = Direction.HORIZONTAL.get(random.nextInt(Direction.HORIZONTAL.size()));
+                var branchPos = current.add(0, height, 0).add(direction.stepX(), 0, direction.stepZ());
                 if (Math.abs(branchPos.blockX() - origin.blockX()) >= maxRadius
                         || Math.abs(branchPos.blockZ() - origin.blockZ()) >= maxRadius) {
                     continue;
@@ -79,7 +79,7 @@ public final class ChorusPlantFeature implements Feature<NoneFeatureConfiguratio
 
                 branched = true;
                 setPlantBlock(level, branchPos);
-                var oppositePos = branchPos.add(direction.opposite().stepX, 0, direction.opposite().stepZ);
+                var oppositePos = branchPos.add(direction.opposite().stepX(), 0, direction.opposite().stepZ());
                 setPlantBlock(level, oppositePos);
                 growTreeRecursive(level, random, branchPos, origin, maxRadius, depth + 1);
             }
@@ -96,13 +96,13 @@ public final class ChorusPlantFeature implements Feature<NoneFeatureConfiguratio
         return getter.getBlock(position).isAir();
     }
 
-    private static boolean allNeighborsEmpty(Block.Getter getter, BlockVec position, HorizontalDirection skipDirection) {
-        for (var direction : HorizontalDirection.VALUES) {
+    private static boolean allNeighborsEmpty(Block.Getter getter, BlockVec position, Direction skipDirection) {
+        for (var direction : Direction.HORIZONTAL) {
             if (skipDirection != null && direction == skipDirection) {
                 continue;
             }
 
-            var neighbor = position.add(direction.stepX, 0, direction.stepZ);
+            var neighbor = position.add(direction.stepX(), 0, direction.stepZ());
             if (!getter.getBlock(neighbor).isAir()) {
                 return false;
             }
@@ -142,35 +142,5 @@ public final class ChorusPlantFeature implements Feature<NoneFeatureConfiguratio
 
     private static boolean isChorusPlantOrFlower(Block block) {
         return block.compare(Block.CHORUS_PLANT) || block.compare(Block.CHORUS_FLOWER);
-    }
-
-    private record HorizontalDirection(int stepX, int stepZ) {
-        private static final HorizontalDirection EAST = new HorizontalDirection(1, 0);
-        private static final HorizontalDirection WEST = new HorizontalDirection(-1, 0);
-        private static final HorizontalDirection SOUTH = new HorizontalDirection(0, 1);
-        private static final HorizontalDirection NORTH = new HorizontalDirection(0, -1);
-        private static final HorizontalDirection[] VALUES = new HorizontalDirection[]{
-                EAST,
-                WEST,
-                SOUTH,
-                NORTH
-        };
-
-        private static HorizontalDirection random(RandomSource random) {
-            return VALUES[random.nextInt(VALUES.length)];
-        }
-
-        private HorizontalDirection opposite() {
-            if (this == EAST) {
-                return WEST;
-            }
-            if (this == WEST) {
-                return EAST;
-            }
-            if (this == SOUTH) {
-                return NORTH;
-            }
-            return SOUTH;
-        }
     }
 }

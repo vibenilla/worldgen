@@ -5,8 +5,8 @@ import net.minestom.server.codec.StructCodec;
 import net.minestom.server.instance.block.Block;
 import rocks.minestom.worldgen.VMath;
 import rocks.minestom.worldgen.feature.configurations.EndSpikeConfiguration;
-import rocks.minestom.worldgen.random.RandomSource;
-import rocks.minestom.worldgen.random.XoroshiroRandomSource;
+import rocks.minestom.worldgen.random.LegacyRandomSource;
+import rocks.minestom.worldgen.structure.StructureRng;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -44,18 +44,20 @@ public final class EndSpikeFeature implements Feature<EndSpikeConfiguration> {
         var radius = spike.radius();
         var centerX = spike.centerX();
         var centerZ = spike.centerZ();
+        var topY = Math.min(spike.height() + 10, maxY);
 
         for (var x = centerX - radius; x <= centerX + radius; x++) {
             for (var z = centerZ - radius; z <= centerZ + radius; z++) {
                 var dx = x - centerX;
                 var dz = z - centerZ;
-                if (dx * dx + dz * dz > radius * radius + 1) {
-                    continue;
-                }
+                var withinRadius = dx * dx + dz * dz <= radius * radius + 1;
 
-                var height = Math.min(spike.height(), maxY + 1);
-                for (var y = minY; y < height; y++) {
-                    level.setBlock(x, y, z, Block.OBSIDIAN);
+                for (var y = minY; y <= topY; y++) {
+                    if (withinRadius && y < spike.height()) {
+                        level.setBlock(x, y, z, Block.OBSIDIAN);
+                    } else if (y > 65) {
+                        level.setBlock(x, y, z, Block.AIR);
+                    }
                 }
             }
         }
@@ -101,9 +103,13 @@ public final class EndSpikeFeature implements Feature<EndSpikeConfiguration> {
     }
 
     private static List<EndSpike> getSpikesForSeed(long seed) {
-        var randomSource = new XoroshiroRandomSource(seed);
+        var randomSource = new LegacyRandomSource(seed);
         var value = randomSource.nextLong() & 65535L;
-        var shuffled = shuffledIndices(new XoroshiroRandomSource(value));
+        var shuffled = new ArrayList<Integer>(SPIKE_COUNT);
+        for (var index = 0; index < SPIKE_COUNT; index++) {
+            shuffled.add(index);
+        }
+        StructureRng.shuffle(shuffled, new LegacyRandomSource(value));
         var spikes = new ArrayList<EndSpike>(SPIKE_COUNT);
 
         for (var index = 0; index < SPIKE_COUNT; index++) {
@@ -118,22 +124,6 @@ public final class EndSpikeFeature implements Feature<EndSpikeConfiguration> {
         }
 
         return spikes;
-    }
-
-    private static List<Integer> shuffledIndices(RandomSource random) {
-        var values = new ArrayList<Integer>(SPIKE_COUNT);
-        for (var index = 0; index < SPIKE_COUNT; index++) {
-            values.add(index);
-        }
-
-        for (var index = 0; index < values.size(); index++) {
-            var swapIndex = index + random.nextInt(values.size() - index);
-            var current = values.get(index);
-            values.set(index, values.get(swapIndex));
-            values.set(swapIndex, current);
-        }
-
-        return values;
     }
 
     public record EndSpike(int centerX, int centerZ, int radius, int height, boolean guarded) {
