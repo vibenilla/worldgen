@@ -172,6 +172,11 @@ tasks.register<JavaExec>("compareVanilla") {
     systemProperty("compare.dimension", providers.gradleProperty("dimension").getOrElse("overworld"))
     systemProperty("compare.pregenRadius", providers.gradleProperty("pregenRadius").getOrElse("16"))
     providers.gradleProperty("debugchunk").orNull?.let { systemProperty("worldgen.debugchunk", it) }
+    providers.gradleProperty("decorTrace").orNull?.let { systemProperty("worldgen.decorTrace", it) }
+    providers.gradleProperty("decorTraceFeature").orNull?.let { systemProperty("worldgen.decorTraceFeature", it) }
+    providers.gradleProperty("decorTraceMinY").orNull?.let { systemProperty("worldgen.decorTraceMinY", it) }
+    providers.gradleProperty("decorTraceMaxY").orNull?.let { systemProperty("worldgen.decorTraceMaxY", it) }
+    providers.gradleProperty("decorTraceReach").orNull?.let { systemProperty("worldgen.decorTraceReach", it) }
     args(
         providers.gradleProperty("vanillaWorld").getOrElse("data/vanilla-world/world/dimensions/minecraft/overworld"),
         providers.gradleProperty("datapack").getOrElse("data/mc/datapack"),
@@ -293,6 +298,8 @@ tasks.register<JavaExec>("chunkVegReplay") {
     mainClass = "rocks.minestom.worldgen.verify.ChunkVegetationReplay"
     jvmArgs("-Xmx2G")
     systemProperty("replay.logHeights", providers.gradleProperty("logHeights").getOrElse("false"))
+    systemProperty("replay.traceReads", providers.gradleProperty("traceReads").getOrElse("false"))
+    systemProperty("replay.debugDraws", providers.gradleProperty("debugDraws").getOrElse("0"))
     args(
         providers.gradleProperty("traceFile").getOrElse("/tmp/trace.txt"),
         providers.gradleProperty("featureJson").getOrElse("data/mc/datapack/data/minecraft/worldgen/placed_feature/dark_forest_vegetation.json"),

@@ -106,7 +106,8 @@ public final class TreeReplay {
         var tagsNeeded = List.of("replaceable_by_trees", "logs", "prevents_nearby_leaf_decay",
                 "cannot_replace_below_tree_trunk", "leaves", "dirt", "supports_vegetation",
                 "huge_red_mushroom_can_place_on", "huge_brown_mushroom_can_place_on",
-                "replaceable_by_mushrooms");
+                "replaceable_by_mushrooms", "air", "moss_replaceable", "lush_ground_replaceable",
+                "cave_vines", "climbable");
         var blockToTags = new HashMap<String, List<TagKey<net.minecraft.world.level.block.Block>>>();
         for (var tagName : tagsNeeded) {
             var key = TagKey.create(net.minecraft.core.registries.Registries.BLOCK,
@@ -172,19 +173,33 @@ public final class TreeReplay {
         @Override
         @SuppressWarnings("unchecked")
         public Object invoke(Object proxy, Method method, Object[] args) {
+            if (Boolean.getBoolean("replay.traceReads") && !method.getName().equals("getHeight")) {
+                System.out.println("VCALL " + method.getName() + " " + (args != null ? java.util.Arrays.toString(args) : "[]"));
+            }
             switch (method.getName()) {
                 case "getBlockState" -> {
-                    return this.state((BlockPos) args[0]);
+                    var result = this.state((BlockPos) args[0]);
+                    if (Boolean.getBoolean("replay.traceReads")) {
+                        System.out.println("VGET " + args[0] + " -> " + result);
+                    }
+                    return result;
                 }
                 case "getFluidState" -> {
                     return this.state((BlockPos) args[0]).getFluidState();
                 }
                 case "isStateAtPosition" -> {
-                    return ((java.util.function.Predicate<BlockState>) args[1]).test(this.state((BlockPos) args[0]));
+                    var result = ((java.util.function.Predicate<BlockState>) args[1]).test(this.state((BlockPos) args[0]));
+                    if (Boolean.getBoolean("replay.traceReads")) {
+                        System.out.println("VISAT " + args[0] + " -> " + result);
+                    }
+                    return result;
                 }
                 case "isFluidAtPosition" -> {
                     return ((java.util.function.Predicate<net.minecraft.world.level.material.FluidState>) args[1])
                             .test(this.state((BlockPos) args[0]).getFluidState());
+                }
+                case "isWaterAt" -> {
+                    return this.state((BlockPos) args[0]).getFluidState().is(net.minecraft.tags.FluidTags.WATER);
                 }
                 case "setBlock" -> {
                     var pos = ((BlockPos) args[0]).immutable();
@@ -214,6 +229,34 @@ public final class TreeReplay {
                 }
                 case "getMaxY" -> {
                     return this.maxY + 200;
+                }
+                case "isOutsideBuildHeight" -> {
+                    var y = args[0] instanceof BlockPos pos ? pos.getY() : (Integer) args[0];
+                    return y < -64 || y > 319;
+                }
+                case "isEmptyBlock" -> {
+                    return this.state((BlockPos) args[0]).isAir();
+                }
+                case "hasChunkAt", "hasChunksAt" -> {
+                    return true;
+                }
+                case "getChunkGenerator" -> {
+                    return null;
+                }
+                case "levelEvent", "playSound" -> {
+                    return null;
+                }
+                case "getCurrentDifficultyAt" -> {
+                    return null;
+                }
+                case "setCurrentlyGenerating" -> {
+                    return null;
+                }
+                case "getSeed" -> {
+                    return 0L;
+                }
+                case "getLevel" -> {
+                    return null;
                 }
                 case "getBlockEntity" -> {
                     return args.length > 1 ? Optional.empty() : null;

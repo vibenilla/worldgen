@@ -27,7 +27,7 @@ public final class ChunkVegetationReplay {
     public static void main(String[] args) throws Exception {
         net.minecraft.SharedConstants.tryDetectVersion();
         net.minecraft.server.Bootstrap.bootStrap();
-        bindTags();
+        FeatureABCompare.bindAllTags();
 
         var traceFile = Path.of(args[0]);
         var featureJson = Path.of(args[1]);

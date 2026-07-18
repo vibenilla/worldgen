@@ -14,6 +14,7 @@ import rocks.minestom.worldgen.carver.CarverLoader;
 import rocks.minestom.worldgen.carver.Carvers;
 import rocks.minestom.worldgen.feature.*;
 import rocks.minestom.worldgen.feature.placement.PlacementContext;
+import rocks.minestom.worldgen.random.RandomSource;
 import rocks.minestom.worldgen.random.WorldgenRandom;
 import rocks.minestom.worldgen.random.XoroshiroRandomSource;
 import rocks.minestom.worldgen.structure.placement.StructurePlacer;
@@ -195,6 +196,60 @@ public final class WorldGenerator implements Generator {
             }
             lateModifier.setRelative(localX, localY, localZ, entry.getValue());
         }
+    }
+
+    /**
+     * Debug trace for isolating lush-caves-style decoration divergences: dumps
+     * the rng seed state and a world snapshot right before a placed feature
+     * runs, in the same format {@code ChunkVegetationReplay} consumes.
+     */
+    private static void dumpDecorTrace(String key, WorldgenRandom random, GenerationUnitAdapter levelAdapter, BlockVec origin, int minY, int maxY) {
+        try {
+            var sourceField = random.getClass().getDeclaredField("randomSource");
+            sourceField.setAccessible(true);
+            var source = sourceField.get(random);
+            var generatorField = source.getClass().getDeclaredField("randomNumberGenerator");
+            generatorField.setAccessible(true);
+            var generator = generatorField.get(source);
+            var loField = generator.getClass().getDeclaredField("seedLo");
+            var hiField = generator.getClass().getDeclaredField("seedHi");
+            loField.setAccessible(true);
+            hiField.setAccessible(true);
+            System.out.println("TRACE rng " + key + " " + loField.getLong(generator) + " " + hiField.getLong(generator));
+        } catch (ReflectiveOperationException exception) {
+            System.out.println("TRACE rng " + key + " unavailable " + exception);
+        }
+
+        var reachXZ = Integer.getInteger("worldgen.decorTraceReach", 24);
+        var traceMinY = Integer.getInteger("worldgen.decorTraceMinY", minY);
+        var traceMaxY = Integer.getInteger("worldgen.decorTraceMaxY", maxY);
+        for (var y = Math.max(minY, traceMinY); y <= Math.min(maxY, traceMaxY); y++) {
+            for (var x = origin.blockX() - reachXZ; x < origin.blockX() + reachXZ; x++) {
+                for (var z = origin.blockZ() - reachXZ; z < origin.blockZ() + reachXZ; z++) {
+                    var block = levelAdapter.getBlock(x, y, z);
+                    if (!block.isAir()) {
+                        System.out.println("TRACE world " + key + " " + x + " " + y + " " + z + " " + serializeBlock(block));
+                    }
+                }
+            }
+        }
+    }
+
+    private static String serializeBlock(Block block) {
+        var properties = block.properties();
+        if (properties.isEmpty()) {
+            return block.name();
+        }
+        var builder = new StringBuilder(block.name()).append('[');
+        var first = true;
+        for (var entry : new java.util.TreeMap<>(properties).entrySet()) {
+            if (!first) {
+                builder.append(',');
+            }
+            builder.append(entry.getKey()).append('=').append(entry.getValue());
+            first = false;
+        }
+        return builder.append(']').toString();
     }
 
     /**
@@ -395,7 +450,18 @@ public final class WorldGenerator implements Generator {
                 var debugChunk = System.getProperty("worldgen.debugchunk");
                 var debugThis = debugChunk != null && debugChunk.equals((startX >> 4) + "," + (startZ >> 4));
                 var debugStep = stepIndex;
-                placedFeature.place(placementContext, random, origin, (position, featureRandom) -> {
+
+                var decorTraceChunk = System.getProperty("worldgen.decorTrace", "");
+                var decorTraceFeature = System.getProperty("worldgen.decorTraceFeature", "");
+                var tracingThisFeature = decorTraceChunk.equals((startX >> 4) + "," + (startZ >> 4))
+                        && placedFeatureKey.asString().contains(decorTraceFeature);
+                if (tracingThisFeature) {
+                    dumpDecorTrace(placedFeatureKey.asString() + ":" + featureIndex + ":" + stepIndex, random, levelAdapter, origin,
+                            this.settings.minY(), this.settings.maxYInclusive());
+                }
+
+                var placeRandom = tracingThisFeature ? new CountingRandomSource(random) : (RandomSource) random;
+                placedFeature.place(placementContext, placeRandom, origin, (position, featureRandom) -> {
                     if (debugThis) {
                         System.out.println("FEATPOS " + placedFeatureKey.asString() + " idx=" + featureIndex + " step=" + debugStep + " pos=" + position);
                     }
@@ -425,7 +491,72 @@ public final class WorldGenerator implements Generator {
                         }
                     }
                 });
+                if (tracingThisFeature) {
+                    System.out.println("TRACE draws " + placedFeatureKey.asString() + ":" + featureIndex + ":" + stepIndex
+                            + " " + ((CountingRandomSource) placeRandom).count);
+                }
             }
+        }
+    }
+
+    /** Debug-only wrapper counting draws consumed by a single traced placed-feature call. */
+    private static final class CountingRandomSource implements RandomSource {
+        private final RandomSource delegate;
+        private long count;
+
+        CountingRandomSource(RandomSource delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public RandomSource fork() {
+            return this.delegate.fork();
+        }
+
+        @Override
+        public rocks.minestom.worldgen.random.PositionalRandomFactory forkPositional() {
+            return this.delegate.forkPositional();
+        }
+
+        @Override
+        public void setSeed(long seed) {
+            this.delegate.setSeed(seed);
+        }
+
+        @Override
+        public int nextInt() {
+            this.count++;
+            return this.delegate.nextInt();
+        }
+
+        @Override
+        public int nextInt(int bound) {
+            this.count++;
+            return this.delegate.nextInt(bound);
+        }
+
+        @Override
+        public long nextLong() {
+            this.count++;
+            return this.delegate.nextLong();
+        }
+
+        @Override
+        public boolean nextBoolean() {
+            this.count++;
+            return this.delegate.nextBoolean();
+        }
+
+        @Override
+        public float nextFloat() {
+            this.count++;
+            return this.delegate.nextFloat();
+        }
+
+        @Override
+        public double nextDouble() {
+            this.count++;
+            return this.delegate.nextDouble();
         }
     }
 
