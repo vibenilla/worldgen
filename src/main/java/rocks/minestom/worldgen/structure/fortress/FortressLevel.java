@@ -1,7 +1,10 @@
 package rocks.minestom.worldgen.structure.fortress;
 
+import net.minestom.server.coordinate.BlockVec;
 import net.minestom.server.instance.block.Block;
 import rocks.minestom.worldgen.structure.StructureWrites;
+
+import java.util.List;
 
 /**
  * Chunk-local world view for nether fortress piece placement, mirroring the
@@ -22,9 +25,10 @@ final class FortressLevel {
     private final int maxY;
     private final int height;
     private final int[] chunkHandle;
+    private final List<BlockVec> shapeUpdatePositions;
 
     FortressLevel(Block.Setter adapter, Block[] blocks, int startX, int startZ,
-            int minY, int maxY, int[] chunkHandle) {
+            int minY, int maxY, int[] chunkHandle, List<BlockVec> shapeUpdatePositions) {
         this.adapter = adapter;
         this.blocks = blocks;
         this.startX = startX;
@@ -33,6 +37,7 @@ final class FortressLevel {
         this.maxY = maxY;
         this.height = maxY - minY + 1;
         this.chunkHandle = chunkHandle;
+        this.shapeUpdatePositions = shapeUpdatePositions;
     }
 
     Block getBlock(int x, int y, int z) {
@@ -52,6 +57,20 @@ final class FortressLevel {
         this.blocks[index] = block;
         this.adapter.setBlock(x, y, z, block);
         StructureWrites.record(this.chunkHandle, x, y, z, block);
+        if (this.shapeUpdatePositions != null && isShapeCheckBlock(block)) {
+            this.shapeUpdatePositions.add(new BlockVec(x, y, z));
+        }
+    }
+
+    /**
+     * Vanilla {@code StructurePiece.SHAPE_CHECK_BLOCKS}, restricted to the
+     * families fortress pieces actually place (fences): a position marked
+     * here has its connection shape recomputed against its final neighbors
+     * once every piece in the chunk has been placed.
+     */
+    private static boolean isShapeCheckBlock(Block block) {
+        var key = block.key().value();
+        return key.endsWith("_fence") && !key.endsWith("_fence_gate");
     }
 
     int minY() {

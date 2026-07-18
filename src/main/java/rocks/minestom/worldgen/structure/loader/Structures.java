@@ -12,6 +12,7 @@ import rocks.minestom.worldgen.structure.SimpleStructure;
 import rocks.minestom.worldgen.structure.Structure;
 import rocks.minestom.worldgen.structure.TerrainAdjustment;
 import rocks.minestom.worldgen.structure.endcity.EndCityStructure;
+import rocks.minestom.worldgen.structure.fortress.FortressStructure;
 import rocks.minestom.worldgen.structure.mineshaft.MineshaftStructure;
 import rocks.minestom.worldgen.structure.mineshaft.MineshaftType;
 import rocks.minestom.worldgen.structure.pool.PoolAliasBinding;
@@ -63,6 +64,10 @@ public final class Structures {
 
         if (typeStr.equals("minecraft:stronghold")) {
             return parseStrongholdStructure(json);
+        }
+
+        if (typeStr.equals("minecraft:fortress")) {
+            return parseFortressStructure(json);
         }
 
         if (typeStr.equals("minecraft:desert_pyramid") || typeStr.equals("minecraft:jungle_temple")
@@ -155,6 +160,12 @@ public final class Structures {
         var decoded = SIMPLE_CODEC.decode(Transcoder.JSON, json).orElseThrow();
         var biomes = parseBiomes(decoded.biomes().convertTo(Transcoder.JSON).orElseThrow());
         return new StrongholdStructure(biomes);
+    }
+
+    private static Structure parseFortressStructure(JsonElement json) {
+        var decoded = SIMPLE_CODEC.decode(Transcoder.JSON, json).orElseThrow();
+        var biomes = parseBiomes(decoded.biomes().convertTo(Transcoder.JSON).orElseThrow());
+        return new FortressStructure(biomes);
     }
 
     private static Structure parseWoodlandMansionStructure(JsonElement json) {

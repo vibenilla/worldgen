@@ -140,6 +140,7 @@ public final class StructurePlacer {
                         settings.minY(), lookup.terrain(chunkX, chunkZ).blocks(), settings.height(), null)
                 : new GenerationUnitAdapter(unit);
 
+        StructureSet fortressStructureSet = null;
         for (var structureSetId : this.structureSets) {
             var structureSet = this.structureLoader.getStructureSet(structureSetId);
             if (structureSet == null) {
@@ -212,11 +213,7 @@ public final class StructurePlacer {
             }
 
             if (this.fortressPlacer.isFortressSet(structureSet)) {
-                // Unlike mineshafts, nether_complexes mixes the procedural
-                // fortress with the jigsaw bastion remnant, so the fortress
-                // placer runs in addition to (not instead of) the generic
-                // path below, which still places bastion remnant starts.
-                this.fortressPlacer.place(unit, biomeZoomer, settings, structureSet, surfaceHeights);
+                fortressStructureSet = structureSet;
             }
 
             // Starts are pure functions of their start chunk, so scan every
@@ -237,6 +234,23 @@ public final class StructurePlacer {
                             startX, startZ, unit.size().blockX(), unit.size().blockZ());
                 }
             }
+        }
+
+        if (fortressStructureSet != null) {
+            // Unlike mineshafts, nether_complexes mixes the procedural
+            // fortress with the jigsaw bastion remnant, so the fortress
+            // placer runs in addition to (not instead of) the generic path
+            // above, which places bastion remnant (and any other structure
+            // set's, e.g. a nether ruined portal's) starts. Vanilla decorates
+            // every other nether structure step (surface_structures for
+            // bastion and ruined portal) before fortress's
+            // underground_decoration step (the last structure-placing step
+            // before vegetal decoration), so where two structures overlap at
+            // a set cell boundary, fortress's later write wins - this placer
+            // must therefore run after every structure set's generic path,
+            // not interleaved with it, so its unconditional block writes land
+            // on top of anything already placed this chunk.
+            this.fortressPlacer.place(unit, biomeZoomer, settings, fortressStructureSet, surfaceHeights);
         }
     }
 

@@ -387,6 +387,24 @@ tasks.register<JavaExec>("strongholdVerify") {
     )
 }
 
+tasks.register<JavaExec>("fortressVerify") {
+    group = "verification"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass = "rocks.minestom.worldgen.verify.StructureVerify"
+    jvmArgs("-Xmx4G")
+    args(
+        providers.gradleProperty("vanillaWorld").getOrElse("data/vanilla-census/world/dimensions/minecraft/the_nether"),
+        providers.gradleProperty("datapack").getOrElse("data/mc/datapack"),
+        providers.gradleProperty("seed").getOrElse("123456789"),
+        providers.gradleProperty("minChunkX").getOrElse("-10"),
+        providers.gradleProperty("minChunkZ").getOrElse("-10"),
+        providers.gradleProperty("maxChunkX").getOrElse("10"),
+        providers.gradleProperty("maxChunkZ").getOrElse("10"),
+        providers.gradleProperty("nameFilter").getOrElse("Fortress"),
+        providers.gradleProperty("locateKey").getOrElse("minecraft:fortress")
+    )
+}
+
 tasks.register<JavaExec>("strongholdPieceDump") {
     group = "verification"
     classpath = sourceSets.test.get().runtimeClasspath

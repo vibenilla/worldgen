@@ -58,7 +58,7 @@ final class FortressBlockConsistencyTest {
             var startX = (pieceBox.minX() >> 4) << 4;
             var startZ = (pieceBox.minZ() >> 4) << 4;
             var chunkBB = new BoundingBox(startX, minY + 1, startZ, startX + 15, maxY, startZ + 15);
-            var level = new FortressLevel(adapter, new Block[16 * 16 * (maxY - minY + 1)], startX, startZ, minY, maxY, null);
+            var level = new FortressLevel(adapter, new Block[16 * 16 * (maxY - minY + 1)], startX, startZ, minY, maxY, null, null);
             piece.postProcess(level, decorationRandom, chunkBB);
         }
         return recorded;
