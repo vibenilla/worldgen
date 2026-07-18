@@ -122,6 +122,18 @@ public final class StructurePlacer {
 
     public void placeStructures(GenerationUnit unit, int[] surfaceHeights, BiomeZoomer biomeZoomer,
             NoiseGeneratorSettingsRuntime settings) {
+        this.placeStructures(unit, surfaceHeights, biomeZoomer, settings, -1);
+    }
+
+    /**
+     * Places the structures whose decoration step matches {@code stepFilter}
+     * (or all of them when it is negative). Vanilla interleaves structure
+     * placement with feature steps - each step first places its structures,
+     * then its features - so earlier-step features (basalt pillars, geodes)
+     * are placed before, and overwritten by, later-step structures.
+     */
+    public void placeStructures(GenerationUnit unit, int[] surfaceHeights, BiomeZoomer biomeZoomer,
+            NoiseGeneratorSettingsRuntime settings, int stepFilter) {
         if (this.structureSets.isEmpty()) {
             return;
         }
@@ -151,6 +163,14 @@ public final class StructurePlacer {
         for (var structureSetId : this.structureSets) {
             var structureSet = this.structureLoader.getStructureSet(structureSetId);
             if (structureSet == null) {
+                continue;
+            }
+
+            if (this.fortressPlacer.isFortressSet(structureSet)) {
+                fortressStructureSet = structureSet;
+            }
+
+            if (stepFilter >= 0 && this.genericSetStep(structureSet) != stepFilter) {
                 continue;
             }
 
@@ -237,10 +257,6 @@ public final class StructurePlacer {
                 continue;
             }
 
-            if (this.fortressPlacer.isFortressSet(structureSet)) {
-                fortressStructureSet = structureSet;
-            }
-
             // Starts are pure functions of their start chunk, so scan every
             // candidate start chunk whose pieces could reach this chunk and
             // build them on demand (memoized). This places structures whose
@@ -261,7 +277,7 @@ public final class StructurePlacer {
             }
         }
 
-        if (fortressStructureSet != null) {
+        if (fortressStructureSet != null && (stepFilter < 0 || stepFilter == FORTRESS_STEP)) {
             // Unlike mineshafts, nether_complexes mixes the procedural
             // fortress with the jigsaw bastion remnant, so the fortress
             // placer runs in addition to (not instead of) the generic path
@@ -1012,6 +1028,26 @@ public final class StructurePlacer {
 
     private static long chunkKey(int chunkX, int chunkZ) {
         return ((long) chunkX << 32) ^ (chunkZ & 0xffffffffL);
+    }
+
+    /** Fortress decoration step (underground_decoration). */
+    private static final int FORTRESS_STEP = 7;
+
+    /**
+     * The decoration step of the structures this set places through the
+     * generic or special placer paths. The fortress is dispatched separately,
+     * so mixed sets (nether_complexes) resolve to their non-fortress entry.
+     */
+    private int genericSetStep(StructureSet structureSet) {
+        var step = -1;
+        for (var entry : structureSet.structures()) {
+            if (this.structureLoader.getStructure(entry.structure()) instanceof FortressStructure) {
+                continue;
+            }
+            var entryStep = this.structureLoader.structureStep(entry.structure());
+            step = step < 0 ? entryStep : Math.min(step, entryStep);
+        }
+        return step < 0 ? 4 : step;
     }
 
     private record StartKey(long chunkKey, Key structureSetId) {

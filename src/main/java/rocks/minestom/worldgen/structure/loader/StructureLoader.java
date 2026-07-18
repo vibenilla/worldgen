@@ -91,6 +91,38 @@ public final class StructureLoader {
         }
     }
 
+    /**
+     * The decoration step ordinal of the structure (its {@code step} field),
+     * matching vanilla {@code GenerationStep.Decoration}; defaults to
+     * surface_structures when unreadable.
+     */
+    public int structureStep(Key id) {
+        return this.structureStepCache.computeIfAbsent(id, key -> {
+            try {
+                var json = this.dataPack.readStructure(key);
+                var step = json.getAsJsonObject().get("step").getAsString();
+                return switch (step.replace("minecraft:", "")) {
+                    case "raw_generation" -> 0;
+                    case "lakes" -> 1;
+                    case "local_modifications" -> 2;
+                    case "underground_structures" -> 3;
+                    case "surface_structures" -> 4;
+                    case "strongholds" -> 5;
+                    case "underground_ores" -> 6;
+                    case "underground_decoration" -> 7;
+                    case "fluid_springs" -> 8;
+                    case "vegetal_decoration" -> 9;
+                    case "top_layer_modification" -> 10;
+                    default -> 4;
+                };
+            } catch (Exception exception) {
+                return 4;
+            }
+        });
+    }
+
+    private final Map<Key, Integer> structureStepCache = new ConcurrentHashMap<>();
+
     private StructureSet loadStructureSet(Key id) {
         try {
             var json = this.dataPack.readStructureSet(id);

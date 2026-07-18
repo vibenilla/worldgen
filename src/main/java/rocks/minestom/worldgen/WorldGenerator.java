@@ -145,9 +145,6 @@ public final class WorldGenerator implements Generator {
             return block != null ? block : Block.AIR;
         });
 
-        if (this.structurePlacer != null) {
-            this.structurePlacer.placeStructures(unit, surfaceHeights, this.biomeZoomer, this.settings);
-        }
 
         if (this.generateEndStructures) {
             this.placeEndPodium(unit, surfaceHeights);
@@ -426,7 +423,16 @@ public final class WorldGenerator implements Generator {
         var decorationSeed = random.setDecorationSeed(this.settings.randomState().seed(), startX, startZ);
         var origin = new BlockVec(startX, this.settings.minY(), startZ);
 
-        for (var stepIndex = 0; stepIndex < featuresPerStep.size(); stepIndex++) {
+        // Vanilla step interleave: each decoration step places its structures
+        // first, then its features
+        var totalSteps = Math.max(11, featuresPerStep.size());
+        for (var stepIndex = 0; stepIndex < totalSteps; stepIndex++) {
+            if (this.structurePlacer != null) {
+                this.structurePlacer.placeStructures(unit, surfaceHeights, this.biomeZoomer, this.settings, stepIndex);
+            }
+            if (stepIndex >= featuresPerStep.size()) {
+                continue;
+            }
             var stepData = featuresPerStep.get(stepIndex);
             var featureIndexes = new TreeSet<Integer>();
             for (var biome : chunkBiomes) {
