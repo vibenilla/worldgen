@@ -2,6 +2,7 @@ package rocks.minestom.worldgen.feature;
 
 import net.minestom.server.coordinate.BlockVec;
 import net.minestom.server.instance.block.Block;
+import net.minestom.server.instance.block.BlockFace;
 import rocks.minestom.worldgen.feature.configurations.VegetationPatchConfiguration;
 import rocks.minestom.worldgen.random.RandomSource;
 
@@ -74,7 +75,8 @@ public class VegetationPatchFeature implements Feature<VegetationPatchConfigurat
 
                 var belowY = y + inwards;
                 var belowBlock = level.getBlock(x, belowY, z);
-                if (level.getBlock(x, y, z).isAir() && belowBlock.isSolid()) {
+                var sturdyFace = config.ceiling() ? BlockFace.BOTTOM : BlockFace.TOP;
+                if (level.getBlock(x, y, z).isAir() && hasFullFace(belowBlock, sturdyFace)) {
                     var depth = config.depth().sample(random)
                             + (config.extraBottomBlockChance() > 0.0F && random.nextFloat() < config.extraBottomBlockChance() ? 1 : 0);
                     var groundPos = new VanillaPos(x, belowY, z);
@@ -86,6 +88,11 @@ public class VegetationPatchFeature implements Feature<VegetationPatchConfigurat
         }
 
         return surface;
+    }
+
+    /** Vanilla's {@code BlockState.isFaceSturdy} (default {@code SupportType.FULL}), approximated with the collision shape. */
+    private static boolean hasFullFace(Block block, BlockFace face) {
+        return block.registry().collisionShape().isFaceFull(face);
     }
 
     private <T extends Block.Getter & Block.Setter> boolean placeGround(T level, VegetationPatchConfiguration config,
