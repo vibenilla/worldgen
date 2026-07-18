@@ -293,6 +293,30 @@ tasks.register<JavaExec>("vanillaPeek") {
     args((providers.gradleProperty("peekArgs").getOrElse("")).split(" "))
 }
 
+tasks.register<JavaExec>("ourPeek") {
+    group = "verification"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass = "rocks.minestom.worldgen.verify.CaveDivergenceOurPeek"
+    jvmArgs("-Xmx4G")
+    args((providers.gradleProperty("peekArgs").getOrElse("")).split(" "))
+}
+
+tasks.register<JavaExec>("terrainPeek") {
+    group = "verification"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass = "rocks.minestom.worldgen.verify.CaveDivergenceTerrainPeek"
+    jvmArgs("-Xmx4G")
+    args((providers.gradleProperty("peekArgs").getOrElse("")).split(" "))
+}
+
+tasks.register<JavaExec>("biomePeek") {
+    group = "verification"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass = "rocks.minestom.worldgen.verify.CaveDivergenceBiomePeek"
+    jvmArgs("-Xmx4G")
+    args((providers.gradleProperty("peekArgs").getOrElse("")).split(" "))
+}
+
 tasks.register<JavaExec>("chunkVegReplay") {
     classpath = sourceSets.test.get().runtimeClasspath
     mainClass = "rocks.minestom.worldgen.verify.ChunkVegetationReplay"

@@ -455,6 +455,111 @@ final class CavePatchABTest {
         return y <= floorHeight ? "minecraft:sand" : "minecraft:water";
     }
 
+    // --- lush caves clay ---------------------------------------------------
+
+    @Test
+    void lushCavesClay() throws Exception {
+        var registries = (net.minecraft.core.HolderLookup.Provider) lookup;
+        var vanillaConfigured = registries.lookupOrThrow(net.minecraft.core.registries.Registries.CONFIGURED_FEATURE)
+                .getOrThrow(net.minecraft.resources.ResourceKey.create(
+                        net.minecraft.core.registries.Registries.CONFIGURED_FEATURE,
+                        net.minecraft.resources.Identifier.parse("minecraft:lush_caves_clay")))
+                .value();
+
+        var ourConfigured = loader.getConfiguredFeature(net.kyori.adventure.key.Key.key("minecraft:lush_caves_clay"));
+
+        var mismatches = 0L;
+        var drawMismatchRuns = 0;
+        var vanillaSetTotal = 0L;
+        var printed = 0;
+        for (var run = 0; run < RUNS; run++) {
+            var salt = 8000L + run;
+            var seed = 271828L + run * 48611L;
+            var x = -1500 + run * 29;
+            var z = 2200 - run * 41;
+            var floor = lushFloorHeight(x, z, salt);
+            var originY = floor + 1;
+
+            var handler = new CaveLevel(salt, CavePatchABTest::lushCaveState);
+            var level = (WorldGenLevel) Proxy.newProxyInstance(
+                    CavePatchABTest.class.getClassLoader(), new Class<?>[]{WorldGenLevel.class}, handler);
+            var vanillaRandom = new ChunkVegetationReplay.CountingRandom(new XoroshiroRandomSource(seed));
+            vanillaConfigured.place(level, generator, vanillaRandom, new BlockPos(x, originY, z));
+
+            var vanillaSets = new TreeMap<String, String>();
+            for (var entry : handler.overlay.entrySet()) {
+                vanillaSets.put(entry.getKey().getX() + "," + entry.getKey().getY() + "," + entry.getKey().getZ(),
+                        FeatureABCompare.canonical(entry.getValue()));
+            }
+
+            var ourWorld = new OurCaveWorld(salt, CavePatchABTest::lushCaveState);
+            var ourRandom = new FeatureABCompare.CountingOurRandom(new rocks.minestom.worldgen.random.XoroshiroRandomSource(seed));
+            var context = new FeaturePlaceContext<>(ourWorld, ourRandom, new BlockVec(x, originY, z),
+                    ourConfigured.config(), seed, -64, 319, 63);
+            var featureImpl = ourConfigured.feature();
+            if (featureImpl instanceof rocks.minestom.worldgen.feature.RandomSelectorFeature randomSelector) {
+                randomSelector.place((FeaturePlaceContext) context, loader);
+            } else {
+                ((Feature) featureImpl).place(context);
+            }
+
+            var ourSets = new TreeMap<String, String>();
+            for (var entry : ourWorld.overlay.entrySet()) {
+                ourSets.put(entry.getKey().blockX() + "," + entry.getKey().blockY() + "," + entry.getKey().blockZ(),
+                        FeatureABCompare.canonical(entry.getValue()));
+            }
+
+            vanillaSetTotal += vanillaSets.size();
+            if (vanillaRandom.count != ourRandom.count) {
+                drawMismatchRuns++;
+                if (printed < 4) {
+                    System.out.println("lush_caves_clay run=" + run + " DRAWS vanilla=" + vanillaRandom.count + " ours=" + ourRandom.count);
+                    printed++;
+                }
+            }
+
+            var keys = new TreeSet<String>();
+            keys.addAll(vanillaSets.keySet());
+            keys.addAll(ourSets.keySet());
+            for (var key : keys) {
+                var vanilla = vanillaSets.get(key);
+                var ours = ourSets.get(key);
+                if (!java.util.Objects.equals(vanilla, ours)) {
+                    mismatches++;
+                    if (printed < 16) {
+                        System.out.println("lush_caves_clay run=" + run + " at " + key + " vanilla=" + vanilla + " ours=" + ours);
+                        printed++;
+                    }
+                }
+            }
+        }
+
+        System.out.println("lush_caves_clay: runs=" + RUNS + " vanillaSets=" + vanillaSetTotal
+                + " mismatches=" + mismatches + " drawMismatchRuns=" + drawMismatchRuns);
+        assertEquals(0L, mismatches, "lush_caves_clay block write mismatches");
+        assertEquals(0, drawMismatchRuns, "lush_caves_clay runs with diverging draw counts");
+    }
+
+    static int lushFloorHeight(int x, int z, long salt) {
+        return -40 + FeatureABCompare.lattice(x, z, salt * 8 + 1, 16);
+    }
+
+    /** Lush-cave-like stone/deepslate cave: solid floor and ceiling with an air gap. */
+    static String lushCaveState(int x, int y, int z, long salt) {
+        if (y < -64 || y > 319) {
+            return null;
+        }
+
+        var floor = lushFloorHeight(x, z, salt);
+        var gap = 5 + FeatureABCompare.lattice(x, z, salt * 8 + 2, 8);
+        var ceil = floor + 1 + gap;
+        if (y <= floor || y >= ceil) {
+            return y < 0 ? "minecraft:deepslate" : "minecraft:stone";
+        }
+
+        return null;
+    }
+
     // --- shared vanilla level proxy ---------------------------------------------
 
     @FunctionalInterface
@@ -498,6 +603,9 @@ final class CavePatchABTest {
                 case "isFluidAtPosition" -> {
                     return ((java.util.function.Predicate<net.minecraft.world.level.material.FluidState>) args[1])
                             .test(this.state((BlockPos) args[0]).getFluidState());
+                }
+                case "isWaterAt" -> {
+                    return this.state((BlockPos) args[0]).getFluidState().is(net.minecraft.tags.FluidTags.WATER);
                 }
                 case "setBlock" -> {
                     var pos = ((BlockPos) args[0]).immutable();
