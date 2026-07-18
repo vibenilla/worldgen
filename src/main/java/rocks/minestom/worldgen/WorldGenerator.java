@@ -418,7 +418,11 @@ public final class WorldGenerator implements Generator {
                     } else if (featureImpl instanceof FreezeTopLayerFeature freezeTopLayer) {
                         freezeTopLayer.place(context, placementContext, this.biomeResolver);
                     } else {
-                        ((Feature) featureImpl).place(context);
+                        var placed = ((Feature) featureImpl).place(context);
+                        if (placed && featureImpl instanceof UnderwaterMagmaFeature) {
+                            UnderwaterMagmaFeature.convertBubbleColumnsAfterPlacement(levelAdapter,
+                                    (FeaturePlaceContext) context);
+                        }
                     }
                 });
             }

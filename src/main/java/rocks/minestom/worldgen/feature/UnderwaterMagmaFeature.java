@@ -47,6 +47,39 @@ public final class UnderwaterMagmaFeature implements Feature<UnderwaterMagmaConf
         return placedAny;
     }
 
+    /** Vanilla's {@code BubbleColumnBlock.updateColumn}, applied after {@link #place} finishes. */
+    public static <T extends Block.Getter & Block.Setter> void convertBubbleColumnsAfterPlacement(
+            T level, FeaturePlaceContext<UnderwaterMagmaConfiguration, T> context) {
+        var origin = context.origin();
+        var config = context.config();
+
+        var column = Column.scan(level, origin, config.floorSearchRange(),
+                block -> block.compare(Block.WATER),
+                block -> !block.compare(Block.WATER));
+        if (column.isEmpty() || column.get().floor().isEmpty()) {
+            return;
+        }
+
+        var floorY = column.get().floor().getAsInt();
+        var radius = config.placementRadiusAroundFloor();
+        var minX = origin.blockX() - radius;
+        var maxX = origin.blockX() + radius;
+        var minY = floorY - radius;
+        var maxY = floorY + radius;
+        var minZ = origin.blockZ() - radius;
+        var maxZ = origin.blockZ() + radius;
+
+        for (var z = minZ; z <= maxZ; z++) {
+            for (var x = minX; x <= maxX; x++) {
+                for (var y = minY; y <= maxY; y++) {
+                    if (level.getBlock(x, y, z).compare(Block.MAGMA_BLOCK)) {
+                        convertWaterAboveToBubbleColumn(level, x, y, z, context.maxY());
+                    }
+                }
+            }
+        }
+    }
+
     private static <T extends Block.Getter & Block.Setter> boolean isValidPlacement(T level, int x, int y, int z) {
         var block = level.getBlock(x, y, z);
         if (block.isAir() || block.compare(Block.WATER)) {
@@ -68,5 +101,23 @@ public final class UnderwaterMagmaFeature implements Feature<UnderwaterMagmaConf
 
     private static boolean isVisibleFromOutside(Block.Getter level, int x, int y, int z) {
         return !level.getBlock(x, y, z).registry().isSolid();
+    }
+
+    /**
+     * Port of vanilla's {@code BubbleColumnBlock.updateColumn}: a magma block
+     * placed under a water source turns the water above it (and every water
+     * source stacked above that) into a downward-dragging bubble column.
+     */
+    private static <T extends Block.Getter & Block.Setter> void convertWaterAboveToBubbleColumn(T level, int x, int y, int z, int maxY) {
+        var bubbleColumn = Block.BUBBLE_COLUMN.withProperty("drag", "true");
+        var aboveY = y + 1;
+        while (aboveY <= maxY && isWaterSource(level.getBlock(x, aboveY, z))) {
+            level.setBlock(x, aboveY, z, bubbleColumn);
+            aboveY++;
+        }
+    }
+
+    private static boolean isWaterSource(Block block) {
+        return block.compare(Block.WATER) && "0".equals(block.getProperty("level"));
     }
 }

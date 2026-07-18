@@ -108,6 +108,10 @@ public class RandomSelectorFeature implements Feature<FeatureConfiguration> {
 
             if (placed) {
                 placedAny[0] = true;
+                if (featureImpl instanceof UnderwaterMagmaFeature) {
+                    UnderwaterMagmaFeature.convertBubbleColumnsAfterPlacement(newContext.accessor(),
+                            (FeaturePlaceContext) newContext);
+                }
             }
         });
 
