@@ -32,6 +32,7 @@ import rocks.minestom.worldgen.structure.stronghold.StrongholdPlacer;
 import rocks.minestom.worldgen.structure.processor.StructureProcessorContext;
 import rocks.minestom.worldgen.structure.processor.StructureProcessorList;
 import rocks.minestom.worldgen.structure.scattered.ScatteredFeaturePlacer;
+import rocks.minestom.worldgen.structure.scattered.ScatteredFeatureStructure;
 import rocks.minestom.worldgen.structure.template.BoundingBox;
 import rocks.minestom.worldgen.structure.template.LiquidSettings;
 import rocks.minestom.worldgen.structure.template.Rotation;
@@ -347,7 +348,8 @@ public final class StructurePlacer {
 
             if (structureSet.structures().size() == 1) {
                 var only = structureSet.structures().getFirst().structure();
-                if (only.equals(structureKey) && this.biomeMatches(only, biomeKey)) {
+                if (only.equals(structureKey) && this.passesSeaLevelGate(only, chunkX, chunkZ, settings)
+                        && this.biomeMatches(only, biomeKey)) {
                     return new BlockVec(centerX, surfaceY, centerZ);
                 }
                 continue;
@@ -364,7 +366,8 @@ public final class StructurePlacer {
             while (!options.isEmpty() && total > 0) {
                 var index = pickWeightedIndex(options, random.nextInt(total));
                 var selected = options.get(index);
-                if (this.biomeMatches(selected.structure(), biomeKey)) {
+                if (this.passesSeaLevelGate(selected.structure(), chunkX, chunkZ, settings)
+                        && this.biomeMatches(selected.structure(), biomeKey)) {
                     if (selected.structure().equals(structureKey)) {
                         return new BlockVec(centerX, surfaceY, centerZ);
                     }
@@ -380,6 +383,46 @@ public final class StructurePlacer {
     private boolean biomeMatches(Key structureKey, Key biomeKey) {
         var structure = this.structureLoader.getStructure(structureKey);
         return structure != null && structure.biomes().matches(biomeKey, this.structureLoader.biomeTags());
+    }
+
+    /**
+     * Vanilla {@code SinglePieceStructure.findGenerationPoint}: the desert
+     * pyramid and jungle temple refuse to start at all (before ever sampling
+     * a biome) if the lowest {@code WORLD_SURFACE_WG} corner height across
+     * their footprint dips below sea level. The swamp hut is a plain
+     * {@code Structure}, not a {@code SinglePieceStructure}, so it has no
+     * such gate. Mirrors {@code ScatteredFeaturePlacer}'s own gate so this
+     * locate-only path agrees with what generation would actually place.
+     */
+    private boolean passesSeaLevelGate(Key structureKey, int chunkX, int chunkZ, NoiseGeneratorSettingsRuntime settings) {
+        var structure = this.structureLoader.getStructure(structureKey);
+        if (!(structure instanceof ScatteredFeatureStructure scattered) || !scattered.kind().hasSeaLevelGate()) {
+            return true;
+        }
+
+        var chunkMinX = chunkX << 4;
+        var chunkMinZ = chunkZ << 4;
+        var width = scattered.kind().footprintWidth();
+        var depth = scattered.kind().footprintDepth();
+        var lowestY = Math.min(
+                Math.min(this.rawSurfaceHeight(chunkMinX, chunkMinZ, settings),
+                        this.rawSurfaceHeight(chunkMinX, chunkMinZ + depth, settings)),
+                Math.min(this.rawSurfaceHeight(chunkMinX + width, chunkMinZ, settings),
+                        this.rawSurfaceHeight(chunkMinX + width, chunkMinZ + depth, settings)));
+        return lowestY >= settings.seaLevel();
+    }
+
+    /**
+     * The raw noise terrain's topmost solid block at an arbitrary block
+     * position, matching vanilla's {@code getFirstOccupiedHeight}.
+     */
+    private int rawSurfaceHeight(int blockX, int blockZ, NoiseGeneratorSettingsRuntime settings) {
+        var chunkX = Math.floorDiv(blockX, 16);
+        var chunkZ = Math.floorDiv(blockZ, 16);
+        var terrainData = new TerrainGenerator(settings).generate(chunkX, chunkZ);
+        var index = (blockX - (chunkX << 4)) * 16 + (blockZ - (chunkZ << 4));
+        var solidTop = terrainData.surfaceHeights()[index];
+        return solidTop == Integer.MIN_VALUE ? settings.minY() - 1 : solidTop;
     }
 
     /**

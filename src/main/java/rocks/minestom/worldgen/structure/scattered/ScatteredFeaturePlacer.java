@@ -48,7 +48,7 @@ public final class ScatteredFeaturePlacer {
 
     private final StructureLoader structureLoader;
     private final FeatureLoader featureLoader;
-    private final Map<Long, Optional<ScatteredStart>> starts = new ConcurrentHashMap<>();
+    private final Map<StartKey, Optional<ScatteredStart>> starts = new ConcurrentHashMap<>();
     private volatile Carvers carvers;
     private volatile List<Key> surfaceStructures;
     private volatile List<Key> undergroundStructures;
@@ -168,10 +168,18 @@ public final class ScatteredFeaturePlacer {
 
     private ScatteredStart startAt(int chunkX, int chunkZ, StructureSet structureSet,
             NoiseGeneratorSettingsRuntime settings, BiomeZoomer biomeZoomer) {
-        var key = (long) chunkX << 32 ^ (chunkZ & 0xFFFFFFFFL);
+        // Keyed by structure set as well as chunk: this placer is shared by
+        // the desert pyramid, jungle temple, swamp hut and buried treasure
+        // structure sets, and each has its own placement grid, so the same
+        // chunk coordinate can be a candidate start for more than one of
+        // them with different answers.
+        var key = new StartKey(structureSet, chunkX, chunkZ);
         return this.starts.computeIfAbsent(key,
                 unused -> Optional.ofNullable(this.computeStart(chunkX, chunkZ, structureSet, settings, biomeZoomer)))
                 .orElse(null);
+    }
+
+    private record StartKey(StructureSet structureSet, int chunkX, int chunkZ) {
     }
 
     private ScatteredStart computeStart(int chunkX, int chunkZ, StructureSet structureSet,
@@ -302,10 +310,12 @@ public final class ScatteredFeaturePlacer {
      * Approximation of vanilla {@code getFirstOccupiedHeight} for
      * {@code WORLD_SURFACE_WG} (any non-air block, {@code oceanFloor=false})
      * or {@code OCEAN_FLOOR_WG} (solid, non-fluid blocks, {@code oceanFloor=true}):
-     * one above the highest solid block of the raw noise terrain (fluids are
+     * the highest solid block itself of the raw noise terrain (fluids are
      * approximated as absent, matching {@link rocks.minestom.worldgen.structure.placement.StructurePlacer#surfaceYAt}'s
      * existing precedent of reading structure-start heights from
-     * uncarved, undecorated terrain).
+     * uncarved, undecorated terrain). Vanilla's {@code getFirstOccupiedHeight}
+     * is {@code getBaseHeight - 1}: one below the first free height, i.e. the
+     * occupied block itself, not one above it.
      */
     private int worldSurfaceHeight(int blockX, int blockZ, NoiseGeneratorSettingsRuntime settings) {
         var chunkX = Math.floorDiv(blockX, 16);
@@ -313,7 +323,7 @@ public final class ScatteredFeaturePlacer {
         var terrainData = new TerrainGenerator(settings).generate(chunkX, chunkZ);
         var index = (blockX - (chunkX << 4)) * 16 + (blockZ - (chunkZ << 4));
         var solidTop = terrainData.surfaceHeights()[index];
-        return solidTop == Integer.MIN_VALUE ? settings.minY() : solidTop + 1;
+        return solidTop == Integer.MIN_VALUE ? settings.minY() - 1 : solidTop;
     }
 
     private static BoundingBox copyBounds(BoundingBox bounds) {
