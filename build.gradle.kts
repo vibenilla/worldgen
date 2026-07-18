@@ -310,6 +310,14 @@ tasks.register<JavaExec>("terrainPeek") {
     args((providers.gradleProperty("peekArgs").getOrElse("")).split(" "))
 }
 
+tasks.register<JavaExec>("oreChunkReplay") {
+    group = "verification"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass = "rocks.minestom.worldgen.verify.OreChunkReplay"
+    jvmArgs("-Xmx2G")
+    args((providers.gradleProperty("replayArgs").getOrElse("")).split(" "))
+}
+
 tasks.register<JavaExec>("terrainBlockPeek") {
     group = "verification"
     classpath = sourceSets.test.get().runtimeClasspath
