@@ -17,6 +17,7 @@ import rocks.minestom.worldgen.structure.mineshaft.MineshaftType;
 import rocks.minestom.worldgen.structure.pool.PoolAliasBinding;
 import rocks.minestom.worldgen.structure.mansion.WoodlandMansionStructure;
 import rocks.minestom.worldgen.structure.monument.OceanMonumentStructure;
+import rocks.minestom.worldgen.structure.netherfossil.NetherFossilStructure;
 import rocks.minestom.worldgen.structure.oceanruin.OceanRuinStructure;
 import rocks.minestom.worldgen.structure.scattered.BuriedTreasureStructure;
 import rocks.minestom.worldgen.structure.shipwreck.ShipwreckStructure;
@@ -24,6 +25,7 @@ import rocks.minestom.worldgen.structure.stronghold.StrongholdStructure;
 import rocks.minestom.worldgen.structure.scattered.ScatteredFeatureKind;
 import rocks.minestom.worldgen.structure.scattered.ScatteredFeatureStructure;
 import rocks.minestom.worldgen.structure.template.LiquidSettings;
+import rocks.minestom.worldgen.surface.VerticalAnchor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -92,7 +94,23 @@ public final class Structures {
             return parseShipwreckStructure(json);
         }
 
+        if (typeStr.equals("minecraft:nether_fossil")) {
+            return parseNetherFossilStructure(json);
+        }
+
         return parseSimpleStructure(typeStr, json);
+    }
+
+    private static Structure parseNetherFossilStructure(JsonElement json) {
+        var decoded = SIMPLE_CODEC.decode(Transcoder.JSON, json).orElseThrow();
+        var biomes = parseBiomes(decoded.biomes().convertTo(Transcoder.JSON).orElseThrow());
+        var obj = json.getAsJsonObject();
+        var heightObj = obj.getAsJsonObject("height");
+        var minHeight = VerticalAnchor.CODEC.decode(Transcoder.JSON, heightObj.get("min_inclusive")).orElseThrow();
+        var maxHeight = VerticalAnchor.CODEC.decode(Transcoder.JSON, heightObj.get("max_inclusive")).orElseThrow();
+        var templates = getTemplatesForType("minecraft:nether_fossil");
+        var terrainAdaptation = parseTerrainAdaptation(obj);
+        return new NetherFossilStructure(biomes, minHeight, maxHeight, templates, terrainAdaptation);
     }
 
     private static Structure parseOceanRuinStructure(JsonElement json) {
