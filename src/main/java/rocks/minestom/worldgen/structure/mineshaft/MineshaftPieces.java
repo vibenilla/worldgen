@@ -86,7 +86,8 @@ public final class MineshaftPieces {
      * blocks): any motion-blocking full block except fences and chains.
      */
     private static boolean isFaceSturdy(Block block) {
-        return block.isSolid() && !isFence(block) && !block.compare(Block.IRON_CHAIN);
+        return block.isSolid() && !isFence(block) && !block.compare(Block.IRON_CHAIN)
+                && !block.compare(Block.COBWEB);
     }
 
     /**
@@ -94,7 +95,7 @@ public final class MineshaftPieces {
      */
     private static boolean isSolidRender(Block block) {
         return block.isSolid() && !isFence(block) && !block.compare(Block.IRON_CHAIN)
-                && !block.compare(Block.SPAWNER);
+                && !block.compare(Block.COBWEB) && !block.compare(Block.SPAWNER);
     }
 
     private static boolean isFence(Block block) {
@@ -917,7 +918,6 @@ public final class MineshaftPieces {
             var wy = this.worldY(y);
             var wz = this.worldZ(x, z);
             var sturdyNeighbours = 0;
-
             for (var direction : Direction.values()) {
                 var nx = wx + direction.stepX();
                 var ny = wy + direction.stepY();

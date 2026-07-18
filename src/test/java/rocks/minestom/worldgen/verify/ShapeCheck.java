@@ -8,9 +8,9 @@ import net.minestom.server.instance.block.BlockFace;
 public final class ShapeCheck {
     public static void main(String[] args) {
         MinecraftServer.init();
-        for (var block : new Block[]{Block.AZALEA, Block.FLOWERING_AZALEA, Block.MOSS_BLOCK, Block.HOPPER, Block.SHORT_GRASS, Block.BIG_DRIPLEAF}) {
+        for (var block : new Block[]{Block.AZALEA, Block.FLOWERING_AZALEA, Block.MOSS_BLOCK, Block.HOPPER, Block.SHORT_GRASS, Block.BIG_DRIPLEAF, Block.COBWEB, Block.RAIL, Block.OAK_PLANKS}) {
             System.out.println(block.name() + " topFull=" + block.registry().collisionShape().isFaceFull(BlockFace.TOP)
-                    + " bottomFull=" + block.registry().collisionShape().isFaceFull(BlockFace.BOTTOM));
+                    + " isSolid=" + block.isSolid() + " bottomFull=" + block.registry().collisionShape().isFaceFull(BlockFace.BOTTOM));
         }
         System.exit(0);
     }
