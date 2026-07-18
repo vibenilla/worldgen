@@ -121,17 +121,8 @@ public class VegetationPatchFeature implements Feature<VegetationPatchConfigurat
         return surface;
     }
 
-    /** Vanilla's {@code BlockState.isFaceSturdy} (default {@code SupportType.FULL}), approximated with the collision shape. */
     private static boolean hasFullFace(Block block, BlockFace face) {
-        // Minestom's face fullness misses multi-box collision shapes whose
-        // face-adjacent box spans the full square (azalea tops, hopper rims,
-        // scaffolding); vanilla's isFaceSturdy reports those as sturdy
-        if (face == BlockFace.TOP
-                && (block.compare(Block.AZALEA) || block.compare(Block.FLOWERING_AZALEA)
-                        || block.compare(Block.HOPPER) || block.compare(Block.SCAFFOLDING))) {
-            return true;
-        }
-        return block.registry().collisionShape().isFaceFull(face);
+        return SturdyFaces.isFaceSturdy(block, face);
     }
 
     private <T extends Block.Getter & Block.Setter> boolean placeGround(T level, VegetationPatchConfiguration config,

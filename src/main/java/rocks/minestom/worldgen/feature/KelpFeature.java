@@ -56,6 +56,9 @@ public final class KelpFeature implements Feature<NoneFeatureConfiguration> {
         if (below.compare(Block.MAGMA_BLOCK)) {
             return false;
         }
-        return below.isSolid() || below.compare(Block.KELP) || below.compare(Block.KELP_PLANT);
+        // Vanilla GrowingPlantBlock.canSurvive: same plant below or a sturdy
+        // UP face, not mere solidity
+        return below.compare(Block.KELP) || below.compare(Block.KELP_PLANT)
+                || SturdyFaces.isFaceSturdy(below, net.minestom.server.instance.block.BlockFace.TOP);
     }
 }

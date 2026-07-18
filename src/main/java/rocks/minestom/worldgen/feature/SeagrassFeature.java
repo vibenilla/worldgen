@@ -26,8 +26,12 @@ public final class SeagrassFeature implements Feature<ProbabilityConfiguration> 
         }
 
         var tall = random.nextDouble() < context.config().probability();
+        // Vanilla seagrass canSurvive: the floor block needs a sturdy TOP
+        // face (isFaceSturdy), not merely solidity - bottom-half stairs and
+        // other partial tops reject it
         var below = level.getBlock(grassPos.add(0, -1, 0));
-        if (!below.isSolid() || below.compare(Block.MAGMA_BLOCK)) {
+        if (!SturdyFaces.isFaceSturdy(below, net.minestom.server.instance.block.BlockFace.TOP)
+                || below.compare(Block.MAGMA_BLOCK)) {
             return false;
         }
 
