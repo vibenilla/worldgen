@@ -168,6 +168,7 @@ tasks.register<JavaExec>("compareVanilla") {
     }
     systemProperty("compare.sequential", providers.gradleProperty("sequential").getOrElse("false"))
     systemProperty("compare.diffblock", providers.gradleProperty("diffblock").getOrElse(""))
+    systemProperty("compare.diffcap", providers.gradleProperty("diffcap").getOrElse("25"))
     systemProperty("compare.biomediffpos", providers.gradleProperty("biomediffpos").getOrElse("false"))
     systemProperty("compare.dimension", providers.gradleProperty("dimension").getOrElse("overworld"))
     systemProperty("compare.pregenRadius", providers.gradleProperty("pregenRadius").getOrElse("16"))
@@ -305,6 +306,14 @@ tasks.register<JavaExec>("terrainPeek") {
     group = "verification"
     classpath = sourceSets.test.get().runtimeClasspath
     mainClass = "rocks.minestom.worldgen.verify.CaveDivergenceTerrainPeek"
+    jvmArgs("-Xmx4G")
+    args((providers.gradleProperty("peekArgs").getOrElse("")).split(" "))
+}
+
+tasks.register<JavaExec>("terrainBlockPeek") {
+    group = "verification"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass = "rocks.minestom.worldgen.verify.TerrainBlockPeek"
     jvmArgs("-Xmx4G")
     args((providers.gradleProperty("peekArgs").getOrElse("")).split(" "))
 }

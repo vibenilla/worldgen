@@ -196,7 +196,7 @@ public final class VanillaComparison {
                         stats.recordMismatch(expected, actual, y);
                         var diffBlock = System.getProperty("compare.diffblock", "");
                         if (!diffBlock.isEmpty() && (expected.contains(diffBlock) || actual.contains(diffBlock))
-                                && stats.diffPrinted < 25) {
+                                && stats.diffPrinted < Integer.getInteger("compare.diffcap", 25)) {
                             stats.diffPrinted++;
                             System.out.printf("DIFF %d,%d,%d expected=%s actual=%s%n",
                                     chunk.getChunkX() * 16 + x, y, chunk.getChunkZ() * 16 + z, expected, actual);
