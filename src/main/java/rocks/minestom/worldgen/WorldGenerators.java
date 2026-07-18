@@ -95,15 +95,15 @@ public final class WorldGenerators {
     }
 
     public Generator overworld() {
-        return new WorldGenerator(this.overworldSettings, this.overworldBiomes, this.biomeZoomSeed, this.biomeResolver, this.featureLoader, this.overworldStructures, false);
+        return new WorldGenerator(this.overworldSettings, this.overworldBiomes, this.biomeZoomSeed, this.biomeResolver, this.featureLoader, this.overworldStructures);
     }
 
     public Generator nether() {
-        return new WorldGenerator(this.netherSettings, this.netherBiomes, this.biomeZoomSeed, this.biomeResolver, this.featureLoader, this.netherStructures, false);
+        return new WorldGenerator(this.netherSettings, this.netherBiomes, this.biomeZoomSeed, this.biomeResolver, this.featureLoader, this.netherStructures);
     }
 
     public Generator end() {
-        return new WorldGenerator(this.endSettings, this.endBiomes, this.biomeZoomSeed, this.biomeResolver, this.featureLoader, this.endStructures, true);
+        return new WorldGenerator(this.endSettings, this.endBiomes, this.biomeZoomSeed, this.biomeResolver, this.featureLoader, this.endStructures);
     }
 
     public Path dataPackRoot() {

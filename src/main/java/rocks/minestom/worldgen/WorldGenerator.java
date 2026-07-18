@@ -49,7 +49,6 @@ public final class WorldGenerator implements Generator {
     private static final int MAX_CACHED_TERRAIN = 3000;
 
     private final StructurePlacer structurePlacer;
-    private final boolean generateEndStructures;
     private final Carvers carvers;
     // A chunk is blitted long before its own decoration finishes; spill writes
     // arriving in that window must still land chronologically, so writePending
@@ -95,15 +94,13 @@ public final class WorldGenerator implements Generator {
             });
 
     public WorldGenerator(NoiseGeneratorSettingsRuntime settings, BiomeSource biomeSource, long biomeZoomSeed,
-            BiomeResolver biomeResolver, FeatureLoader featureLoader, StructurePlacer structurePlacer,
-            boolean generateEndStructures) {
+            BiomeResolver biomeResolver, FeatureLoader featureLoader, StructurePlacer structurePlacer) {
         this.settings = settings;
         this.biomeSource = new CachedBiomeSource(biomeSource, settings.minY(), settings.height());
         this.biomeZoomer = new BiomeZoomer(this.biomeSource, biomeZoomSeed);
         this.biomeResolver = biomeResolver;
         this.featureLoader = featureLoader;
         this.structurePlacer = structurePlacer;
-        this.generateEndStructures = generateEndStructures;
         this.carvers = new Carvers(settings, this.biomeSource, biomeResolver, this.biomeZoomer,
                 new CarverLoader(featureLoader.dataPack(), featureLoader.blockTags()));
     }
@@ -145,10 +142,6 @@ public final class WorldGenerator implements Generator {
             return block != null ? block : Block.AIR;
         });
 
-
-        if (this.generateEndStructures) {
-            this.placeEndPodium(unit, surfaceHeights);
-        }
 
         this.placeFeatures(unit, terrainData);
 
@@ -701,30 +694,6 @@ public final class WorldGenerator implements Generator {
     private static boolean isEndFeature(Key key) {
         return key.asString().equals("minecraft:end_platform")
                 || key.asString().equals("minecraft:end_spike");
-    }
-
-    private void placeEndPodium(GenerationUnit unit, int[] surfaceHeights) {
-        var startX = unit.absoluteStart().blockX();
-        var startZ = unit.absoluteStart().blockZ();
-        var sizeX = unit.size().blockX();
-        var sizeZ = unit.size().blockZ();
-        if (startX > 0 || startX + sizeX <= 0 || startZ > 0 || startZ + sizeZ <= 0) {
-            return;
-        }
-
-        var localX = -startX;
-        var localZ = -startZ;
-        var surfaceY = surfaceHeights[localX * sizeZ + localZ];
-        if (surfaceY == Integer.MIN_VALUE) {
-            surfaceY = this.settings.seaLevel();
-        }
-
-        var forkPadding = 16;
-        var forkStart = new BlockVec(-forkPadding, this.settings.minY(), -forkPadding);
-        var forkEnd = new BlockVec(forkPadding + 1, this.settings.maxYInclusive() + 1, forkPadding + 1);
-        var featureUnit = unit.fork(forkStart, forkEnd);
-        var levelAdapter = new GenerationUnitAdapter(featureUnit);
-        EndPodiumFeature.place(levelAdapter, new BlockVec(0, surfaceY, 0), false);
     }
 
     private static void fillBiomesFromNoise(GenerationUnit unit, BiomeSource biomes, int minY, int maxY) {

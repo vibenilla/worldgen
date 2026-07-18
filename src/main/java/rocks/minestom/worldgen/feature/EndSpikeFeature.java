@@ -69,6 +69,10 @@ public final class EndSpikeFeature implements Feature<EndSpikeConfiguration> {
         if (spike.guarded() && spike.height() <= maxY) {
             placeCage(level, spike);
         }
+
+        if (spike.height() + 1 <= maxY) {
+            level.setBlock(centerX, spike.height() + 1, centerZ, Block.FIRE);
+        }
     }
 
     private static <T extends Block.Getter & Block.Setter> void placeCage(T level, EndSpike spike) {
