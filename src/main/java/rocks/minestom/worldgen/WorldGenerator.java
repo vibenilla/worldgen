@@ -557,6 +557,9 @@ public final class WorldGenerator implements Generator {
                 this.settings.height(),
                 this.terrainAccess);
         StructureWrites.flushLeavesUpdates(surfaceHeights, leavesAdapter);
+        if (this.structurePlacer != null) {
+            this.structurePlacer.flushShapeUpdates(startX >> 4, startZ >> 4, leavesAdapter);
+        }
     }
 
     /** Debug-only wrapper counting draws consumed by a single traced placed-feature call. */

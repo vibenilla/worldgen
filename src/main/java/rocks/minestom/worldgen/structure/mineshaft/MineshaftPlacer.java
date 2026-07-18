@@ -54,6 +54,8 @@ public final class MineshaftPlacer {
     private final StructureLoader structureLoader;
     private final FeatureLoader featureLoader;
     private final Map<Long, Optional<MineshaftStart>> starts = new ConcurrentHashMap<>();
+    private final Map<Long, List<BlockVec>> pendingShapeUpdates = new ConcurrentHashMap<>();
+    private final java.util.Set<Long> decoratedChunks = ConcurrentHashMap.newKeySet();
     private volatile Carvers carvers;
     private volatile List<Key> undergroundStructures;
 
@@ -165,8 +167,51 @@ public final class MineshaftPlacer {
         }
 
         if (!shapeUpdatePositions.isEmpty()) {
-            StructureShapeUpdater.update(forkAdapter, this.structureLoader.blockTags(), shapeUpdatePositions);
+            this.pendingShapeUpdates
+                    .computeIfAbsent(packChunk(chunkX, chunkZ),
+                            unused -> java.util.Collections.synchronizedList(new ArrayList<>()))
+                    .addAll(shapeUpdatePositions);
         }
+    }
+
+    /**
+     * Runs the deferred connection-shape pass for every queued chunk whose
+     * full 3x3 neighborhood has now finished decorating, mirroring vanilla
+     * only recomputing marked positions in {@code postProcessGeneration}
+     * when the chunk is promoted to FULL - which requires the surrounding
+     * chunks to have completed their FEATURES stage, so a fence next to a
+     * chunk border sees the neighbor chunk's corridor already dug out
+     * instead of raw terrain.
+     */
+    public void flushShapeUpdates(int chunkX, int chunkZ, GenerationUnitAdapter level) {
+        this.decoratedChunks.add(packChunk(chunkX, chunkZ));
+        var iterator = this.pendingShapeUpdates.entrySet().iterator();
+        while (iterator.hasNext()) {
+            var entry = iterator.next();
+            var pendingChunkX = (int) (long) entry.getKey();
+            var pendingChunkZ = (int) (entry.getKey() >> 32);
+            if (!this.neighborhoodDecorated(pendingChunkX, pendingChunkZ)) {
+                continue;
+            }
+            List<BlockVec> positions;
+            var pending = entry.getValue();
+            synchronized (pending) {
+                positions = new ArrayList<>(pending);
+            }
+            StructureShapeUpdater.update(level, this.structureLoader.blockTags(), positions);
+            iterator.remove();
+        }
+    }
+
+    private boolean neighborhoodDecorated(int chunkX, int chunkZ) {
+        for (var offsetX = -1; offsetX <= 1; offsetX++) {
+            for (var offsetZ = -1; offsetZ <= 1; offsetZ++) {
+                if (!this.decoratedChunks.contains(packChunk(chunkX + offsetX, chunkZ + offsetZ))) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     private static boolean intersectsColumn(BoundingBox bounds, int blockX, int blockZ) {

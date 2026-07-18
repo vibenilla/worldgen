@@ -296,6 +296,15 @@ public final class StructurePlacer {
     }
 
     /**
+     * Marks the chunk as fully decorated and runs any deferred structure
+     * connection-shape passes whose 3x3 neighborhood is now complete (see
+     * {@link MineshaftPlacer#flushShapeUpdates}).
+     */
+    public void flushShapeUpdates(int chunkX, int chunkZ, GenerationUnitAdapter level) {
+        this.mineshaftPlacer.flushShapeUpdates(chunkX, chunkZ, level);
+    }
+
+    /**
      * Finds the nearest chunk that starts the given structure, scanning
      * outward in square rings from the center chunk like vanilla locate.
      * Applies the same placement, weighted selection and biome checks as
