@@ -148,6 +148,7 @@ public final class TreeReplay {
 
     static final class Handler implements InvocationHandler {
         static Object biomeHolder;
+        static net.minecraft.world.level.biome.BiomeManager biomeManager;
         static java.util.concurrent.atomic.AtomicLong drawCounter;
         private final Map<BlockPos, BlockState> world;
         private final int minY;
@@ -284,7 +285,7 @@ public final class TreeReplay {
                     return null;
                 }
                 case "getBiome" -> {
-                    return biomeHolder;
+                    return biomeManager != null ? biomeManager.getBiome((BlockPos) args[0]) : biomeHolder;
                 }
                 case "toString" -> {
                     return "tree-replay-level";

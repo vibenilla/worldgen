@@ -307,7 +307,8 @@ tasks.register<JavaExec>("chunkVegReplay") {
         providers.gradleProperty("sx").getOrElse("-272"),
         providers.gradleProperty("sz").getOrElse("-272"),
         providers.gradleProperty("rewind").getOrElse("5"),
-        providers.gradleProperty("biome").getOrElse("minecraft:dark_forest")
+        providers.gradleProperty("biome").getOrElse("minecraft:dark_forest"),
+        providers.gradleProperty("seed").getOrElse("")
     )
 }
 

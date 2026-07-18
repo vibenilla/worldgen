@@ -101,6 +101,19 @@ public final class ChunkVegetationReplay {
                         net.minecraft.resources.Identifier.parse(biomeName)));
         TreeReplay.Handler.biomeHolder = biome;
 
+        if (args.length > 7 && !args[7].isEmpty()) {
+            var worldSeed = Long.parseLong(args[7]);
+            var randomState = net.minecraft.world.level.levelgen.RandomState.create(
+                    lookup, net.minecraft.resources.ResourceKey.create(
+                            net.minecraft.core.registries.Registries.NOISE_SETTINGS,
+                            net.minecraft.resources.Identifier.parse("minecraft:overworld")),
+                    worldSeed);
+            var sampler = randomState.sampler();
+            TreeReplay.Handler.biomeManager = new net.minecraft.world.level.biome.BiomeManager(
+                    (quartX, quartY, quartZ) -> biomeSource.getNoiseBiome(quartX, quartY, quartZ, sampler),
+                    net.minecraft.world.level.biome.BiomeManager.obfuscateSeed(worldSeed));
+        }
+
         var counted = new CountingRandom(new XoroshiroRandomSource(state[0], state[1]));
         TreeReplay.Handler.drawCounter = new java.util.concurrent.atomic.AtomicLong();
         counted.counter = TreeReplay.Handler.drawCounter;
