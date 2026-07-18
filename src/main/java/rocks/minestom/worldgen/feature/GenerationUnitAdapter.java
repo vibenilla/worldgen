@@ -160,6 +160,11 @@ public final class GenerationUnitAdapter implements Block.Getter, Block.Setter {
         var localX = position.blockX() - this.startX;
         var localY = position.blockY() - this.startY;
         var localZ = position.blockZ() - this.startZ;
+        var writeTraceProperty = System.getProperty("worldgen.writeTrace");
+        if (writeTraceProperty != null && writeTraceProperty.equals(position.blockX() + "," + position.blockY() + "," + position.blockZ())) {
+            System.out.println("WRITETRACE-FORK local=" + localX + "," + localY + "," + localZ
+                    + " unitStart=" + this.unit.absoluteStart() + " unitSize=" + this.unit.size());
+        }
         this.unit.modifier().setRelative(localX, localY, localZ, block);
     }
 

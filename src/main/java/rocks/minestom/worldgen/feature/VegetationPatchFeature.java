@@ -95,8 +95,7 @@ public class VegetationPatchFeature implements Feature<VegetationPatchConfigurat
                 var belowY = y + inwards;
                 var belowBlock = level.getBlock(x, belowY, z);
                 var sturdyFace = config.ceiling() ? BlockFace.BOTTOM : BlockFace.TOP;
-                var groundDebug = ((origin.blockX() >> 4) + "," + (origin.blockZ() >> 4))
-                        .equals(System.getProperty("worldgen.groundDebug"));
+                var groundDebug = VegetationPatchFeature.debugMatch(origin.blockX() >> 4, origin.blockZ() >> 4);
                 if (groundDebug) {
                     System.out.println("VPROBE " + origin.blockX() + "," + origin.blockY() + "," + origin.blockZ()
                             + " d=" + dx + "," + dz + " pos=" + x + "," + y + "," + z
@@ -148,8 +147,7 @@ public class VegetationPatchFeature implements Feature<VegetationPatchConfigurat
             FeaturePlaceContext<VegetationPatchConfiguration, T> context, T level,
             VegetationPatchConfiguration config, RandomSource random, Set<VanillaPos> surface) {
         var origin = context.origin();
-        var groundDebug = ((origin.blockX() >> 4) + "," + (origin.blockZ() >> 4))
-                .equals(System.getProperty("worldgen.groundDebug"));
+        var groundDebug = VegetationPatchFeature.debugMatch(origin.blockX() >> 4, origin.blockZ() >> 4);
         for (var surfacePos : surface) {
             if (config.vegetationChance() > 0.0F && random.nextFloat() < config.vegetationChance()) {
                 if (groundDebug) {
@@ -177,4 +175,23 @@ public class VegetationPatchFeature implements Feature<VegetationPatchConfigurat
                 context.seaLevel());
         return RandomSelectorFeature.placePlacedFeature(vegetationContext, config.loader(), config.vegetationFeature());
     }
+
+    /**
+     * Whether the vegetation-patch debug stream is enabled for a feature
+     * whose origin is in the given chunk: {@code worldgen.groundDebug} takes
+     * either a single "cx,cz" chunk or a "box:cx1,cz1,cx2,cz2" range.
+     */
+    static boolean debugMatch(int chunkX, int chunkZ) {
+        var gate = System.getProperty("worldgen.groundDebug");
+        if (gate == null) {
+            return false;
+        }
+        if (gate.startsWith("box:")) {
+            var parts = gate.substring(4).split(",");
+            return chunkX >= Integer.parseInt(parts[0]) && chunkX <= Integer.parseInt(parts[2])
+                    && chunkZ >= Integer.parseInt(parts[1]) && chunkZ <= Integer.parseInt(parts[3]);
+        }
+        return gate.equals(chunkX + "," + chunkZ);
+    }
 }
+

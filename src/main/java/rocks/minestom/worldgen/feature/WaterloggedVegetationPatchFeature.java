@@ -22,8 +22,7 @@ public final class WaterloggedVegetationPatchFeature extends VegetationPatchFeat
         var surface = super.placeGroundPatch(level, config, random, origin, xRadius, zRadius);
         var waterSurface = new HashSet<VanillaPos>();
 
-        var debug = ((origin.blockX() >> 4) + "," + (origin.blockZ() >> 4))
-                .equals(System.getProperty("worldgen.groundDebug"));
+        var debug = VegetationPatchFeature.debugMatch(origin.blockX() >> 4, origin.blockZ() >> 4);
         for (var surfacePos : surface) {
             var exposed = isExposed(level, surfacePos);
             if (debug) {

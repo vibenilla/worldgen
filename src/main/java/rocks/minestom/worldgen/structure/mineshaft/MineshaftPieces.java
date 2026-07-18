@@ -86,8 +86,8 @@ public final class MineshaftPieces {
      * blocks): any motion-blocking full block except fences and chains.
      */
     private static boolean isFaceSturdy(Block block) {
-        return block.isSolid() && !isFence(block) && !block.compare(Block.IRON_CHAIN)
-                && !block.compare(Block.COBWEB);
+        return rocks.minestom.worldgen.feature.SturdyFaces.isFaceSturdy(block,
+                net.minestom.server.instance.block.BlockFace.TOP);
     }
 
     /**
