@@ -269,6 +269,8 @@ public final class StructureTemplate {
         var applyWaterlogging = liquidSettings == LiquidSettings.APPLY_WATERLOGGING;
         var level = context.level();
         var placedPositions = new ArrayList<BlockVec>(finalized.size());
+        var lockedFluids = new ArrayList<BlockVec>();
+        var toFill = new ArrayList<BlockVec>();
         for (var blockInfo : finalized) {
             var blockPos = blockInfo.pos();
             if (chunkBounds != null && !chunkBounds.isInside(blockPos)) {
@@ -281,9 +283,16 @@ public final class StructureTemplate {
                 continue;
             }
 
-            if (applyWaterlogging && state.getProperty("waterlogged") != null
-                    && isSourceWater(level.getBlock(blockPos.blockX(), blockPos.blockY(), blockPos.blockZ()))) {
-                state = state.withProperty("waterlogged", "true");
+            if (applyWaterlogging) {
+                if (isSourceWater(state)) {
+                    lockedFluids.add(blockPos);
+                } else if (state.getProperty("waterlogged") != null) {
+                    if (isSourceWater(level.getBlock(blockPos.blockX(), blockPos.blockY(), blockPos.blockZ()))) {
+                        state = state.withProperty("waterlogged", "true");
+                    } else {
+                        toFill.add(blockPos);
+                    }
+                }
             }
 
             if (blockInfo.nbt() != null && blockInfo.nbt() != state.nbt()) {
@@ -293,6 +302,8 @@ public final class StructureTemplate {
             level.setBlock(blockPos, state);
             placedPositions.add(blockPos);
         }
+
+        fillFromNeighborSources(level, lockedFluids, toFill);
 
         // Vanilla StructureTemplate.placeInWorld tail: recompute connection
         // shapes (fences, walls, leaves) against the final placed neighbors,
@@ -311,8 +322,61 @@ public final class StructureTemplate {
             var levelProperty = block.getProperty("level");
             return levelProperty == null || levelProperty.equals("0");
         }
+        if (key.equals("minecraft:seagrass") || key.equals("minecraft:tall_seagrass")
+                || key.equals("minecraft:kelp") || key.equals("minecraft:kelp_plant")
+                || key.equals("minecraft:bubble_column")) {
+            return true;
+        }
         // Waterlogged blocks expose a source water fluid state.
         return "true".equals(block.getProperty("waterlogged"));
+    }
+
+    /**
+     * The tail of vanilla {@code StructureTemplate.placeInWorld}'s liquid
+     * handling: every waterloggable block placed over a non-source fluid cell
+     * was recorded, and any of them adjacent (up or horizontally) to a source
+     * water cell fills with it - excluding cells whose source water came from
+     * the palette itself ({@code lockedFluids}) - repeating until no block
+     * fills.
+     */
+    private static void fillFromNeighborSources(GenerationUnitAdapter level,
+            List<BlockVec> lockedFluids, List<BlockVec> toFill) {
+        var offsets = new int[][] {{0, 1, 0}, {0, 0, -1}, {1, 0, 0}, {0, 0, 1}, {-1, 0, 0}};
+        var filled = true;
+        while (filled && !toFill.isEmpty()) {
+            filled = false;
+            var iterator = toFill.iterator();
+            while (iterator.hasNext()) {
+                var position = iterator.next();
+                var foundSource = false;
+                for (var offset : offsets) {
+                    var neighborPos = new BlockVec(
+                            position.blockX() + offset[0],
+                            position.blockY() + offset[1],
+                            position.blockZ() + offset[2]);
+                    if (lockedFluids.contains(neighborPos)) {
+                        continue;
+                    }
+                    if (isSourceWater(level.getBlock(neighborPos.blockX(), neighborPos.blockY(), neighborPos.blockZ()))) {
+                        foundSource = true;
+                        break;
+                    }
+                }
+
+                if (!foundSource) {
+                    continue;
+                }
+
+                var current = level.getBlock(position.blockX(), position.blockY(), position.blockZ());
+                if (current.getProperty("waterlogged") != null) {
+                    if ("false".equals(current.getProperty("waterlogged"))) {
+                        level.setBlock(position, current.withProperty("waterlogged", "true"));
+                    }
+                    filled = true;
+                    iterator.remove();
+                }
+            }
+        }
     }
 
     /**
