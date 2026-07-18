@@ -79,6 +79,21 @@ public final class MineshaftPlacer {
 
     public void place(GenerationUnit unit, BiomeZoomer biomeZoomer,
             NoiseGeneratorSettingsRuntime settings, StructureSet structureSet, int[] surfaceHeights) {
+        this.place(unit, biomeZoomer, settings, structureSet, surfaceHeights, null);
+    }
+
+    /**
+     * When a {@code featureAdapter} is given (the interleaved structure step
+     * inside feature decoration), writes go through the SAME fork as the
+     * chunk's feature placement, so structure and feature writes land in
+     * true chronological order - a corridor dug at the underground_structures
+     * step no longer erases vegetation a later step plants inside it, which
+     * is what happened with a separate fork (Minestom applies forks in
+     * creation order, and the feature fork is created first).
+     */
+    public void place(GenerationUnit unit, BiomeZoomer biomeZoomer,
+            NoiseGeneratorSettingsRuntime settings, StructureSet structureSet, int[] surfaceHeights,
+            GenerationUnitAdapter featureAdapter) {
         var startX = unit.absoluteStart().blockX();
         var startZ = unit.absoluteStart().blockZ();
         var chunkX = Math.floorDiv(startX, 16);
@@ -114,18 +129,16 @@ public final class MineshaftPlacer {
             chunkBlocks = terrainData.blocks();
         }
 
-        // Writes go through a fork so they apply after forks created by
-        // earlier-generated neighbor chunks (whose ore blobs vanilla mineshafts
-        // carve through), and before this chunk's own feature fork.
-        var forkUnit = unit.fork(
-                new BlockVec(startX, settings.minY(), startZ),
-                new BlockVec(startX + 16, settings.maxYInclusive() + 1, startZ + 16));
-        // The connection shape pass (fences) reads neighbors across chunk
-        // boundaries, so the adapter needs the same live cross-chunk terrain
-        // access as regular feature decoration, not just an unbacked getter
-        // that always reads air.
-        var forkAdapter = new GenerationUnitAdapter(forkUnit, startX, startZ, 16, 16, settings.minY(),
-                chunkBlocks, settings.height(), StructureWrites.terrainLookup());
+        GenerationUnitAdapter forkAdapter;
+        if (featureAdapter != null && usingLiveBuffer) {
+            forkAdapter = featureAdapter;
+        } else {
+            var forkUnit = unit.fork(
+                    new BlockVec(startX, settings.minY(), startZ),
+                    new BlockVec(startX + 16, settings.maxYInclusive() + 1, startZ + 16));
+            forkAdapter = new GenerationUnitAdapter(forkUnit, startX, startZ, 16, 16, settings.minY(),
+                    chunkBlocks, settings.height(), StructureWrites.terrainLookup());
+        }
 
         // Writing into the live buffer already makes the blocks visible to
         // this chunk's decoration and to later neighbors; the fallback

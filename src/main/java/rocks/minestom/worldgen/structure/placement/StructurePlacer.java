@@ -122,7 +122,12 @@ public final class StructurePlacer {
 
     public void placeStructures(GenerationUnit unit, int[] surfaceHeights, BiomeZoomer biomeZoomer,
             NoiseGeneratorSettingsRuntime settings) {
-        this.placeStructures(unit, surfaceHeights, biomeZoomer, settings, -1);
+        this.placeStructures(unit, surfaceHeights, biomeZoomer, settings, -1, null);
+    }
+
+    public void placeStructures(GenerationUnit unit, int[] surfaceHeights, BiomeZoomer biomeZoomer,
+            NoiseGeneratorSettingsRuntime settings, int stepFilter) {
+        this.placeStructures(unit, surfaceHeights, biomeZoomer, settings, stepFilter, null);
     }
 
     /**
@@ -133,7 +138,7 @@ public final class StructurePlacer {
      * are placed before, and overwritten by, later-step structures.
      */
     public void placeStructures(GenerationUnit unit, int[] surfaceHeights, BiomeZoomer biomeZoomer,
-            NoiseGeneratorSettingsRuntime settings, int stepFilter) {
+            NoiseGeneratorSettingsRuntime settings, int stepFilter, GenerationUnitAdapter featureAdapter) {
         if (this.structureSets.isEmpty()) {
             return;
         }
@@ -177,7 +182,7 @@ public final class StructurePlacer {
             if (this.mineshaftPlacer.isMineshaftSet(structureSet)) {
                 // Procedural piece structures use vanilla-exact seeding and
                 // their own multi-chunk placement path.
-                this.mineshaftPlacer.place(unit, biomeZoomer, settings, structureSet, surfaceHeights);
+                this.mineshaftPlacer.place(unit, biomeZoomer, settings, structureSet, surfaceHeights, featureAdapter);
                 continue;
             }
 

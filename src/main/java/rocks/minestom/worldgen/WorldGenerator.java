@@ -498,7 +498,7 @@ public final class WorldGenerator implements Generator {
         var totalSteps = Math.max(11, featuresPerStep.size());
         for (var stepIndex = 0; stepIndex < totalSteps; stepIndex++) {
             if (this.structurePlacer != null) {
-                this.structurePlacer.placeStructures(unit, surfaceHeights, this.biomeZoomer, this.settings, stepIndex);
+                this.structurePlacer.placeStructures(unit, surfaceHeights, this.biomeZoomer, this.settings, stepIndex, levelAdapter);
             }
             if (stepIndex >= featuresPerStep.size()) {
                 continue;
