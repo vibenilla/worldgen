@@ -144,6 +144,32 @@ public final class VanillaComparison {
      * plain z-ascending order.
      */
     static java.util.List<Long> decorationOrder(int pregenRadius) {
+        // An exact captured FEATURES-stage order (one "cx,cz" line per chunk,
+        // from a single-worker vanilla server instrumented at
+        // applyBiomeDecoration) overrides the modeled ladder below.
+        var orderFile = System.getProperty("compare.decoOrderFile", "");
+        if (!orderFile.isEmpty()) {
+            try {
+                var order = new java.util.ArrayList<Long>();
+                for (var line : java.nio.file.Files.readAllLines(java.nio.file.Path.of(orderFile))) {
+                    var parts = line.trim().split(",");
+                    if (parts.length == 2) {
+                        var chunkX = Integer.parseInt(parts[0]);
+                        var chunkZ = Integer.parseInt(parts[1]);
+                        order.add((long) chunkX << 32 | (chunkZ & 0xFFFFFFFFL));
+                    }
+                }
+                if (!order.isEmpty()) {
+                    return order;
+                }
+            } catch (java.io.IOException exception) {
+                throw new java.io.UncheckedIOException(exception);
+            }
+        }
+        return modeledDecorationOrder(pregenRadius);
+    }
+
+    private static java.util.List<Long> modeledDecorationOrder(int pregenRadius) {
         var done = new java.util.HashSet<Long>();
         var order = new java.util.ArrayList<Long>();
         for (var forceX = -pregenRadius; forceX < pregenRadius; forceX++) {

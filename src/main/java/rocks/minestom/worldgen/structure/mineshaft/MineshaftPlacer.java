@@ -170,9 +170,14 @@ public final class MineshaftPlacer {
             var index = this.undergroundStructures().indexOf(structureKey);
             random.setFeatureSeed(decorationSeed, index, UNDERGROUND_STRUCTURES_STEP);
 
+            var pieceDebug = (chunkX + "," + chunkZ).equals(System.getProperty("worldgen.pieceChunk"));
             for (var reference : referenceIterationOrder(references)) {
                 for (var piece : reference.start().pieces()) {
                     if (piece.boundingBox().intersects(chunkBB)) {
+                        if (pieceDebug) {
+                            System.out.println("PIECE " + piece.getClass().getSimpleName()
+                                    + " box=" + piece.boundingBox() + " rng=" + rngState(random));
+                        }
                         piece.postProcess(level, random, chunkBB);
                     }
                 }
@@ -260,37 +265,18 @@ public final class MineshaftPlacer {
      * Vanilla stores a chunk's structure references in a fastutil
      * {@code LongOpenHashSet}; iteration order over that set decides how
      * multiple starts of the same structure share the placement random.
-     * The set is created with the default 32-slot table, but every chunk
-     * save/reload between the references and features stages rebuilds it via
-     * {@code new LongOpenHashSet(long[])}, whose table is sized to the
-     * element count - changing the iteration order. World pregeneration
-     * reloads chunks at least once between those stages, so this emulates the
-     * fresh set followed by reload rebuilds until the order stabilizes.
+     * The set is created with the default 32-slot table at the references
+     * stage. During the pregen ladder the server sits paused (empty), so
+     * chunks never unload between the references and features stages and the
+     * set is never rebuilt from a save - the original 32-slot insertion
+     * table's iteration order is what the features stage sees.
      */
     private static List<Reference> referenceIterationOrder(List<Reference> insertionOrder) {
         if (insertionOrder.size() <= 1) {
             return insertionOrder;
         }
 
-        var order = hashSetOrder(insertionOrder, 32);
-        for (var reload = 0; reload < 8; reload++) {
-            var rebuilt = hashSetOrder(order, reloadTableSize(order.size()));
-            if (rebuilt.equals(order)) {
-                break;
-            }
-            order = rebuilt;
-        }
-        return order;
-    }
-
-    /** fastutil HashCommon.arraySize for the LongOpenHashSet(long[]) constructor. */
-    private static int reloadTableSize(int count) {
-        var needed = (int) Math.ceil(count / 0.75);
-        var size = 2;
-        while (size < needed) {
-            size <<= 1;
-        }
-        return size;
+        return hashSetOrder(insertionOrder, 32);
     }
 
     /**
@@ -561,6 +547,25 @@ public final class MineshaftPlacer {
     }
 
     private record MineshaftStart(Key structureKey, List<MineshaftPieces.MineshaftPiece> pieces, BoundingBox bounds) {
+    }
+
+
+    private static String rngState(rocks.minestom.worldgen.random.RandomSource random) {
+        try {
+            var sourceField = rocks.minestom.worldgen.random.WorldgenRandom.class.getDeclaredField("randomSource");
+            sourceField.setAccessible(true);
+            var source = sourceField.get(random);
+            var generatorField = source.getClass().getDeclaredField("randomNumberGenerator");
+            generatorField.setAccessible(true);
+            var generator = generatorField.get(source);
+            var loField = generator.getClass().getDeclaredField("seedLo");
+            var hiField = generator.getClass().getDeclaredField("seedHi");
+            loField.setAccessible(true);
+            hiField.setAccessible(true);
+            return loField.getLong(generator) + "," + hiField.getLong(generator);
+        } catch (ReflectiveOperationException exception) {
+            return "?";
+        }
     }
 
     private record Reference(MineshaftStart start, long packedChunk) {

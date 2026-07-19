@@ -209,24 +209,7 @@ public final class StrongholdPlacer {
         if (insertionOrder.size() <= 1) {
             return insertionOrder;
         }
-        var order = hashSetOrder(insertionOrder, 32);
-        for (var reload = 0; reload < 8; reload++) {
-            var rebuilt = hashSetOrder(order, reloadTableSize(order.size()));
-            if (rebuilt.equals(order)) {
-                break;
-            }
-            order = rebuilt;
-        }
-        return order;
-    }
-
-    private static int reloadTableSize(int count) {
-        var needed = (int) Math.ceil(count / 0.75);
-        var size = 2;
-        while (size < needed) {
-            size <<= 1;
-        }
-        return size;
+        return hashSetOrder(insertionOrder, 32);
     }
 
     private static List<Reference> hashSetOrder(List<Reference> insertionOrder, int tableSize) {
