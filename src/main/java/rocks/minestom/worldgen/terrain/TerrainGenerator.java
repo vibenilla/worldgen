@@ -180,7 +180,7 @@ public final class TerrainGenerator {
                                     // Ocean/Aquifer Liquid
                                     stoneMask[maskIndex + yIndex] = TerrainData.FLUID;
                                     blocks[maskIndex + yIndex] = state;
-                                    if (aquifer.shouldScheduleFluidUpdate() && state.compare(net.minestom.server.instance.block.Block.WATER)) {
+                                    if (aquifer.shouldScheduleFluidUpdate() && !state.isAir()) {
                                         data.fluidTicks().add(new net.minestom.server.coordinate.BlockVec(blockX, blockY, blockZ));
                                     }
 
