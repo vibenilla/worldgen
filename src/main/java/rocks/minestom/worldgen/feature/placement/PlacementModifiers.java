@@ -290,6 +290,9 @@ public final class PlacementModifiers {
             if (context.currentFeatureInBiomeAt(position)) {
                 return List.of(position);
             }
+            if (System.getProperty("worldgen.debugFilter") != null) {
+                System.out.println("BIOMEREJ " + context.currentFeature() + " at " + position);
+            }
             return List.of();
         }
     }
@@ -468,7 +471,16 @@ public final class PlacementModifiers {
                     }
                 }
 
-                return this.targetCondition.test(context, mutablePosition) ? List.of(mutablePosition) : List.of();
+                if (this.targetCondition.test(context, mutablePosition)) {
+                    return List.of(mutablePosition);
+                }
+                if (System.getProperty("worldgen.debugFilter") != null) {
+                    System.out.println("ESCANREJ " + context.currentFeature() + " origin=" + position
+                            + " stopped=" + mutablePosition + " block="
+                            + context.accessor().getBlock(mutablePosition.blockX(), mutablePosition.blockY(),
+                                    mutablePosition.blockZ()).name());
+                }
+                return List.of();
             }
         }
 

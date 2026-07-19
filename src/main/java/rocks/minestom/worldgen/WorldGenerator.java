@@ -172,8 +172,25 @@ public final class WorldGenerator implements Generator {
      * is promoted to FULL and starts block-ticking.
      */
     private void flushFluidTicks(GenerationUnit unit, TerrainData terrainData) {
-        var pendingChunks = new java.util.HashSet<>(this.pendingFluidTicks.keySet());
-        pendingChunks.addAll(StructureWrites.postProcessChunkKeys(this.terrainAccess));
+        var chunkKey = (long) (unit.absoluteStart().blockX() >> 4) << 32
+                | ((unit.absoluteStart().blockZ() >> 4) & 0xFFFFFFFFL);
+        java.util.Collection<Long> pendingChunks;
+        var script = scriptedPostProcess();
+        if (script != null) {
+            // Event-script mode: flush exactly the chunks vanilla
+            // post-processed after this chunk's decoration, in that order
+            // (captured from an instrumented ladder run). Chunks the ladder
+            // never promoted to ticking never flush, exactly like vanilla.
+            var scripted = script.get(chunkKey);
+            if (scripted == null) {
+                return;
+            }
+            pendingChunks = scripted;
+        } else {
+            var pending = new java.util.HashSet<>(this.pendingFluidTicks.keySet());
+            pending.addAll(StructureWrites.postProcessChunkKeys(this.terrainAccess));
+            pendingChunks = pending;
+        }
         if (pendingChunks.isEmpty()) {
             return;
         }
@@ -182,7 +199,7 @@ public final class WorldGenerator implements Generator {
         for (var pendingKey : pendingChunks) {
             var pendingChunkX = (int) (pendingKey >> 32);
             var pendingChunkZ = (int) (long) pendingKey;
-            if (!this.neighborhoodDecorated(pendingChunkX, pendingChunkZ)) {
+            if (script == null && !this.neighborhoodDecorated(pendingChunkX, pendingChunkZ)) {
                 continue;
             }
 
@@ -221,6 +238,52 @@ public final class WorldGenerator implements Generator {
             for (var position : StructureWrites.drainPostProcess(this.terrainAccess, pendingKey)) {
                 WaterSpread.postProcessMarked(adapter, position);
             }
+        }
+    }
+
+    private static volatile Map<Long, List<Long>> scriptedPostProcessCache;
+    private static volatile boolean scriptedPostProcessLoaded;
+
+    /**
+     * Optional replay script mapping each decorated chunk to the chunks
+     * vanilla post-processed (fluid ticks + marked positions) right after
+     * it, parsed from an instrumented ladder log ({@code DECO x,z} /
+     * {@code POSTPROC x,z} lines, {@code worldgen.eventScript} property).
+     * Null when no script is configured (live 3x3-neighborhood flushing).
+     */
+    private static Map<Long, List<Long>> scriptedPostProcess() {
+        if (scriptedPostProcessLoaded) {
+            return scriptedPostProcessCache;
+        }
+        synchronized (WorldGenerator.class) {
+            if (scriptedPostProcessLoaded) {
+                return scriptedPostProcessCache;
+            }
+            var path = System.getProperty("worldgen.eventScript", "");
+            if (!path.isEmpty()) {
+                try {
+                    var script = new java.util.HashMap<Long, List<Long>>();
+                    var currentDeco = Long.MIN_VALUE;
+                    for (var line : java.nio.file.Files.readAllLines(java.nio.file.Path.of(path))) {
+                        var parts = line.trim().split("[ ,]+");
+                        if (parts.length != 3) {
+                            continue;
+                        }
+                        var key = (long) Integer.parseInt(parts[1]) << 32
+                                | (Integer.parseInt(parts[2]) & 0xFFFFFFFFL);
+                        if (parts[0].equals("DECO")) {
+                            currentDeco = key;
+                        } else if (parts[0].equals("POSTPROC") && currentDeco != Long.MIN_VALUE) {
+                            script.computeIfAbsent(currentDeco, unused -> new java.util.ArrayList<>()).add(key);
+                        }
+                    }
+                    scriptedPostProcessCache = script;
+                } catch (java.io.IOException exception) {
+                    throw new java.io.UncheckedIOException(exception);
+                }
+            }
+            scriptedPostProcessLoaded = true;
+            return scriptedPostProcessCache;
         }
     }
 
@@ -271,6 +334,24 @@ public final class WorldGenerator implements Generator {
      * the rng seed state and a world snapshot right before a placed feature
      * runs, in the same format {@code ChunkVegetationReplay} consumes.
      */
+    private static String rngState(WorldgenRandom random) {
+        try {
+            var sourceField = random.getClass().getDeclaredField("randomSource");
+            sourceField.setAccessible(true);
+            var source = sourceField.get(random);
+            var generatorField = source.getClass().getDeclaredField("randomNumberGenerator");
+            generatorField.setAccessible(true);
+            var generator = generatorField.get(source);
+            var loField = generator.getClass().getDeclaredField("seedLo");
+            var hiField = generator.getClass().getDeclaredField("seedHi");
+            loField.setAccessible(true);
+            hiField.setAccessible(true);
+            return loField.getLong(generator) + "," + hiField.getLong(generator);
+        } catch (ReflectiveOperationException exception) {
+            return "?";
+        }
+    }
+
     private static void dumpDecorTrace(String key, WorldgenRandom random, GenerationUnitAdapter levelAdapter, BlockVec origin, int minY, int maxY) {
         try {
             var sourceField = random.getClass().getDeclaredField("randomSource");
@@ -543,23 +624,8 @@ public final class WorldGenerator implements Generator {
                 var debugThis = debugChunk != null && debugChunk.equals((startX >> 4) + "," + (startZ >> 4));
                 var debugStep = stepIndex;
                 if (debugThis) {
-                    var state = "?";
-                    try {
-                        var sourceField = random.getClass().getDeclaredField("randomSource");
-                        sourceField.setAccessible(true);
-                        var source = sourceField.get(random);
-                        var generatorField = source.getClass().getDeclaredField("randomNumberGenerator");
-                        generatorField.setAccessible(true);
-                        var generator = generatorField.get(source);
-                        var loField = generator.getClass().getDeclaredField("seedLo");
-                        var hiField = generator.getClass().getDeclaredField("seedHi");
-                        loField.setAccessible(true);
-                        hiField.setAccessible(true);
-                        state = loField.getLong(generator) + "," + hiField.getLong(generator);
-                    } catch (ReflectiveOperationException ignored) {
-                    }
-                    System.out.println("FEATSTART idx=" + featureIndex + " step=" + stepIndex + " rng=" + state
-                            + " " + placedFeatureKey.asString());
+                    System.out.println("FEATSTART idx=" + featureIndex + " step=" + stepIndex
+                            + " rng=" + rngState(random) + " " + placedFeatureKey.asString());
                 }
 
                 var decorTraceChunk = System.getProperty("worldgen.decorTrace", "");
@@ -574,7 +640,8 @@ public final class WorldGenerator implements Generator {
                 var placeRandom = tracingThisFeature ? new CountingRandomSource(random) : (RandomSource) random;
                 placedFeature.place(placementContext, placeRandom, origin, (position, featureRandom) -> {
                     if (debugThis) {
-                        System.out.println("FEATPOS " + placedFeatureKey.asString() + " idx=" + featureIndex + " step=" + debugStep + " pos=" + position);
+                        System.out.println("FEATPOS " + placedFeatureKey.asString() + " idx=" + featureIndex + " step=" + debugStep
+                                + " rng=" + rngState(random) + " pos=" + position);
                     }
                     // No world-bounds filter: vanilla runs features at out-of-world
                     // origins (deep ore blobs still reach into the world, and the

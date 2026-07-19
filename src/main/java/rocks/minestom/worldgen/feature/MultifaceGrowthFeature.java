@@ -28,12 +28,19 @@ public final class MultifaceGrowthFeature implements Feature<MultifaceGrowthConf
         }
 
         var directions = config.shuffledDirections(random);
+        if (debugGate(origin)) {
+            System.out.println("MFG origin=" + origin.blockX() + "," + origin.blockY() + "," + origin.blockZ()
+                    + " state=" + originState.name() + " dirs=" + directions);
+        }
         if (placeGrowthIfPossible(level, origin, originState, config, random, directions)) {
             return true;
         }
 
         for (var searchDirection : directions) {
             var placementDirections = config.shuffledDirectionsExcept(random, searchDirection.opposite());
+            if (debugGate(origin)) {
+                System.out.println("MFG search=" + searchDirection + " placeDirs=" + placementDirections);
+            }
 
             for (var step = 0; step < config.searchRange(); step++) {
                 // Vanilla quirk: the cursor is re-set from the origin every
@@ -64,17 +71,30 @@ public final class MultifaceGrowthFeature implements Feature<MultifaceGrowthConf
         for (var direction : placementDirections) {
             var support = level.getBlock(direction.relative(position));
             if (!config.canBePlacedOn().contains(support.name())) {
+                if (debugGate(position)) {
+                    System.out.println("MFG skip pos=" + position.blockX() + "," + position.blockY() + ","
+                            + position.blockZ() + " dir=" + direction + " support=" + support.name());
+                }
                 continue;
             }
 
             var newState = getStateForPlacement(currentState, level, position, direction, config);
             if (newState == null) {
+                if (debugGate(position)) {
+                    System.out.println("MFG null pos=" + position.blockX() + "," + position.blockY() + ","
+                            + position.blockZ() + " dir=" + direction + " support=" + support.name());
+                }
                 return false;
             }
 
             level.setBlock(position, newState);
             markPostProcess(level, position);
-            if (random.nextFloat() < config.chanceOfSpreading()) {
+            var roll = random.nextFloat();
+            if (debugGate(position)) {
+                System.out.println("MFG placed pos=" + position.blockX() + "," + position.blockY() + ","
+                        + position.blockZ() + " dir=" + direction + " roll=" + roll);
+            }
+            if (roll < config.chanceOfSpreading()) {
                 spreadFromFaceTowardRandomDirection(level, position, direction, random, config);
             }
 
@@ -82,6 +102,16 @@ public final class MultifaceGrowthFeature implements Feature<MultifaceGrowthConf
         }
 
         return false;
+    }
+
+    private static boolean debugGate(BlockVec position) {
+        var box = System.getProperty("worldgen.mfgBox", "");
+        if (box.isEmpty()) {
+            return false;
+        }
+        var parts = box.split(",");
+        return position.blockX() >= Integer.parseInt(parts[0]) && position.blockX() <= Integer.parseInt(parts[2])
+                && position.blockZ() >= Integer.parseInt(parts[1]) && position.blockZ() <= Integer.parseInt(parts[3]);
     }
 
     /**

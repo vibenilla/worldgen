@@ -152,10 +152,19 @@ public final class VanillaComparison {
             try {
                 var order = new java.util.ArrayList<Long>();
                 for (var line : java.nio.file.Files.readAllLines(java.nio.file.Path.of(orderFile))) {
-                    var parts = line.trim().split(",");
+                    var trimmed = line.trim();
+                    // Event-script files interleave DECO and POSTPROC lines;
+                    // only the decoration events define the generation order.
+                    if (trimmed.startsWith("POSTPROC")) {
+                        continue;
+                    }
+                    if (trimmed.startsWith("DECO ")) {
+                        trimmed = trimmed.substring("DECO ".length());
+                    }
+                    var parts = trimmed.split(",");
                     if (parts.length == 2) {
-                        var chunkX = Integer.parseInt(parts[0]);
-                        var chunkZ = Integer.parseInt(parts[1]);
+                        var chunkX = Integer.parseInt(parts[0].trim());
+                        var chunkZ = Integer.parseInt(parts[1].trim());
                         order.add((long) chunkX << 32 | (chunkZ & 0xFFFFFFFFL));
                     }
                 }
