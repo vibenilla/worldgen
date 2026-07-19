@@ -119,7 +119,18 @@ public final class OceanRuinPlacer {
         }
 
         if (!connectionShapeUpdates.isEmpty()) {
-            StructureShapeUpdater.updateEdges(adapter, this.structureLoader.blockTags(), connectionShapeUpdates);
+            // Edge reactions can touch neighbors in already-decorated chunks
+            // (a chunk-border fence connecting to this part), which the plain
+            // chunk-bound adapter would silently drop; a one-chunk padded fork
+            // applies those writes directly onto the neighbor.
+            var edgeUnit = unit.fork(
+                    new BlockVec(startX - 16, settings.minY(), startZ - 16),
+                    new BlockVec(startX + 32, settings.maxYInclusive() + 1, startZ + 32));
+            var edgeAdapter = chunkBlocks != null
+                    ? new GenerationUnitAdapter(edgeUnit, startX, startZ, 16, 16, settings.minY(), chunkBlocks,
+                            settings.height(), StructureWrites.terrainLookup())
+                    : new GenerationUnitAdapter(edgeUnit);
+            StructureShapeUpdater.updateEdges(edgeAdapter, this.structureLoader.blockTags(), connectionShapeUpdates);
             StructureShapeUpdater.update(adapter, this.structureLoader.blockTags(), connectionShapeUpdates);
         }
     }
