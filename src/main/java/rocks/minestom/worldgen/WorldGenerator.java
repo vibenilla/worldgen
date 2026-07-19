@@ -46,7 +46,7 @@ public final class WorldGenerator implements Generator {
     // Must comfortably exceed a pregen run's whole working set: evicting an
     // already-decorated chunk here silently discards its feature writes, since
     // the recomputed replacement only has terrain, surface, and carvers again
-    private static final int MAX_CACHED_TERRAIN = 3000;
+    private static final int MAX_CACHED_TERRAIN = 12000;
 
     private final StructurePlacer structurePlacer;
     private final Carvers carvers;
