@@ -230,6 +230,10 @@ public final class WorldGenerator implements Generator {
                 synchronized (pending) {
                     positions = new java.util.ArrayList<>(pending);
                 }
+                // Vanilla postProcessGeneration iterates the marked positions
+                // per SECTION bottom-up (insertion order within a section);
+                // source formation cascades depend on this order.
+                positions.sort(java.util.Comparator.comparingInt(position -> position.blockY() >> 4));
                 for (var position : positions) {
                     WaterSpread.tick(adapter, position);
                 }
