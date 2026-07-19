@@ -80,10 +80,17 @@ final class MineshaftLevel {
     }
 
     /**
-     * Vanilla {@code OCEAN_FLOOR_WG} heightmap: one above the highest
-     * motion-blocking block, live over the structure's writes.
+     * Vanilla {@code OCEAN_FLOOR_WG} heightmap: frozen post-carver terrain.
+     * The WG heightmaps never see structure writes (heightmapsAfter switches
+     * to the live set at the carvers status), so a corridor digging cave_air
+     * through a column must NOT lower this value - a live scan skipped
+     * spider-corridor cobwebs whose isInterior test vanilla passed.
      */
     int oceanFloorHeight(int x, int z) {
+        var frozen = this.adapter.frozenOceanFloor(x, z);
+        if (frozen != Integer.MAX_VALUE) {
+            return frozen;
+        }
         var localX = x - this.startX;
         var localZ = z - this.startZ;
         if (localX < 0 || localX >= 16 || localZ < 0 || localZ >= 16) {

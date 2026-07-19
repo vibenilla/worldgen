@@ -922,7 +922,11 @@ public final class MineshaftPieces {
                 var nx = wx + direction.stepX();
                 var ny = wy + direction.stepY();
                 var nz = wz + direction.stepZ();
-                if (isInside(chunkBB, nx, ny, nz) && isFaceSturdy(level.getBlock(nx, ny, nz))) {
+                // Vanilla tests the neighbor's face pointing back toward the
+                // cobweb position, not a fixed top face (a mob spawner or a
+                // stair counts direction-dependently).
+                if (isInside(chunkBB, nx, ny, nz) && rocks.minestom.worldgen.feature.SturdyFaces.isFaceSturdy(
+                        level.getBlock(nx, ny, nz), direction.opposite().blockFace())) {
                     if (++sturdyNeighbours >= count) {
                         return true;
                     }
