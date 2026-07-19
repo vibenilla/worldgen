@@ -131,6 +131,9 @@ public final class RuinedPortalPlacer {
             if (index < 0) {
                 continue;
             }
+            if (System.getProperty("worldgen.portalDebug") != null) {
+                System.out.println("PINDEX " + start.structureKey() + " index=" + index);
+            }
             random.setFeatureSeed(decorationSeed, index, SURFACE_STRUCTURES_STEP);
             this.placeStart(start, unit, chunkX, chunkZ, chunkBlocks, lookup, settings, random);
         }
@@ -165,7 +168,7 @@ public final class RuinedPortalPlacer {
         // the center chunk, spilling across chunk boundaries like vanilla's
         // WorldGenLevel, matching RuinedPortalPiece.postProcess's single run.
         var placementContext = new StructureTemplate.PlacementContext(
-                adapter, null, processorContext, connectionShapeUpdates);
+                adapter, null, processorContext, connectionShapeUpdates, random);
         template.place(placementContext, start.placementPosition(), start.rotation(), start.mirror(),
                 processors(start.placement(), properties), false, false,
                 LiquidSettings.APPLY_WATERLOGGING, true);
@@ -473,6 +476,11 @@ public final class RuinedPortalPlacer {
         var centerZ = center.blockZ();
         var maxDistance = NETHERRACK_PROBABILITY_BY_DISTANCE.length;
         var averageWidth = (box.getXSpan() + box.getZSpan()) / 2;
+        if (System.getProperty("worldgen.portalDebug") != null) {
+            System.out.println("PSTART box=" + box + " avgWidth=" + averageWidth
+                    + " rng=" + rngState(random)
+                    + " count=" + (random instanceof WorldgenRandom worldgenRandom ? worldgenRandom.getCount() : -1));
+        }
         var distanceAdjustment = random.nextInt(Math.max(1, 8 - averageWidth / 2));
 
         for (var x = centerX - maxDistance; x <= centerX + maxDistance; x++) {
@@ -481,7 +489,12 @@ public final class RuinedPortalPlacer {
                 var adjustedDistance = Math.max(0, distance + distanceAdjustment);
                 if (adjustedDistance < maxDistance) {
                     var probabilityOfNetherrack = NETHERRACK_PROBABILITY_BY_DISTANCE[adjustedDistance];
-                    if (random.nextDouble() < probabilityOfNetherrack) {
+                    var roll = random.nextDouble() < probabilityOfNetherrack;
+                    if (System.getProperty("worldgen.portalDebug") != null) {
+                        System.out.println("PSPREAD " + x + "," + z + " roll=" + roll
+                                + " surfaceY=" + this.getSurfaceY(level, x, z, placement));
+                    }
+                    if (roll) {
                         var surfaceY = this.getSurfaceY(level, x, z, placement);
                         var y = followGroundSurface ? surfaceY : Math.min(box.minY(), surfaceY);
                         var pos = new BlockVec(x, y, z);
@@ -541,11 +554,17 @@ public final class RuinedPortalPlacer {
         }
     }
 
+    /**
+     * Vanilla {@code getSurfaceY} asks for the WG heightmap: the surrounding
+     * chunks are still proto chunks during the pregen ladder, so the value is
+     * the frozen post-carver heightmap, not one primed over structure and
+     * feature writes.
+     */
     private int getSurfaceY(GenerationUnitAdapter level, int x, int z, VerticalPlacement placement) {
-        var type = placement == VerticalPlacement.ON_OCEAN_FLOOR
-                ? GenerationUnitAdapter.HeightmapType.OCEAN_FLOOR
-                : GenerationUnitAdapter.HeightmapType.WORLD_SURFACE;
-        return level.heightmap(type, x, z) - 1;
+        var height = placement == VerticalPlacement.ON_OCEAN_FLOOR
+                ? level.frozenOceanFloor(x, z)
+                : level.frozenWorldSurface(x, z);
+        return height - 1;
     }
 
     private void maybeAddVines(RandomSource random, GenerationUnitAdapter level, BlockVec pos) {
@@ -637,51 +656,9 @@ public final class RuinedPortalPlacer {
     }
 
     private List<Key> loadStepStructures(String step) {
-        var dataPack = this.featureLoader.dataPack();
-        var keys = new ArrayList<Key>();
-        var dataRoot = dataPack.rootPath().resolve("data");
-        try (var namespaces = Files.list(dataRoot)) {
-            for (var namespaceDir : namespaces.filter(Files::isDirectory).toList()) {
-                var structureDir = namespaceDir.resolve("worldgen").resolve("structure");
-                if (!Files.isDirectory(structureDir)) {
-                    continue;
-                }
-                try (var files = Files.list(structureDir)) {
-                    for (var file : files.filter(path -> path.getFileName().toString().endsWith(".json")).toList()) {
-                        var name = file.getFileName().toString();
-                        keys.add(Key.key(namespaceDir.getFileName().toString(),
-                                name.substring(0, name.length() - ".json".length())));
-                    }
-                }
-            }
-        } catch (Exception exception) {
-            return List.of();
-        }
-
-        keys.sort((left, right) -> {
-            var byPath = left.value().compareTo(right.value());
-            return byPath != 0 ? byPath : left.namespace().compareTo(right.namespace());
-        });
-
-        var result = new ArrayList<Key>();
-        for (var key : keys) {
-            if (this.isStepStructure(key, step)) {
-                result.add(key);
-            }
-        }
-        return List.copyOf(result);
+        return this.structureLoader.structuresAtStep(step);
     }
 
-    private boolean isStepStructure(Key key, String step) {
-        try {
-            var json = this.featureLoader.dataPack().readStructure(key);
-            return json.isJsonObject()
-                    && json.getAsJsonObject().has("step")
-                    && json.getAsJsonObject().get("step").getAsString().equals(step);
-        } catch (Exception exception) {
-            return false;
-        }
-    }
 
     private static long packChunk(int chunkX, int chunkZ) {
         return (long) chunkX & 0xFFFFFFFFL | ((long) chunkZ & 0xFFFFFFFFL) << 32;
@@ -704,4 +681,23 @@ public final class RuinedPortalPlacer {
             BoundingBox bounds,
             BlockVec center) {
     }
+
+    private static String rngState(RandomSource random) {
+        try {
+            var sourceField = rocks.minestom.worldgen.random.WorldgenRandom.class.getDeclaredField("randomSource");
+            sourceField.setAccessible(true);
+            var source = sourceField.get(random);
+            var generatorField = source.getClass().getDeclaredField("randomNumberGenerator");
+            generatorField.setAccessible(true);
+            var generator = generatorField.get(source);
+            var loField = generator.getClass().getDeclaredField("seedLo");
+            var hiField = generator.getClass().getDeclaredField("seedHi");
+            loField.setAccessible(true);
+            hiField.setAccessible(true);
+            return loField.getLong(generator) + "," + hiField.getLong(generator);
+        } catch (ReflectiveOperationException exception) {
+            return "?";
+        }
+    }
 }
+

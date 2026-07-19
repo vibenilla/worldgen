@@ -56,6 +56,44 @@ public final class StructureWrites {
         return terrainLookup;
     }
 
+    // Vanilla marks the position above every placed magma_block / soul_sand
+    // (Blocks::postProcessAbove) for chunk post-processing; at FULL the
+    // water there ticks and BubbleColumnBlock.updateColumn converts the
+    // source column. Keyed per generator (its terrain lookup identity) so
+    // dimensions sharing chunk coordinates never cross.
+    private static final Map<GenerationUnitAdapter.TerrainLookup, Map<Long, List<BlockVec>>> PENDING_POST_PROCESS =
+            Collections.synchronizedMap(new WeakHashMap<>());
+
+    public static void markPostProcess(GenerationUnitAdapter.TerrainLookup lookup, BlockVec position) {
+        if (lookup == null) {
+            return;
+        }
+        var chunkKey = (long) (position.blockX() >> 4) << 32 | ((position.blockZ() >> 4) & 0xFFFFFFFFL);
+        PENDING_POST_PROCESS
+                .computeIfAbsent(lookup, unused -> new java.util.concurrent.ConcurrentHashMap<>())
+                .computeIfAbsent(chunkKey, unused -> Collections.synchronizedList(new ArrayList<>()))
+                .add(position);
+    }
+
+    public static java.util.Set<Long> postProcessChunkKeys(GenerationUnitAdapter.TerrainLookup lookup) {
+        var byChunk = PENDING_POST_PROCESS.get(lookup);
+        return byChunk != null ? java.util.Set.copyOf(byChunk.keySet()) : java.util.Set.of();
+    }
+
+    public static List<BlockVec> drainPostProcess(GenerationUnitAdapter.TerrainLookup lookup, long chunkKey) {
+        var byChunk = PENDING_POST_PROCESS.get(lookup);
+        if (byChunk == null) {
+            return List.of();
+        }
+        var positions = byChunk.remove(chunkKey);
+        if (positions == null) {
+            return List.of();
+        }
+        synchronized (positions) {
+            return List.copyOf(positions);
+        }
+    }
+
     public record Write(int x, int y, int z, Block block) {
     }
 

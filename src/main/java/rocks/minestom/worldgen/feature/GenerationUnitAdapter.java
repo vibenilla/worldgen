@@ -134,6 +134,11 @@ public final class GenerationUnitAdapter implements Block.Getter, Block.Setter {
             return;
         }
 
+        if (block.compare(Block.MAGMA_BLOCK) || block.compare(Block.SOUL_SAND)) {
+            rocks.minestom.worldgen.structure.StructureWrites.markPostProcess(
+                    this.terrainLookup, position.add(0, 1, 0));
+        }
+
         var bufferIndex = this.bufferIndex(position);
         if (bufferIndex >= 0) {
             this.terrainBlocks[bufferIndex] = block;

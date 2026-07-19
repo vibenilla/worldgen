@@ -146,8 +146,13 @@ public final class StructureTemplate {
             GenerationUnitAdapter level,
             BoundingBox chunkBounds,
             StructureProcessorContext processorContext,
-            List<BlockVec> connectionShapeUpdates
+            List<BlockVec> connectionShapeUpdates,
+            rocks.minestom.worldgen.random.RandomSource lootRandom
     ) {
+        public PlacementContext(GenerationUnitAdapter level, BoundingBox chunkBounds,
+                StructureProcessorContext processorContext, List<BlockVec> connectionShapeUpdates) {
+            this(level, chunkBounds, processorContext, connectionShapeUpdates, null);
+        }
     }
 
     /**
@@ -301,6 +306,13 @@ public final class StructureTemplate {
 
             level.setBlock(blockPos, state);
             placedPositions.add(blockPos);
+
+            if (context.lootRandom() != null && blockInfo.nbt() != null && isRandomizableContainer(state)) {
+                // Vanilla placeInWorld seeds every placed loot container with
+                // random.nextLong() ("LootTableSeed"); the draw must be
+                // consumed even though loot NBT is out of scope.
+                context.lootRandom().nextLong();
+            }
         }
 
         fillFromNeighborSources(level, lockedFluids, toFill);
@@ -314,6 +326,15 @@ public final class StructureTemplate {
         if (updateConnectionShapes) {
             context.connectionShapeUpdates().addAll(placedPositions);
         }
+    }
+
+
+    /** The blocks whose block entity is a vanilla {@code RandomizableContainer}. */
+    private static boolean isRandomizableContainer(Block state) {
+        var key = state.key().value();
+        return key.equals("chest") || key.equals("trapped_chest") || key.equals("barrel")
+                || key.equals("dispenser") || key.equals("dropper") || key.equals("hopper")
+                || key.equals("crafter") || key.equals("decorated_pot") || key.endsWith("shulker_box");
     }
 
     private static boolean isSourceWater(Block block) {

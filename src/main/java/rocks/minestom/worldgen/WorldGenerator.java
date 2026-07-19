@@ -172,16 +172,16 @@ public final class WorldGenerator implements Generator {
      * is promoted to FULL and starts block-ticking.
      */
     private void flushFluidTicks(GenerationUnit unit, TerrainData terrainData) {
-        if (this.pendingFluidTicks.isEmpty()) {
+        var pendingChunks = new java.util.HashSet<>(this.pendingFluidTicks.keySet());
+        pendingChunks.addAll(StructureWrites.postProcessChunkKeys(this.terrainAccess));
+        if (pendingChunks.isEmpty()) {
             return;
         }
 
         GenerationUnitAdapter adapter = null;
-        var iterator = this.pendingFluidTicks.entrySet().iterator();
-        while (iterator.hasNext()) {
-            var entry = iterator.next();
-            var pendingChunkX = (int) (entry.getKey() >> 32);
-            var pendingChunkZ = (int) (long) entry.getKey();
+        for (var pendingKey : pendingChunks) {
+            var pendingChunkX = (int) (pendingKey >> 32);
+            var pendingChunkZ = (int) (long) pendingKey;
             if (!this.neighborhoodDecorated(pendingChunkX, pendingChunkZ)) {
                 continue;
             }
@@ -207,15 +207,20 @@ public final class WorldGenerator implements Generator {
                         this.terrainAccess);
             }
 
-            List<BlockVec> positions;
-            var pending = entry.getValue();
-            synchronized (pending) {
-                positions = new java.util.ArrayList<>(pending);
+            var pending = this.pendingFluidTicks.remove(pendingKey);
+            if (pending != null) {
+                List<BlockVec> positions;
+                synchronized (pending) {
+                    positions = new java.util.ArrayList<>(pending);
+                }
+                for (var position : positions) {
+                    WaterSpread.tick(adapter, position);
+                }
             }
-            for (var position : positions) {
-                WaterSpread.tick(adapter, position);
+
+            for (var position : StructureWrites.drainPostProcess(this.terrainAccess, pendingKey)) {
+                WaterSpread.postProcessMarked(adapter, position);
             }
-            iterator.remove();
         }
     }
 
@@ -590,11 +595,7 @@ public final class WorldGenerator implements Generator {
                     } else if (featureImpl instanceof FreezeTopLayerFeature freezeTopLayer) {
                         freezeTopLayer.place(context, placementContext, this.biomeResolver);
                     } else {
-                        var placed = ((Feature) featureImpl).place(context);
-                        if (placed && featureImpl instanceof UnderwaterMagmaFeature) {
-                            UnderwaterMagmaFeature.convertBubbleColumnsAfterPlacement(levelAdapter,
-                                    (FeaturePlaceContext) context);
-                        }
+                        ((Feature) featureImpl).place(context);
                     }
                 });
                 if (tracingThisFeature) {

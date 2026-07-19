@@ -307,39 +307,7 @@ public final class StrongholdPlacer {
      * determines each structure's feature-seed index for the step.
      */
     private List<Key> loadSurfaceStructuresStructures() {
-        var dataPack = this.featureLoader.dataPack();
-        var keys = new ArrayList<Key>();
-        var dataRoot = dataPack.rootPath().resolve("data");
-        try (var namespaces = Files.list(dataRoot)) {
-            for (var namespaceDir : namespaces.filter(Files::isDirectory).toList()) {
-                var structureDir = namespaceDir.resolve("worldgen").resolve("structure");
-                if (!Files.isDirectory(structureDir)) {
-                    continue;
-                }
-                try (var files = Files.list(structureDir)) {
-                    for (var file : files.filter(path -> path.getFileName().toString().endsWith(".json")).toList()) {
-                        var name = file.getFileName().toString();
-                        keys.add(Key.key(namespaceDir.getFileName().toString(),
-                                name.substring(0, name.length() - ".json".length())));
-                    }
-                }
-            }
-        } catch (Exception exception) {
-            return List.of();
-        }
-
-        keys.sort((left, right) -> {
-            var byPath = left.value().compareTo(right.value());
-            return byPath != 0 ? byPath : left.namespace().compareTo(right.namespace());
-        });
-
-        var result = new ArrayList<Key>();
-        for (var key : keys) {
-            if (this.isSurfaceStructuresStructure(key)) {
-                result.add(key);
-            }
-        }
-        return List.copyOf(result);
+        return this.structureLoader.structuresAtStep("surface_structures");
     }
 
     private boolean isSurfaceStructuresStructure(Key key) {

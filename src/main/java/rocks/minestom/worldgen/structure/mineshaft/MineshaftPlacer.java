@@ -499,51 +499,7 @@ public final class MineshaftPlacer {
     }
 
     private List<Key> loadUndergroundStructures() {
-        var dataPack = this.featureLoader.dataPack();
-        var keys = new ArrayList<Key>();
-        var dataRoot = dataPack.rootPath().resolve("data");
-        try (var namespaces = Files.list(dataRoot)) {
-            for (var namespaceDir : namespaces.filter(Files::isDirectory).toList()) {
-                var structureDir = namespaceDir.resolve("worldgen").resolve("structure");
-                if (!Files.isDirectory(structureDir)) {
-                    continue;
-                }
-                try (var files = Files.list(structureDir)) {
-                    for (var file : files.filter(path -> path.getFileName().toString().endsWith(".json")).toList()) {
-                        var name = file.getFileName().toString();
-                        keys.add(Key.key(namespaceDir.getFileName().toString(),
-                                name.substring(0, name.length() - ".json".length())));
-                    }
-                }
-            }
-        } catch (Exception exception) {
-            return List.of();
-        }
-
-        // ResourceLocation ordering: path first, then namespace
-        keys.sort((left, right) -> {
-            var byPath = left.value().compareTo(right.value());
-            return byPath != 0 ? byPath : left.namespace().compareTo(right.namespace());
-        });
-
-        var result = new ArrayList<Key>();
-        for (var key : keys) {
-            if (this.isUndergroundStructure(key)) {
-                result.add(key);
-            }
-        }
-        return List.copyOf(result);
-    }
-
-    private boolean isUndergroundStructure(Key key) {
-        try {
-            var json = this.featureLoader.dataPack().readStructure(key);
-            return json.isJsonObject()
-                    && json.getAsJsonObject().has("step")
-                    && json.getAsJsonObject().get("step").getAsString().equals("underground_structures");
-        } catch (Exception exception) {
-            return false;
-        }
+        return this.structureLoader.structuresAtStep("underground_structures");
     }
 
     private record MineshaftStart(Key structureKey, List<MineshaftPieces.MineshaftPiece> pieces, BoundingBox bounds) {

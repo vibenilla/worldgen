@@ -42,6 +42,47 @@ public final class WaterSpread {
         }
     }
 
+    /**
+     * Vanilla {@code LevelChunk.postProcessGeneration} for a marked position
+     * above a placed magma_block / soul_sand: the water there gets its fluid
+     * tick, then {@code LiquidBlock.tick} runs
+     * {@code BubbleColumnBlock.updateColumn}, converting the whole source
+     * water column above the column-enabling block in one synchronous pass.
+     */
+    public static void postProcessMarked(GenerationUnitAdapter level, BlockVec position) {
+        var state = blockAt(level, position);
+        if (!isPlainWaterSource(state)) {
+            return;
+        }
+
+        tick(level, position);
+
+        var below = blockAt(level, position.add(0, -1, 0));
+        boolean dragDown;
+        if (below.compare(Block.MAGMA_BLOCK)) {
+            dragDown = true;
+        } else if (below.compare(Block.SOUL_SAND)) {
+            dragDown = false;
+        } else {
+            return;
+        }
+
+        var columnState = Block.BUBBLE_COLUMN.withProperty("drag", Boolean.toString(dragDown));
+        var current = position;
+        while (canOccupyColumn(blockAt(level, current))) {
+            level.setBlock(current, columnState);
+            current = current.add(0, 1, 0);
+        }
+    }
+
+    private static boolean isPlainWaterSource(Block state) {
+        return state.key().value().equals("water") && fluidOf(state).source();
+    }
+
+    private static boolean canOccupyColumn(Block state) {
+        return state.compare(Block.BUBBLE_COLUMN) || isPlainWaterSource(state);
+    }
+
     public static void tick(GenerationUnitAdapter level, BlockVec position) {
         var state = level.getBlock(position.blockX(), position.blockY(), position.blockZ());
         var fluid = fluidOf(state);

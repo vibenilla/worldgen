@@ -122,6 +122,71 @@ public final class StructureLoader {
     }
 
     private final Map<Key, Integer> structureStepCache = new ConcurrentHashMap<>();
+    private final Map<String, java.util.List<Key>> stepStructuresCache = new ConcurrentHashMap<>();
+
+    /**
+     * The structures of the given decoration step in the order vanilla's
+     * {@code ChunkGenerator.applyBiomeDecoration} sees them: the structure
+     * registry order (resource path, then namespace), filtered by the
+     * structure's {@code step}. The position in this list is the
+     * {@code setFeatureSeed} index a structure's placement random is seeded
+     * with (verified against an instrumented server: the runtime order is
+     * alphabetical by structure path, NOT structure-set flattening order).
+     */
+    public java.util.List<Key> structuresAtStep(String step) {
+        return this.stepStructuresCache.computeIfAbsent(step, stepName -> {
+            var keys = new java.util.ArrayList<Key>();
+            var dataRoot = this.dataPack.rootPath().resolve("data");
+            try (var namespaces = java.nio.file.Files.list(dataRoot)) {
+                for (var namespaceDir : namespaces.filter(java.nio.file.Files::isDirectory).toList()) {
+                    var structureDir = namespaceDir.resolve("worldgen").resolve("structure");
+                    if (!java.nio.file.Files.isDirectory(structureDir)) {
+                        continue;
+                    }
+                    try (var files = java.nio.file.Files.list(structureDir)) {
+                        for (var file : files.filter(path -> path.getFileName().toString().endsWith(".json")).toList()) {
+                            var name = file.getFileName().toString();
+                            keys.add(Key.key(namespaceDir.getFileName().toString(),
+                                    name.substring(0, name.length() - ".json".length())));
+                        }
+                    }
+                }
+            } catch (Exception exception) {
+                return java.util.List.of();
+            }
+
+            keys.sort((left, right) -> {
+                var byPath = left.value().compareTo(right.value());
+                return byPath != 0 ? byPath : left.namespace().compareTo(right.namespace());
+            });
+
+            var stepOrdinal = stepOrdinal(stepName);
+            var result = new java.util.ArrayList<Key>();
+            for (var key : keys) {
+                if (this.structureStep(key) == stepOrdinal) {
+                    result.add(key);
+                }
+            }
+            return java.util.List.copyOf(result);
+        });
+    }
+
+    private static int stepOrdinal(String step) {
+        return switch (step.replace("minecraft:", "")) {
+            case "raw_generation" -> 0;
+            case "lakes" -> 1;
+            case "local_modifications" -> 2;
+            case "underground_structures" -> 3;
+            case "surface_structures" -> 4;
+            case "strongholds" -> 5;
+            case "underground_ores" -> 6;
+            case "underground_decoration" -> 7;
+            case "fluid_springs" -> 8;
+            case "vegetal_decoration" -> 9;
+            case "top_layer_modification" -> 10;
+            default -> 4;
+        };
+    }
 
     private StructureSet loadStructureSet(Key id) {
         try {
