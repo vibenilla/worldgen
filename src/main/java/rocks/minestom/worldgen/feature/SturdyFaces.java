@@ -14,9 +14,12 @@ public final class SturdyFaces {
     }
 
     public static boolean isFaceSturdy(Block block, BlockFace face) {
+        // A hopper's top face is NOT sturdy: the funnel interior punches a
+        // hole through the face square (verified against a trial chamber
+        // hopper with the instrumented-server vegetation patch probes).
         if (face == BlockFace.TOP
                 && (block.compare(Block.AZALEA) || block.compare(Block.FLOWERING_AZALEA)
-                        || block.compare(Block.HOPPER) || block.compare(Block.SCAFFOLDING))) {
+                        || block.compare(Block.SCAFFOLDING))) {
             return true;
         }
         return block.registry().collisionShape().isFaceFull(face);
