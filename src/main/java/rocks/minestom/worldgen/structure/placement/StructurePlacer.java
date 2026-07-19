@@ -157,12 +157,18 @@ public final class StructurePlacer {
 
         // Write through the generator's live chunk buffer when available so
         // structure blocks are visible to this chunk's decoration and later
-        // neighbors, like vanilla's proto-chunk writes.
+        // neighbors, like vanilla's proto-chunk writes. When the interleaved
+        // feature fork is available it MUST carry these writes too: Minestom
+        // applies forks after direct unit writes, so a step-3 mineshaft going
+        // through the feature fork would otherwise re-assert its corridor
+        // cave_air over a trial chamber placed later through a direct write.
         var lookup = validatedLookup(chunkX, chunkZ, surfaceHeights);
-        var adapter = lookup != null
-                ? new GenerationUnitAdapter(unit, startX, startZ, unit.size().blockX(), unit.size().blockZ(),
-                        settings.minY(), lookup.terrain(chunkX, chunkZ).blocks(), settings.height(), null)
-                : new GenerationUnitAdapter(unit);
+        var adapter = featureAdapter != null
+                ? featureAdapter
+                : lookup != null
+                        ? new GenerationUnitAdapter(unit, startX, startZ, unit.size().blockX(), unit.size().blockZ(),
+                                settings.minY(), lookup.terrain(chunkX, chunkZ).blocks(), settings.height(), null)
+                        : new GenerationUnitAdapter(unit);
 
         StructureSet fortressStructureSet = null;
         for (var structureSetId : this.structureSets) {
