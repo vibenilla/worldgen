@@ -350,7 +350,7 @@ public final class WaterSpread {
         // (the lava-source-conversion gamerule is off by default)
         if (!forFluid.lava() && neighborSources >= 2) {
             var belowState = blockAt(level, position.add(0, -1, 0));
-            if (isFullCube(belowState) || fluidOf(belowState).source()) {
+            if (blocksMotion(belowState) || fluidOf(belowState).source()) {
                 return new Fluid(8, false, true, false);
             }
         }
@@ -408,14 +408,14 @@ public final class WaterSpread {
         return !(faceFull(sourceState, direction) || faceFull(targetState, direction.opposite()));
     }
 
+    /**
+     * Vanilla {@code BlockStateBase.blocksMotion}: the legacy-solid flag
+     * minus cobweb and bamboo sapling. Collision-shape emptiness is the
+     * wrong test - a moss carpet has a collision box but water still flows
+     * into (and destroys) it.
+     */
     private static boolean blocksMotion(Block state) {
-        var shape = state.registry().collisionShape();
-        if (shape == null) {
-            return false;
-        }
-        var end = shape.relativeEnd();
-        var start = shape.relativeStart();
-        return end.x() - start.x() > 0 || end.y() - start.y() > 0 || end.z() - start.z() > 0;
+        return state.registry().isSolid() && !state.compare(Block.COBWEB) && !state.compare(Block.BAMBOO_SAPLING);
     }
 
     private static boolean isFullCube(Block state) {
