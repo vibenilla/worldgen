@@ -156,8 +156,8 @@ public final class StructureLoader {
             }
 
             keys.sort((left, right) -> {
-                var byPath = left.value().compareTo(right.value());
-                return byPath != 0 ? byPath : left.namespace().compareTo(right.namespace());
+                var byNamespace = left.namespace().compareTo(right.namespace());
+                return byNamespace != 0 ? byNamespace : left.value().compareTo(right.value());
             });
 
             var stepOrdinal = stepOrdinal(stepName);
