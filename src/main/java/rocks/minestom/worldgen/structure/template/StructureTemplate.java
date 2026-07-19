@@ -81,6 +81,36 @@ public final class StructureTemplate {
         return result;
     }
 
+    /** A {@code structure_block} DATA-mode entry: its world position and metadata string. */
+    public record DataMarker(BlockVec position, String metadata) {
+    }
+
+    /**
+     * The DATA-mode structure blocks of the palette a piece at {@code origin}
+     * uses, in block-entity segment order, with positions transformed like
+     * placement. Vanilla {@code TemplateStructurePiece.postProcess} feeds
+     * these to {@code handleDataMarker} after placing the piece.
+     */
+    public List<DataMarker> dataMarkers(BlockVec origin, Rotation rotation, Mirror mirror) {
+        var palette = this.palettes.get(this.paletteIndex(origin));
+        var result = new ArrayList<DataMarker>();
+        for (var entry : palette.blocks()) {
+            if (!entry.block().key().value().equals("structure_block") || entry.nbt() == null) {
+                continue;
+            }
+            if (!entry.nbt().getString("mode").equals("DATA")) {
+                continue;
+            }
+            var rotatedPos = rotation.rotate(mirror.mirror(entry.position()), this.size);
+            result.add(new DataMarker(new BlockVec(
+                    origin.blockX() + rotatedPos.blockX(),
+                    origin.blockY() + rotatedPos.blockY(),
+                    origin.blockZ() + rotatedPos.blockZ()),
+                    entry.nbt().getString("metadata")));
+        }
+        return result;
+    }
+
     public BoundingBox getBoundingBox(BlockVec origin, Rotation rotation) {
         return this.getBoundingBox(origin, rotation, Mirror.NONE);
     }

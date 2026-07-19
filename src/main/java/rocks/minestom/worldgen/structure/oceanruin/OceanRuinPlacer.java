@@ -47,6 +47,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * there is no per-chunk feature-seed draw to replicate here.
  */
 public final class OceanRuinPlacer {
+    /** GenerationStep.Decoration.SURFACE_STRUCTURES ordinal. */
+    private static final int SURFACE_STRUCTURES_STEP = 4;
     /** The 15-block ruin plus an up to ~32-block cluster spread stays within 3 chunks. */
     private static final int REFERENCE_RADIUS = 3;
 
@@ -97,8 +99,23 @@ public final class OceanRuinPlacer {
                 : new GenerationUnitAdapter(unit);
 
         var connectionShapeUpdates = new ArrayList<BlockVec>();
-        for (var start : intersecting) {
-            this.placeStart(start, adapter, chunkBounds, settings, connectionShapeUpdates);
+        var random = new rocks.minestom.worldgen.random.WorldgenRandom(
+                new rocks.minestom.worldgen.random.XoroshiroRandomSource(0L));
+        var decorationSeed = random.setDecorationSeed(settings.randomState().seed(), startX, startZ);
+        for (var structureKey : this.structureLoader.structuresAtStep("surface_structures")) {
+            var index = -1;
+            var seeded = false;
+            for (var start : intersecting) {
+                if (!start.structureKey().equals(structureKey)) {
+                    continue;
+                }
+                if (!seeded) {
+                    index = this.structureLoader.structuresAtStep("surface_structures").indexOf(structureKey);
+                    random.setFeatureSeed(decorationSeed, index, SURFACE_STRUCTURES_STEP);
+                    seeded = true;
+                }
+                this.placeStart(start, adapter, chunkBounds, settings, connectionShapeUpdates, random);
+            }
         }
 
         if (!connectionShapeUpdates.isEmpty()) {
@@ -107,7 +124,8 @@ public final class OceanRuinPlacer {
     }
 
     private void placeStart(OceanRuinStart start, GenerationUnitAdapter adapter, BoundingBox chunkBounds,
-            NoiseGeneratorSettingsRuntime settings, List<BlockVec> connectionShapeUpdates) {
+            NoiseGeneratorSettingsRuntime settings, List<BlockVec> connectionShapeUpdates,
+            rocks.minestom.worldgen.random.RandomSource random) {
         var firstBounds = start.pieces().getFirst().bounds();
         var referencePos = new BlockVec(
                 firstBounds.minX() + (firstBounds.maxX() - firstBounds.minX() + 1) / 2,
@@ -132,6 +150,44 @@ public final class OceanRuinPlacer {
             template.place(placementContext, piece.position(), piece.rotation(),
                     processors(piece.biomeTemp(), piece.integrity()), false, false,
                     LiquidSettings.APPLY_WATERLOGGING, true);
+
+            for (var marker : template.dataMarkers(piece.position(), piece.rotation(),
+                    rocks.minestom.worldgen.structure.template.Mirror.NONE)) {
+                if (!chunkBounds.isInside(marker.position())) {
+                    continue;
+                }
+                this.handleDataMarker(marker, adapter, settings, random);
+            }
+        }
+    }
+
+    /**
+     * Vanilla {@code OceanRuinPieces.OceanRuinPiece.handleDataMarker}: the
+     * chest marker places a chest (waterlogged when the position holds water)
+     * and seeds its loot table with {@code random.nextLong()} (the loot NBT
+     * itself is out of scope); the drowned marker replaces itself with air
+     * above sea level, water below.
+     */
+    private void handleDataMarker(StructureTemplate.DataMarker marker, GenerationUnitAdapter adapter,
+            NoiseGeneratorSettingsRuntime settings, rocks.minestom.worldgen.random.RandomSource random) {
+        var position = marker.position();
+        switch (marker.metadata()) {
+            case "chest" -> {
+                var current = adapter.getBlock(position.blockX(), position.blockY(), position.blockZ());
+                var waterlogged = rocks.minestom.worldgen.feature.WaterStates.hasWaterFluid(current);
+                adapter.setBlock(position.blockX(), position.blockY(), position.blockZ(),
+                        Block.CHEST.withProperty("waterlogged", Boolean.toString(waterlogged)));
+                random.nextLong();
+            }
+            case "drowned" -> {
+                if (position.blockY() > settings.seaLevel()) {
+                    adapter.setBlock(position.blockX(), position.blockY(), position.blockZ(), Block.AIR);
+                } else {
+                    adapter.setBlock(position.blockX(), position.blockY(), position.blockZ(), Block.WATER);
+                }
+            }
+            default -> {
+            }
         }
     }
 
@@ -281,7 +337,7 @@ public final class OceanRuinPlacer {
             return null;
         }
 
-        return new OceanRuinStart(pieces, bounds);
+        return new OceanRuinStart(structureKey, pieces, bounds);
     }
 
     /**
@@ -383,6 +439,6 @@ public final class OceanRuinPlacer {
             OceanRuinStructure.BiomeTemp biomeTemp, BoundingBox bounds) {
     }
 
-    private record OceanRuinStart(List<PlacedOceanRuinPiece> pieces, BoundingBox bounds) {
+    private record OceanRuinStart(Key structureKey, List<PlacedOceanRuinPiece> pieces, BoundingBox bounds) {
     }
 }
