@@ -323,7 +323,9 @@ public final class StructureTemplate {
                     lockedFluids.add(blockPos);
                 } else if (state.getProperty("waterlogged") != null) {
                     if (isSourceWater(level.getBlock(blockPos.blockX(), blockPos.blockY(), blockPos.blockZ()))) {
-                        state = state.withProperty("waterlogged", "true");
+                        if (rocks.minestom.worldgen.feature.WaterStates.canBeWaterlogged(state)) {
+                            state = state.withProperty("waterlogged", "true");
+                        }
                     } else {
                         toFill.add(blockPos);
                     }
@@ -419,7 +421,7 @@ public final class StructureTemplate {
                 }
 
                 var current = level.getBlock(position.blockX(), position.blockY(), position.blockZ());
-                if (current.getProperty("waterlogged") != null) {
+                if (rocks.minestom.worldgen.feature.WaterStates.canBeWaterlogged(current)) {
                     if ("false".equals(current.getProperty("waterlogged"))) {
                         level.setBlock(position, current.withProperty("waterlogged", "true"));
                     }

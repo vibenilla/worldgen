@@ -25,20 +25,30 @@ public final class WaterSpread {
     private WaterSpread() {
     }
 
-    /** Source water (amount 8), flowing water (amount 1-7), or falling water. */
-    private record Fluid(int amount, boolean falling, boolean source) {
-        static final Fluid EMPTY = new Fluid(0, false, false);
+    /** Source fluid (amount 8), flowing (amount 1-7), or falling. */
+    private record Fluid(int amount, boolean falling, boolean source, boolean lava) {
+        static final Fluid EMPTY = new Fluid(0, false, false, false);
 
         boolean isEmpty() {
             return this.amount <= 0 && !this.source;
         }
 
+        /** Vanilla overworld lava: dropOff 2 and slope find distance 2 (water: 1 and 4). */
+        int dropOff() {
+            return this.lava ? 2 : DROP_OFF;
+        }
+
+        int slopeFindDistance() {
+            return this.lava ? 2 : SLOPE_FIND_DISTANCE;
+        }
+
         Block encode() {
+            var base = this.lava ? Block.LAVA : Block.WATER;
             if (this.source) {
-                return Block.WATER;
+                return base;
             }
             var legacyLevel = 8 - Math.min(this.amount, 8) + (this.falling ? 8 : 0);
-            return Block.WATER.withProperty("level", Integer.toString(legacyLevel));
+            return base.withProperty("level", Integer.toString(legacyLevel));
         }
     }
 
@@ -139,7 +149,7 @@ public final class WaterSpread {
         }
 
         if (!fluid.source()) {
-            var newFluid = getNewLiquid(level, position, state);
+            var newFluid = getNewLiquid(level, position, state, fluid);
             if (newFluid.isEmpty()) {
                 state = Block.AIR;
                 level.setBlock(position, state);
@@ -163,7 +173,7 @@ public final class WaterSpread {
         var belowState = blockAt(level, belowPos);
         var belowFluid = fluidOf(belowState);
         if (canMaybePassThrough(level, position, state, Direction.DOWN, belowPos, belowState, belowFluid)) {
-            var newBelowFluid = getNewLiquid(level, belowPos, belowState);
+            var newBelowFluid = getNewLiquid(level, belowPos, belowState, fluid);
             if (canReplaceWith(belowFluid, newBelowFluid) && canHoldSpecificFluid(belowState)) {
                 spreadTo(level, belowPos, belowState, newBelowFluid);
                 if (sourceNeighborCount(level, position) >= 3) {
@@ -179,7 +189,7 @@ public final class WaterSpread {
     }
 
     private static void spreadToSides(GenerationUnitAdapter level, BlockVec position, Fluid fluid, Block state) {
-        var neighborAmount = fluid.amount() - DROP_OFF;
+        var neighborAmount = fluid.amount() - fluid.dropOff();
         if (fluid.falling()) {
             neighborAmount = 7;
         }
@@ -187,7 +197,7 @@ public final class WaterSpread {
             return;
         }
 
-        var spreads = getSpread(level, position, state);
+        var spreads = getSpread(level, position, state, fluid);
         for (var entry : spreads.entrySet()) {
             var direction = entry.getKey();
             var neighborPos = position.add(direction.stepX(), direction.stepY(), direction.stepZ());
@@ -195,7 +205,8 @@ public final class WaterSpread {
         }
     }
 
-    private static Map<Direction, Fluid> getSpread(GenerationUnitAdapter level, BlockVec position, Block state) {
+    private static Map<Direction, Fluid> getSpread(GenerationUnitAdapter level, BlockVec position, Block state,
+            Fluid spreading) {
         var lowest = 1000;
         var result = new EnumMap<Direction, Fluid>(Direction.class);
         Map<BlockVec, Boolean> holeCache = null;
@@ -208,7 +219,7 @@ public final class WaterSpread {
                 continue;
             }
 
-            var newFluid = getNewLiquid(level, testPos, testState);
+            var newFluid = getNewLiquid(level, testPos, testState, spreading);
             if (!canHoldSpecificFluid(testState)) {
                 continue;
             }
@@ -221,7 +232,7 @@ public final class WaterSpread {
             if (isHole(level, testPos, holeCache)) {
                 distance = 0;
             } else {
-                distance = getSlopeDistance(level, testPos, 1, direction.opposite(), testState, holeCache);
+                distance = getSlopeDistance(level, testPos, 1, direction.opposite(), testState, holeCache, spreading);
             }
 
             if (distance < lowest) {
@@ -239,7 +250,7 @@ public final class WaterSpread {
     }
 
     private static int getSlopeDistance(GenerationUnitAdapter level, BlockVec position, int pass,
-            Direction from, Block state, Map<BlockVec, Boolean> holeCache) {
+            Direction from, Block state, Map<BlockVec, Boolean> holeCache, Fluid spreading) {
         var lowest = 1000;
         for (var direction : Direction.HORIZONTAL) {
             if (direction == from) {
@@ -254,8 +265,8 @@ public final class WaterSpread {
             if (isHole(level, testPos, holeCache)) {
                 return pass;
             }
-            if (pass < SLOPE_FIND_DISTANCE) {
-                var value = getSlopeDistance(level, testPos, pass + 1, direction.opposite(), testState, holeCache);
+            if (pass < spreading.slopeFindDistance()) {
+                var value = getSlopeDistance(level, testPos, pass + 1, direction.opposite(), testState, holeCache, spreading);
                 if (value < lowest) {
                     lowest = value;
                 }
@@ -309,7 +320,7 @@ public final class WaterSpread {
                     + " " + fluid + " over " + state.name());
         }
         if (state.getProperty("waterlogged") != null) {
-            if ("false".equals(state.getProperty("waterlogged"))) {
+            if ("false".equals(state.getProperty("waterlogged")) && WaterStates.canBeWaterlogged(state)) {
                 level.setBlock(position, state.withProperty("waterlogged", "true"));
             }
             return;
@@ -317,7 +328,7 @@ public final class WaterSpread {
         level.setBlock(position, fluid.encode());
     }
 
-    private static Fluid getNewLiquid(GenerationUnitAdapter level, BlockVec position, Block state) {
+    private static Fluid getNewLiquid(GenerationUnitAdapter level, BlockVec position, Block state, Fluid forFluid) {
         var highestNeighbor = 0;
         var neighborSources = 0;
 
@@ -325,7 +336,8 @@ public final class WaterSpread {
             var relativePos = position.add(direction.stepX(), direction.stepY(), direction.stepZ());
             var neighborState = blockAt(level, relativePos);
             var neighborFluid = fluidOf(neighborState);
-            if (neighborFluid.isEmpty() || !canPassThroughWall(direction, state, neighborState)) {
+            if (neighborFluid.isEmpty() || neighborFluid.lava() != forFluid.lava()
+                    || !canPassThroughWall(direction, state, neighborState)) {
                 continue;
             }
             if (neighborFluid.source()) {
@@ -334,21 +346,24 @@ public final class WaterSpread {
             highestNeighbor = Math.max(highestNeighbor, neighborFluid.amount());
         }
 
-        if (neighborSources >= 2) {
+        // Vanilla WaterFluid.canConvertToSource is true, LavaFluid's is false
+        // (the lava-source-conversion gamerule is off by default)
+        if (!forFluid.lava() && neighborSources >= 2) {
             var belowState = blockAt(level, position.add(0, -1, 0));
             if (isFullCube(belowState) || fluidOf(belowState).source()) {
-                return new Fluid(8, false, true);
+                return new Fluid(8, false, true, false);
             }
         }
 
         var aboveState = blockAt(level, position.add(0, 1, 0));
         var aboveFluid = fluidOf(aboveState);
-        if (!aboveFluid.isEmpty() && canPassThroughWall(Direction.UP, state, aboveState)) {
-            return new Fluid(8, true, false);
+        if (!aboveFluid.isEmpty() && aboveFluid.lava() == forFluid.lava()
+                && canPassThroughWall(Direction.UP, state, aboveState)) {
+            return new Fluid(8, true, false, forFluid.lava());
         }
 
-        var amount = highestNeighbor - DROP_OFF;
-        return amount <= 0 ? Fluid.EMPTY : new Fluid(amount, false, false);
+        var amount = highestNeighbor - forFluid.dropOff();
+        return amount <= 0 ? Fluid.EMPTY : new Fluid(amount, false, false, forFluid.lava());
     }
 
     private static int sourceNeighborCount(GenerationUnitAdapter level, BlockVec position) {
@@ -437,18 +452,20 @@ public final class WaterSpread {
     }
 
     private static Fluid fluidOf(Block state) {
-        if (state.key().value().equals("water")) {
+        var key = state.key().value();
+        if (key.equals("water") || key.equals("lava")) {
+            var lava = key.equals("lava");
             var levelProperty = state.getProperty("level");
             var legacyLevel = levelProperty == null ? 0 : Integer.parseInt(levelProperty);
             if (legacyLevel == 0) {
-                return new Fluid(8, false, true);
+                return new Fluid(8, false, true, lava);
             }
             var falling = legacyLevel >= 8;
             var amount = falling ? 8 : 8 - legacyLevel;
-            return new Fluid(amount, falling, false);
+            return new Fluid(amount, falling, false, lava);
         }
         if (WaterStates.hasWaterFluid(state)) {
-            return new Fluid(8, false, true);
+            return new Fluid(8, false, true, false);
         }
         return Fluid.EMPTY;
     }

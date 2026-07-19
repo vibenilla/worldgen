@@ -12,6 +12,15 @@ public final class WaterStates {
     private WaterStates() {
     }
 
+    /**
+     * Vanilla {@code LiquidBlockContainer.canPlaceLiquid}: a waterloggable
+     * block accepts water except a double slab ({@code SlabBlock} refuses
+     * when {@code type=double}).
+     */
+    public static boolean canBeWaterlogged(Block block) {
+        return block.getProperty("waterlogged") != null && !"double".equals(block.getProperty("type"));
+    }
+
     public static boolean hasWaterFluid(Block block) {
         return block.compare(Block.WATER)
                 || "true".equals(block.getProperty("waterlogged"))
