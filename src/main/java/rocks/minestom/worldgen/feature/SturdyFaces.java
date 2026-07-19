@@ -21,4 +21,23 @@ public final class SturdyFaces {
         }
         return block.registry().collisionShape().isFaceFull(face);
     }
+
+    /**
+     * Vanilla {@code MultifaceBlock.canAttachTo}: an attachment (vine, glow
+     * lichen, sculk vein) holds when the neighbour's support shape OR
+     * collision shape has a full face toward it. The support shape defaults
+     * to the collision shape; mud and soul sand override it to a full block,
+     * and a full snow layer stack is a full cube. {@code attachmentFace} is
+     * the neighbour's face the attachment sits against (the opposite of the
+     * direction from the attachment toward the neighbour).
+     */
+    public static boolean canAttachTo(Block neighbor, BlockFace attachmentFace) {
+        if (neighbor.compare(Block.MUD) || neighbor.compare(Block.SOUL_SAND)) {
+            return true;
+        }
+        if (neighbor.compare(Block.SNOW) && "8".equals(neighbor.getProperty("layers"))) {
+            return true;
+        }
+        return isFaceSturdy(neighbor, attachmentFace);
+    }
 }

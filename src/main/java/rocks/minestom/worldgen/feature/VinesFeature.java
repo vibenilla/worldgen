@@ -19,7 +19,7 @@ public final class VinesFeature implements Feature<NoneFeatureConfiguration> {
         }
 
         for (var direction : Direction.values()) {
-            if (direction != Direction.DOWN && isAcceptableNeighbour(level, direction.relative(origin))) {
+            if (direction != Direction.DOWN && isAcceptableNeighbour(level, direction.relative(origin), direction)) {
                 level.setBlock(origin, Block.VINE.withProperty(direction.serializedName(), "true"));
                 return true;
             }
@@ -30,10 +30,10 @@ public final class VinesFeature implements Feature<NoneFeatureConfiguration> {
 
     /**
      * Vanilla {@code VineBlock.isAcceptableNeighbour} (MultifaceBlock.canAttachTo):
-     * the neighbour must expose a full face toward the vine. Solid blocks
-     * approximate it (leaves qualify in vanilla via their full collision face).
+     * the neighbour must expose a full support or collision face toward the
+     * vine (a cobweb is solid in Minestom terms but has no such face).
      */
-    private static boolean isAcceptableNeighbour(Block.Getter level, BlockVec position) {
-        return level.getBlock(position).registry().isSolid();
+    private static boolean isAcceptableNeighbour(Block.Getter level, BlockVec position, Direction directionToNeighbour) {
+        return SturdyFaces.canAttachTo(level.getBlock(position), directionToNeighbour.opposite().blockFace());
     }
 }

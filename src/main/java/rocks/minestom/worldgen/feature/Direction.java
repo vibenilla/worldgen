@@ -65,6 +65,17 @@ public enum Direction {
         return this.name().toLowerCase();
     }
 
+    public net.minestom.server.instance.block.BlockFace blockFace() {
+        return switch (this) {
+            case DOWN -> net.minestom.server.instance.block.BlockFace.BOTTOM;
+            case UP -> net.minestom.server.instance.block.BlockFace.TOP;
+            case NORTH -> net.minestom.server.instance.block.BlockFace.NORTH;
+            case SOUTH -> net.minestom.server.instance.block.BlockFace.SOUTH;
+            case WEST -> net.minestom.server.instance.block.BlockFace.WEST;
+            case EAST -> net.minestom.server.instance.block.BlockFace.EAST;
+        };
+    }
+
     public static Direction getRandom(RandomSource random) {
         return VALUES[random.nextInt(VALUES.length)];
     }
