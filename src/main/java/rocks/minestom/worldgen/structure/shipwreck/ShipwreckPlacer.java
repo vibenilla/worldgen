@@ -102,6 +102,7 @@ public final class ShipwreckPlacer {
         }
 
         if (!connectionShapeUpdates.isEmpty()) {
+            StructureShapeUpdater.updateEdges(adapter, connectionShapeUpdates);
             StructureShapeUpdater.update(adapter, this.structureLoader.blockTags(), connectionShapeUpdates);
         }
     }

@@ -47,6 +47,76 @@ public final class StructureShapeUpdater {
     private StructureShapeUpdater() {
     }
 
+    private static final java.util.Set<String> DOUBLE_PLANTS = java.util.Set.of(
+            "tall_seagrass", "tall_grass", "large_fern", "sunflower", "lilac", "rose_bush",
+            "peony", "pitcher_plant", "small_dripleaf");
+
+    /**
+     * Vanilla {@code StructureTemplate.updateShapeAtEdge}: every block just
+     * outside the placed volume gets a shape update against its adjacent
+     * placed block. Ported for the destructive reactions that matter at
+     * generation time: a double-plant half orphaned by the placement breaks
+     * to plain air, and a multiface growth loses the face whose support the
+     * placement replaced. Runs before {@link #update}'s placed-block pass,
+     * matching vanilla's order inside {@code placeInWorld}.
+     */
+    public static void updateEdges(GenerationUnitAdapter level, List<BlockVec> placedPositions) {
+        var placed = new java.util.HashSet<>(placedPositions);
+        for (var position : placedPositions) {
+            for (var direction : Direction.values()) {
+                var edge = new BlockVec(
+                        position.blockX() + direction.normalX(),
+                        position.blockY() + direction.normalY(),
+                        position.blockZ() + direction.normalZ());
+                if (!placed.contains(edge)) {
+                    reactAtEdge(level, edge, direction.opposite());
+                }
+            }
+        }
+    }
+
+    private static void reactAtEdge(GenerationUnitAdapter level, BlockVec position, Direction towardPlaced) {
+        var block = level.getBlock(position.blockX(), position.blockY(), position.blockZ());
+        var key = block.key().value();
+
+        if (DOUBLE_PLANTS.contains(key)) {
+            // Vanilla DoublePlantBlock.updateShape: a lower half reacts to its
+            // UP neighbor, an upper half to its DOWN neighbor; air unless that
+            // neighbor is the matching other half of the same plant.
+            var half = block.getProperty("half");
+            var lower = "lower".equals(half);
+            if (towardPlaced != (lower ? Direction.UP : Direction.DOWN)) {
+                return;
+            }
+            var other = neighbor(level, position, towardPlaced);
+            if (!other.key().value().equals(key) || half.equals(other.getProperty("half"))) {
+                level.setBlock(position, Block.AIR);
+            }
+            return;
+        }
+
+        if (key.equals("glow_lichen") || key.equals("sculk_vein") || key.equals("resin_clump")) {
+            var property = towardPlaced.name().toLowerCase();
+            if (!"true".equals(block.getProperty(property))) {
+                return;
+            }
+            var support = neighbor(level, position, towardPlaced);
+            if (rocks.minestom.worldgen.feature.SturdyFaces.canAttachTo(
+                    support, BlockFace.fromDirection(towardPlaced.opposite()))) {
+                return;
+            }
+            var updated = block.withProperty(property, "false");
+            var hasFace = false;
+            for (var direction : Direction.values()) {
+                if ("true".equals(updated.getProperty(direction.name().toLowerCase()))) {
+                    hasFace = true;
+                    break;
+                }
+            }
+            level.setBlock(position, hasFace ? updated : Block.AIR);
+        }
+    }
+
     public static void update(GenerationUnitAdapter level, BlockTagManager blockTags, List<BlockVec> placedPositions) {
         var walls = new ArrayList<BlockVec>();
         var stairs = new ArrayList<BlockVec>();
