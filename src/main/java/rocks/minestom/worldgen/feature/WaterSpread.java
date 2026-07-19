@@ -52,6 +52,15 @@ public final class WaterSpread {
     public static void postProcessMarked(GenerationUnitAdapter level, BlockVec position) {
         var state = blockAt(level, position);
         if (!isPlainWaterSource(state)) {
+            // Vanilla postProcessGeneration for a non-liquid marked block:
+            // its fluid (waterlogged / inherent) ticks, then the block gets
+            // Block.updateFromNeighbourShapes - for a multiface growth that
+            // strips every face whose support was removed by decoration that
+            // ran after the placing feature, air once no face remains.
+            if (!fluidOf(state).isEmpty()) {
+                tick(level, position);
+            }
+            stripUnsupportedFaces(level, position, blockAt(level, position));
             return;
         }
 
@@ -77,6 +86,41 @@ public final class WaterSpread {
 
     private static boolean isPlainWaterSource(Block state) {
         return state.key().value().equals("water") && fluidOf(state).source();
+    }
+
+    /**
+     * Vanilla {@code MultifaceBlock.updateShape} folded over all six
+     * neighbours ({@code Block.updateFromNeighbourShapes}): every grown face
+     * without an attachable support behind it is removed, and a growth left
+     * with no face at all becomes plain air (even when waterlogged).
+     */
+    private static void stripUnsupportedFaces(GenerationUnitAdapter level, BlockVec position, Block state) {
+        var key = state.key().value();
+        if (!key.equals("glow_lichen") && !key.equals("sculk_vein") && !key.equals("resin_clump")) {
+            return;
+        }
+
+        var updated = state;
+        var hasFace = false;
+        for (var direction : Direction.values()) {
+            var property = direction.serializedName();
+            if (!"true".equals(updated.getProperty(property))) {
+                continue;
+            }
+            var support = blockAt(level, direction.relative(position));
+            if (SturdyFaces.canAttachTo(support, direction.opposite().blockFace())) {
+                hasFace = true;
+            } else {
+                updated = updated.withProperty(property, "false");
+            }
+        }
+
+        if (!hasFace) {
+            updated = Block.AIR;
+        }
+        if (updated != state) {
+            level.setBlock(position, updated);
+        }
     }
 
     private static boolean canOccupyColumn(Block state) {

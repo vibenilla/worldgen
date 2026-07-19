@@ -124,6 +124,15 @@ public final class GenerationUnitAdapter implements Block.Getter, Block.Setter {
         this.setBlock(new BlockVec(x, y, z), block);
     }
 
+    /**
+     * Vanilla {@code ChunkAccess.markPosForPostProcessing}: queues the
+     * position for the FULL-promotion post-process pass (fluid tick plus
+     * neighbour-shape update, see {@code WaterSpread.postProcessMarked}).
+     */
+    public void markPostProcess(BlockVec position) {
+        rocks.minestom.worldgen.structure.StructureWrites.markPostProcess(this.terrainLookup, position);
+    }
+
     public void setBlock(BlockVec position, Block block) {
         var writeTrace = System.getProperty("worldgen.writeTrace");
         if (writeTrace != null && writeTrace.equals(position.blockX() + "," + position.blockY() + "," + position.blockZ())) {

@@ -73,6 +73,7 @@ public final class MultifaceGrowthFeature implements Feature<MultifaceGrowthConf
             }
 
             level.setBlock(position, newState);
+            markPostProcess(level, position);
             if (random.nextFloat() < config.chanceOfSpreading()) {
                 spreadFromFaceTowardRandomDirection(level, position, direction, random, config);
             }
@@ -106,7 +107,7 @@ public final class MultifaceGrowthFeature implements Feature<MultifaceGrowthConf
             base = config.placeBlock();
         }
 
-        if (!canAttachTo(level, face.relative(position))) {
+        if (!canAttachTo(level, position, face)) {
             return null;
         }
 
@@ -165,6 +166,7 @@ public final class MultifaceGrowthFeature implements Feature<MultifaceGrowthConf
                     return false;
                 }
                 level.setBlock(spreadPos, newState);
+                markPostProcess(level, spreadPos);
                 return true;
             }
         }
@@ -183,17 +185,27 @@ public final class MultifaceGrowthFeature implements Feature<MultifaceGrowthConf
             return false;
         }
 
-        return canAttachTo(level, face.relative(position));
+        return canAttachTo(level, position, face);
     }
 
     private static boolean hasFace(Block state, Direction face) {
         return "true".equals(state.getProperty(face.serializedName()));
     }
 
-    /** Approximation of vanilla's full-face support check. */
-    private static boolean canAttachTo(Block.Getter level, BlockVec position) {
-        var block = level.getBlock(position);
-        return block.registry().isSolid() && !block.name().endsWith("_leaves");
+    /** Vanilla {@code MultifaceBlock.canAttachTo} toward the support behind {@code face}. */
+    private static boolean canAttachTo(Block.Getter level, BlockVec position, Direction face) {
+        return SturdyFaces.canAttachTo(level.getBlock(face.relative(position)), face.opposite().blockFace());
+    }
+
+    /**
+     * Vanilla {@code markPosForPostProcessing}: every placed multiface growth
+     * is post-processed at FULL promotion, stripping faces whose support was
+     * removed by later decoration (see {@code WaterSpread.postProcessMarked}).
+     */
+    private static void markPostProcess(Object level, BlockVec position) {
+        if (level instanceof GenerationUnitAdapter adapter) {
+            adapter.markPostProcess(position);
+        }
     }
 
     private static Block waterlogged(Block block) {
