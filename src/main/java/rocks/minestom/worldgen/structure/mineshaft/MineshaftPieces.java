@@ -265,10 +265,25 @@ public final class MineshaftPieces {
         protected void generateMaybeBox(MineshaftLevel level, BoundingBox chunkBB, RandomSource random,
                 float probability, int x0, int y0, int z0, int x1, int y1, int z1,
                 Block edgeBlock, Block fillBlock, boolean skipAir, boolean hasToBeInside) {
+            var webBox = System.getProperty("worldgen.webBox", "");
             for (var y = y0; y <= y1; y++) {
                 for (var x = x0; x <= x1; x++) {
                     for (var z = z0; z <= z1; z++) {
-                        if (random.nextFloat() > probability) {
+                        var roll = random.nextFloat();
+                        if (!webBox.isEmpty()) {
+                            var wx = this.worldX(x, z);
+                            var wz = this.worldZ(x, z);
+                            var parts = webBox.split(",");
+                            if (wx >= Integer.parseInt(parts[0]) && wx <= Integer.parseInt(parts[2])
+                                    && wz >= Integer.parseInt(parts[1]) && wz <= Integer.parseInt(parts[3])) {
+                                System.out.println("MWEB pos=" + wx + "," + this.worldY(y) + "," + wz
+                                        + " roll=" + roll
+                                        + " skipAirHit=" + (skipAir && this.getBlock(level, x, y, z, chunkBB).isAir())
+                                        + " interior=" + (!hasToBeInside || this.isInterior(level, x, y, z, chunkBB))
+                                        + " edge=" + edgeBlock.name());
+                            }
+                        }
+                        if (roll > probability) {
                             continue;
                         }
                         if (skipAir && this.getBlock(level, x, y, z, chunkBB).isAir()) {
@@ -860,7 +875,7 @@ public final class MineshaftPieces {
                     var aboveState = level.getBlock(wx, yAbove, wz);
                     var emptyAbove = isReplaceableByStructures(aboveState);
                     if (!emptyAbove && canHangChainBelow(aboveState)) {
-                        level.setBlock(wx, worldY + 1, wz, this.type.fenceState());
+                        level.setBlockRaw(wx, worldY + 1, wz, this.type.fenceState());
                         fillColumnBetween(level, Block.IRON_CHAIN, wx, wz, worldY + 2, worldY + distance);
                         return;
                     }
@@ -875,12 +890,17 @@ public final class MineshaftPieces {
         private static void fillColumnBetween(MineshaftLevel level, Block pillarBlock, int x, int z,
                 int bottomInclusive, int topExclusive) {
             for (var y = bottomInclusive; y < topExclusive; y++) {
-                level.setBlock(x, y, z, pillarBlock);
+                level.setBlockRaw(x, y, z, pillarBlock);
             }
         }
 
+        /**
+         * Vanilla {@code Block.canSupportCenter(DOWN)}: a cobweb reports
+         * isSolid in Minestom but has no support shape, so a chain must not
+         * hang below one (the fence anchor would overwrite a spider web).
+         */
         private static boolean canHangChainBelow(Block block) {
-            return block.isSolid() && !isFallingBlock(block);
+            return block.isSolid() && !isFallingBlock(block) && !block.compare(Block.COBWEB);
         }
 
         private void placeSupport(MineshaftLevel level, BoundingBox chunkBB, int x0, int y0, int z, int y1, int x1,

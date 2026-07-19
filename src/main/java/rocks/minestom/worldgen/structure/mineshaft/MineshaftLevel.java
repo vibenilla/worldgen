@@ -69,6 +69,23 @@ final class MineshaftLevel {
     }
 
     /**
+     * Write without the connection-shape mark: vanilla only marks fences
+     * placed through {@code StructurePiece.placeBlock} (SHAPE_CHECK_BLOCKS);
+     * the pillar and chain-anchor fences written by
+     * {@code fillPillarDownOrChainUp} bypass it and keep their default
+     * unconnected state forever.
+     */
+    void setBlockRaw(int x, int y, int z, Block block) {
+        var index = this.index(x, y, z);
+        if (index < 0) {
+            return;
+        }
+        this.blocks[index] = block;
+        this.adapter.setBlock(x, y, z, block);
+        StructureWrites.record(this.chunkHandle, x, y, z, block);
+    }
+
+    /**
      * Vanilla {@code StructurePiece.SHAPE_CHECK_BLOCKS}, restricted to the
      * families mineshaft pieces actually place (fences): a position marked
      * here has its connection shape recomputed against its final neighbors
