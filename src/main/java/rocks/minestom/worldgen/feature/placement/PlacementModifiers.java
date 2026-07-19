@@ -479,12 +479,16 @@ public final class PlacementModifiers {
         @Override
             public List<BlockVec> apply(PlacementContext context, RandomSource random, BlockVec position) {
                 var surfaceY = context.getHeight(this.heightmapType, position.blockX(), position.blockZ());
-                var minY = surfaceY + this.minInclusive;
-                var maxY = surfaceY + this.maxInclusive;
+                var minY = (long) surfaceY + this.minInclusive;
+                var maxY = (long) surfaceY + this.maxInclusive;
                 if (position.blockY() >= minY && position.blockY() <= maxY) {
                     return List.of(position);
                 }
 
+                if (System.getProperty("worldgen.debugFilter") != null) {
+                    System.out.println("THRESHREJ " + context.currentFeature() + " at " + position
+                            + " surface=" + surfaceY + " type=" + this.heightmapType);
+                }
                 return List.of();
             }
         }
