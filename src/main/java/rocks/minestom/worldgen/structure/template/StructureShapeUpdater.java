@@ -60,7 +60,7 @@ public final class StructureShapeUpdater {
      * placement replaced. Runs before {@link #update}'s placed-block pass,
      * matching vanilla's order inside {@code placeInWorld}.
      */
-    public static void updateEdges(GenerationUnitAdapter level, List<BlockVec> placedPositions) {
+    public static void updateEdges(GenerationUnitAdapter level, BlockTagManager blockTags, List<BlockVec> placedPositions) {
         var placed = new java.util.HashSet<>(placedPositions);
         for (var position : placedPositions) {
             for (var direction : Direction.values()) {
@@ -69,15 +69,26 @@ public final class StructureShapeUpdater {
                         position.blockY() + direction.normalY(),
                         position.blockZ() + direction.normalZ());
                 if (!placed.contains(edge)) {
-                    reactAtEdge(level, edge, direction.opposite());
+                    reactAtEdge(level, blockTags, edge, direction.opposite());
                 }
             }
         }
     }
 
-    private static void reactAtEdge(GenerationUnitAdapter level, BlockVec position, Direction towardPlaced) {
+    private static void reactAtEdge(GenerationUnitAdapter level, BlockTagManager blockTags, BlockVec position,
+            Direction towardPlaced) {
         var block = level.getBlock(position.blockX(), position.blockY(), position.blockZ());
         var key = block.key().value();
+
+        // A fence or pane just outside the placed volume recomputes its
+        // connections against the freshly placed neighbors, exactly like
+        // vanilla's edge updateShape (this is what connects a template's
+        // chunk-border fences to the part placed by the later chunk).
+        var family = classify(block);
+        if (family == Family.FENCE || family == Family.PANE) {
+            updateCrossCollisionSides(level, blockTags, position, block);
+            return;
+        }
 
         if (DOUBLE_PLANTS.contains(key)) {
             // Vanilla DoublePlantBlock.updateShape: a lower half reacts to its

@@ -104,6 +104,7 @@ public final class NetherFossilPlacer {
         }
 
         if (!connectionShapeUpdates.isEmpty()) {
+            StructureShapeUpdater.updateEdges(adapter, this.structureLoader.blockTags(), connectionShapeUpdates);
             StructureShapeUpdater.update(adapter, this.structureLoader.blockTags(), connectionShapeUpdates);
         }
     }
