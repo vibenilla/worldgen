@@ -65,6 +65,16 @@ public final class TerrainBlockPeek {
                 }
             }
         }
+        if (System.getProperty("worldgen.dumpFluidTicks") != null) {
+            for (var entry : terrainCache.entrySet()) {
+                for (var position : entry.getValue().fluidTicks()) {
+                    if (position.blockX() >= minX && position.blockX() <= maxX
+                            && position.blockZ() >= minZ && position.blockZ() <= maxZ) {
+                        System.out.println("FLUIDTICK " + position.blockX() + "," + position.blockY() + "," + position.blockZ());
+                    }
+                }
+            }
+        }
         System.exit(0);
     }
 }

@@ -264,7 +264,7 @@ public final class StructurePlacer {
                 // (its child rooms are dispatched internally), so - like
                 // mineshaft and scattered features - it fully replaces the
                 // generic path for its set rather than complementing it.
-                this.monumentPlacer.place(unit, biomeZoomer, settings, structureSet, surfaceHeights);
+                this.monumentPlacer.place(unit, biomeZoomer, settings, structureSet, surfaceHeights, featureAdapter);
                 continue;
             }
 
@@ -619,6 +619,23 @@ public final class StructurePlacer {
     }
 
     /**
+     * The decorated chunk's frozen water heights (first fluid from the top,
+     * stored one above the fluid block), or null when the terrain lookup does
+     * not resolve to the same chunk data as the given surface heights.
+     */
+    private int[] waterHeights(int chunkStartX, int chunkStartZ, int[] surfaceHeights) {
+        var lookup = validatedLookup(chunkStartX >> 4, chunkStartZ >> 4, surfaceHeights);
+        if (lookup == null) {
+            return null;
+        }
+        try {
+            return lookup.terrain(chunkStartX >> 4, chunkStartZ >> 4).waterHeights();
+        } catch (Exception exception) {
+            return null;
+        }
+    }
+
+    /**
      * How far away (in chunks) a start of this set can lie while its pieces
      * still reach the generating chunk.
      */
@@ -929,15 +946,24 @@ public final class StructurePlacer {
                 firstBounds.minY(),
                 firstBounds.minZ() + (firstBounds.maxZ() - firstBounds.minZ() + 1) / 2);
 
+        // Vanilla GravityProcessor samples WORLD_SURFACE_WG, where water
+        // counts: a village street crossing an ocean bay snaps to the water
+        // surface, not the ocean floor.
+        var waterHeights = this.waterHeights(chunkStartX, chunkStartZ, surfaceHeights);
         StructureProcessorContext.HeightSampler heightSampler = (x, z) -> {
             var localX = x - chunkStartX;
             var localZ = z - chunkStartZ;
             if (surfaceHeights == null || localX < 0 || localX >= chunkSizeX || localZ < 0 || localZ >= chunkSizeZ) {
                 return Integer.MIN_VALUE;
             }
-            var surfaceY = surfaceHeights[localX * chunkSizeZ + localZ];
+            var index = localX * chunkSizeZ + localZ;
+            var solidTop = surfaceHeights[index];
             // Vanilla getHeight returns one above the heightmap surface.
-            return surfaceY == Integer.MIN_VALUE ? Integer.MIN_VALUE : surfaceY + 1;
+            var surfaceY = solidTop == Integer.MIN_VALUE ? Integer.MIN_VALUE : solidTop + 1;
+            if (waterHeights != null && waterHeights[index] != Integer.MIN_VALUE) {
+                surfaceY = Math.max(surfaceY, waterHeights[index]);
+            }
+            return surfaceY;
         };
 
         for (var piece : pieces) {

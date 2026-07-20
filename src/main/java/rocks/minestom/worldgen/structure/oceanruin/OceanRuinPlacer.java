@@ -359,10 +359,16 @@ public final class OceanRuinPlacer {
      * air, water and ice from one below that height to find the true floor,
      * and only commits to the lower height when the footprint is deep and
      * wide enough (matching vanilla's {@code topY - minY > 2 && area > width - 2}).
+     *
+     * <p>Vanilla runs this at decoration time against the live region, so the
+     * frozen heightmap and the descent scan both see POST-CARVER terrain (a
+     * carved underwater cave under the footprint sinks the whole ruin); the
+     * biome check in {@link #tryGenerate} instead mirrors vanilla's
+     * {@code getBaseHeight} noise-column probe and stays on uncarved terrain.
      */
     private int resolveHeight(BlockVec origin, Rotation rotation, BlockVec templateSize,
             NoiseGeneratorSettingsRuntime settings) {
-        var oceanFloorY = this.oceanFloorHeight(origin.blockX(), origin.blockZ(), settings);
+        var oceanFloorY = this.carvedOceanFloorHeight(origin.blockX(), origin.blockZ(), settings);
         var pos = new BlockVec(origin.blockX(), oceanFloorY, origin.blockZ());
         var farCorner = rotation.rotate(
                 new BlockVec(templateSize.blockX() - 1, 0, templateSize.blockZ() - 1), BlockVec.ZERO);
@@ -384,10 +390,10 @@ public final class OceanRuinPlacer {
         for (var x = minX; x <= maxX; x++) {
             for (var z = minZ; z <= maxZ; z++) {
                 var floorY = pos.blockY() - 1;
-                var state = this.terrainBlock(x, floorY, z, settings);
+                var state = this.carvedTerrainBlock(x, floorY, z, settings);
                 while (isPassableFloor(state, iceTag, this.structureLoader) && floorY > settings.minY() + 1) {
                     floorY--;
-                    state = this.terrainBlock(x, floorY, z, settings);
+                    state = this.carvedTerrainBlock(x, floorY, z, settings);
                 }
                 minY = Math.min(minY, floorY);
                 if (floorY < topY - 2) {
@@ -417,10 +423,19 @@ public final class OceanRuinPlacer {
         return solidTop == Integer.MIN_VALUE ? settings.minY() : solidTop + 1;
     }
 
-    private Block terrainBlock(int blockX, int blockY, int blockZ, NoiseGeneratorSettingsRuntime settings) {
+    private int carvedOceanFloorHeight(int blockX, int blockZ, NoiseGeneratorSettingsRuntime settings) {
         var chunkX = Math.floorDiv(blockX, 16);
         var chunkZ = Math.floorDiv(blockZ, 16);
-        var terrainData = this.terrainData(chunkX, chunkZ, settings);
+        var terrainData = this.carvedTerrainData(chunkX, chunkZ, settings);
+        var index = (blockX - (chunkX << 4)) * 16 + (blockZ - (chunkZ << 4));
+        var solidTop = terrainData.surfaceHeights()[index];
+        return solidTop == Integer.MIN_VALUE ? settings.minY() : solidTop + 1;
+    }
+
+    private Block carvedTerrainBlock(int blockX, int blockY, int blockZ, NoiseGeneratorSettingsRuntime settings) {
+        var chunkX = Math.floorDiv(blockX, 16);
+        var chunkZ = Math.floorDiv(blockZ, 16);
+        var terrainData = this.carvedTerrainData(chunkX, chunkZ, settings);
         var localX = blockX - (chunkX << 4);
         var localZ = blockZ - (chunkZ << 4);
         var yIndex = blockY - settings.minY();
@@ -435,6 +450,18 @@ public final class OceanRuinPlacer {
     private TerrainData terrainData(int chunkX, int chunkZ, NoiseGeneratorSettingsRuntime settings) {
         return this.terrainCache.computeIfAbsent(packChunk(chunkX, chunkZ),
                 unused -> new TerrainGenerator(settings).generate(chunkX, chunkZ));
+    }
+
+    private TerrainData carvedTerrainData(int chunkX, int chunkZ, NoiseGeneratorSettingsRuntime settings) {
+        var lookup = StructureWrites.terrainLookup();
+        if (lookup != null) {
+            try {
+                return lookup.terrain(chunkX, chunkZ);
+            } catch (Exception exception) {
+                // fall through to the uncarved local terrain
+            }
+        }
+        return this.terrainData(chunkX, chunkZ, settings);
     }
 
     private static BoundingBox copyBounds(BoundingBox bounds) {

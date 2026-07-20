@@ -105,7 +105,61 @@ public final class TreeFeature implements Feature<TreeConfiguration> {
             }
         }
 
-        return updateLeaves(level, logs, leaves, decorations);
+        var updated = updateLeaves(level, logs, leaves, decorations);
+        this.breakOrphanedDoublePlants(level, logs, leaves, decorations);
+        return updated;
+    }
+
+    /**
+     * Vanilla {@code TreeFeature.place} finishes with
+     * {@code StructureTemplate.updateShapeAtEdge} over the tree's volume: a
+     * double-plant half left without its partner (a leaf or log overwrote the
+     * other half) reacts to the shape update and is destroyed - replaced by
+     * its fluid (water for seagrass-family plants, air otherwise) - and the
+     * cascade takes the surviving partner with it.
+     */
+    private <T extends Block.Getter & Block.Setter> void breakOrphanedDoublePlants(
+            T level, Set<VanillaPos> logs, Set<VanillaPos> leaves, Set<VanillaPos> decorations) {
+        var visited = new HashSet<BlockVec>();
+        for (var set : List.of(logs, leaves, decorations)) {
+            for (var placed : set) {
+                for (var offset : NEIGHBOR_OFFSETS) {
+                    var neighborPos = new BlockVec(placed.x() + offset[0], placed.y() + offset[1], placed.z() + offset[2]);
+                    if (!visited.add(neighborPos)) {
+                        continue;
+                    }
+                    var neighbor = level.getBlock(neighborPos);
+                    var half = neighbor.getProperty("half");
+                    if (half == null || !isDoublePlant(neighbor)) {
+                        continue;
+                    }
+                    var partnerPos = half.equals("lower") ? neighborPos.add(0, 1, 0) : neighborPos.add(0, -1, 0);
+                    var partner = level.getBlock(partnerPos);
+                    var partnerHalf = half.equals("lower") ? "upper" : "lower";
+                    if (partner.key().equals(neighbor.key()) && partnerHalf.equals(partner.getProperty("half"))) {
+                        continue;
+                    }
+                    level.setBlock(neighborPos, brokenPlantState(neighbor));
+                }
+            }
+        }
+    }
+
+    private static final int[][] NEIGHBOR_OFFSETS = {
+            {0, 1, 0}, {0, -1, 0}, {1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1}
+    };
+
+    private static boolean isDoublePlant(Block block) {
+        var key = block.key().value();
+        return switch (key) {
+            case "tall_grass", "large_fern", "tall_seagrass", "sunflower", "lilac", "rose_bush", "peony",
+                    "pitcher_plant" -> true;
+            default -> false;
+        };
+    }
+
+    private static Block brokenPlantState(Block plant) {
+        return WaterStates.hasWaterFluid(plant) ? Block.WATER : Block.AIR;
     }
 
     private <T extends Block.Getter & Block.Setter> boolean doPlace(

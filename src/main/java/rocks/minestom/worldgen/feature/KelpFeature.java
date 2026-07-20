@@ -17,6 +17,14 @@ public final class KelpFeature implements Feature<NoneFeatureConfiguration> {
         var floorY = level instanceof GenerationUnitAdapter adapter
                 ? adapter.getHeight(origin.blockX(), origin.blockZ())
                 : origin.blockY();
+        if (System.getProperty("worldgen.kelpDebug") != null
+                && (origin.blockX() + "," + origin.blockZ()).equals(System.getProperty("worldgen.kelpDebug"))) {
+            System.out.println("KELPDBG origin=" + origin + " floorY=" + floorY);
+            for (var y = floorY - 3; y <= floorY + 1; y++) {
+                System.out.println("KELPDBG   " + y + " "
+                        + level.getBlock(new BlockVec(origin.blockX(), y, origin.blockZ())).name());
+            }
+        }
         var kelpPos = new BlockVec(origin.blockX(), floorY, origin.blockZ());
 
         if (isWater(level.getBlock(kelpPos))) {

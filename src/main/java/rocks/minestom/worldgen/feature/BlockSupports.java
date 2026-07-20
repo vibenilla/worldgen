@@ -25,6 +25,24 @@ public final class BlockSupports {
      * The support set for the given block state, or null when no
      * {@code supports_<name>} tag exists for it.
      */
+    /** The installed block tag manager, or null before the data pack loads. */
+    public static BlockTagManager manager() {
+        return blockTags;
+    }
+
+    /** Whether the block is in the given block tag (resolved recursively). */
+    public static boolean isInTag(String tagName, Block block) {
+        var manager = blockTags;
+        if (manager == null) {
+            return false;
+        }
+        Set<Key> members;
+        synchronized (manager) {
+            members = manager.blocks(Key.key(tagName));
+        }
+        return members != null && members.contains(block.key());
+    }
+
     public static Set<Key> supportsOf(Block block) {
         var manager = blockTags;
         if (manager == null) {

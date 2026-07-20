@@ -819,11 +819,23 @@ public final class StructureTemplate {
         }
 
         private static boolean isFullCollisionBlock(Block state) {
+            // Vanilla isCollisionShapeFullBlock: the shape IS the full cube.
+            // Bounds alone are not enough - a stair spans the full 0..1 bounds
+            // without being a cube, and its category decides the palette list
+            // order the capped processors index into.
             var shape = state.registry().collisionShape();
             var start = shape.relativeStart();
             var end = shape.relativeEnd();
-            return start.x() == 0.0 && start.y() == 0.0 && start.z() == 0.0
-                    && end.x() == 1.0 && end.y() == 1.0 && end.z() == 1.0;
+            if (start.x() != 0.0 || start.y() != 0.0 || start.z() != 0.0
+                    || end.x() != 1.0 || end.y() != 1.0 || end.z() != 1.0) {
+                return false;
+            }
+            for (var face : net.minestom.server.instance.block.BlockFace.values()) {
+                if (!shape.isFaceFull(face)) {
+                    return false;
+                }
+            }
+            return true;
         }
     }
 }

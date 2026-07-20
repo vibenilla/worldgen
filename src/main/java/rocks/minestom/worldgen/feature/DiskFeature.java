@@ -44,6 +44,7 @@ public final class DiskFeature implements Feature<DiskConfiguration> {
     private <T extends Block.Getter & Block.Setter> boolean placeColumn(DiskConfiguration config, T level,
             RandomSource random, PlacementContext predicateContext, int top, int bottom, int x, int z) {
         var placedAny = false;
+        var placedAbove = false;
 
         for (var y = top; y > bottom; y--) {
             var position = new BlockVec(x, y, z);
@@ -51,8 +52,25 @@ public final class DiskFeature implements Feature<DiskConfiguration> {
                 var state = config.stateProvider().getOptionalState(level, random, position);
                 if (state != null) {
                     level.setBlock(position, state);
+                    // Vanilla markAboveForPostProcessing: up to two non-air
+                    // blocks above each column's topmost placed block get the
+                    // FULL post-process pass, which breaks a plant left
+                    // without support (grass over a new sand disk) via
+                    // updateFromNeighbourShapes
+                    if (!placedAbove && level instanceof GenerationUnitAdapter adapter) {
+                        for (var above = 1; above <= 2; above++) {
+                            var abovePosition = position.add(0, above, 0);
+                            if (level.getBlock(abovePosition).isAir()) {
+                                break;
+                            }
+                            adapter.markPostProcess(abovePosition);
+                        }
+                    }
                     placedAny = true;
+                    placedAbove = true;
                 }
+            } else {
+                placedAbove = false;
             }
         }
 

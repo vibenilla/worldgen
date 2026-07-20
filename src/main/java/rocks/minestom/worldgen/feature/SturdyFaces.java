@@ -22,7 +22,63 @@ public final class SturdyFaces {
                         || block.compare(Block.SCAFFOLDING))) {
             return true;
         }
+        // Vanilla LeavesBlock.getBlockSupportShape is Shapes.empty(), so no
+        // leaves face is ever sturdy even though the collision box is full
+        // (verified against an azalea_leaves vegetation patch probe at r24).
+        if (block.name().endsWith("_leaves")) {
+            return false;
+        }
+        // Stairs are a multi-box shape Minestom's face fullness misses: the
+        // back (facing) face is full except for outer corners, an inner
+        // corner adds the adjacent side, and the slab half fills top/bottom.
+        if (block.name().endsWith("_stairs")) {
+            var half = block.getProperty("half");
+            if (("top".equals(half) && face == BlockFace.TOP)
+                    || ("bottom".equals(half) && face == BlockFace.BOTTOM)) {
+                return true;
+            }
+            var facing = block.getProperty("facing");
+            var shape = block.getProperty("shape");
+            if (face.name().toLowerCase().equals(facing)) {
+                return !"outer_left".equals(shape) && !"outer_right".equals(shape);
+            }
+            if ("inner_left".equals(shape)) {
+                return face.name().toLowerCase().equals(counterClockwise(facing));
+            }
+            if ("inner_right".equals(shape)) {
+                return face.name().toLowerCase().equals(clockwise(facing));
+            }
+            return false;
+        }
+        // Mud and soul sand override the support shape to a full block, and a
+        // full snow layer stack's support shape is a full cube.
+        if (block.compare(Block.MUD) || block.compare(Block.SOUL_SAND)) {
+            return true;
+        }
+        if (block.compare(Block.SNOW) && "8".equals(block.getProperty("layers"))) {
+            return true;
+        }
         return block.registry().collisionShape().isFaceFull(face);
+    }
+
+    private static String clockwise(String facing) {
+        return switch (facing) {
+            case "north" -> "east";
+            case "east" -> "south";
+            case "south" -> "west";
+            case "west" -> "north";
+            default -> facing;
+        };
+    }
+
+    private static String counterClockwise(String facing) {
+        return switch (facing) {
+            case "north" -> "west";
+            case "west" -> "south";
+            case "south" -> "east";
+            case "east" -> "north";
+            default -> facing;
+        };
     }
 
     /**
@@ -35,12 +91,9 @@ public final class SturdyFaces {
      * direction from the attachment toward the neighbour).
      */
     public static boolean canAttachTo(Block neighbor, BlockFace attachmentFace) {
-        if (neighbor.compare(Block.MUD) || neighbor.compare(Block.SOUL_SAND)) {
+        if (isFaceSturdy(neighbor, attachmentFace)) {
             return true;
         }
-        if (neighbor.compare(Block.SNOW) && "8".equals(neighbor.getProperty("layers"))) {
-            return true;
-        }
-        return isFaceSturdy(neighbor, attachmentFace);
+        return neighbor.registry().collisionShape().isFaceFull(attachmentFace);
     }
 }

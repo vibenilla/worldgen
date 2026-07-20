@@ -24,11 +24,17 @@ public final class StructureStartScan {
                     continue;
                 }
                 var starts = chunkTag.getCompound("structures").getCompound("starts");
+                var detail = args.length > 2 ? args[2] : "";
                 for (var entry : starts) {
                     var start = (CompoundBinaryTag) entry.getValue();
                     if (!"INVALID".equals(start.getString("id", "INVALID"))) {
                         System.out.println(entry.getKey() + " at chunk " + chunkX + "," + chunkZ
                                 + " children=" + start.getList("Children").size());
+                        if (!detail.isEmpty() && entry.getKey().contains(detail)) {
+                            for (var child : start.getList("Children")) {
+                                System.out.println("  child " + child);
+                            }
+                        }
                     }
                 }
             }

@@ -43,6 +43,15 @@ public final class GenerationUnitAdapter implements Block.Getter, Block.Setter {
         default boolean writePending(int chunkX, int chunkZ, int bufferIndex, Block block, Block previousBlock) {
             return false;
         }
+
+        /**
+         * Whether the chunk's decoration has completed. Implementations that
+         * cannot tell return null, and light emulation falls back to the
+         * scanline-order approximation.
+         */
+        default Boolean decorated(int chunkX, int chunkZ) {
+            return null;
+        }
     }
 
     /**
@@ -125,6 +134,64 @@ public final class GenerationUnitAdapter implements Block.Getter, Block.Setter {
     }
 
     /**
+     * Whether the position's chunk generates later in the scanline ladder
+     * than the decorated chunk. Such a chunk has no light data yet, and
+     * vanilla's sky light storage returns full brightness (15) everywhere in
+     * it - the decorated chunk itself and already-decorated chunks read 0
+     * during generation (verified with an instrumented MushroomBlock
+     * canSurvive trace at r24).
+     */
+    public boolean fullBrightAtGeneration(int x, int z) {
+        if (!this.hasSkylight()) {
+            return false;
+        }
+        var chunkX = x >> 4;
+        var chunkZ = z >> 4;
+        var centerX = this.terrainStartX >> 4;
+        var centerZ = this.terrainStartZ >> 4;
+        // The vanilla light engine reads 0 for any chunk it knows about (the
+        // chunk has noise sections: everything within ring 1 of a decorated
+        // or currently-decorating chunk, since FEATURES requires CARVERS on
+        // its ring) and walks up to full bright (15) only for columns with no
+        // sections at all (instrumented SHROOM trace: an east ring-1 neighbor
+        // reads 0 during decoration, not 15).
+        if (Math.max(Math.abs(chunkX - centerX), Math.abs(chunkZ - centerZ)) <= 1) {
+            return false;
+        }
+        if (this.terrainLookup != null) {
+            var anyDecoratedNear = false;
+            var trackingSupported = true;
+            neighborhood:
+            for (var offsetX = -1; offsetX <= 1; offsetX++) {
+                for (var offsetZ = -1; offsetZ <= 1; offsetZ++) {
+                    var decorated = this.terrainLookup.decorated(chunkX + offsetX, chunkZ + offsetZ);
+                    if (decorated == null) {
+                        trackingSupported = false;
+                        break neighborhood;
+                    }
+                    if (decorated) {
+                        anyDecoratedNear = true;
+                        break neighborhood;
+                    }
+                }
+            }
+            if (trackingSupported) {
+                return !anyDecoratedNear;
+            }
+        }
+        return chunkX > centerX || (chunkX == centerX && chunkZ > centerZ);
+    }
+
+    /**
+     * Whether this dimension has sky light. Of the vanilla dimensions only
+     * the overworld does (and only the overworld's build height starts at
+     * -64), so the world floor stands in for the dimension type here.
+     */
+    public boolean hasSkylight() {
+        return this.terrainMinY == -64;
+    }
+
+    /**
      * Vanilla {@code ChunkAccess.markPosForPostProcessing}: queues the
      * position for the FULL-promotion post-process pass (fluid tick plus
      * neighbour-shape update, see {@code WaterSpread.postProcessMarked}).
@@ -146,6 +213,12 @@ public final class GenerationUnitAdapter implements Block.Getter, Block.Setter {
         if (block.compare(Block.MAGMA_BLOCK) || block.compare(Block.SOUL_SAND)) {
             rocks.minestom.worldgen.structure.StructureWrites.markPostProcess(
                     this.terrainLookup, position.add(0, 1, 0));
+        }
+        // Vanilla registers hasPostProcess on the mushroom blocks themselves:
+        // every placed mushroom is re-checked at FULL, where the real light
+        // level breaks sky-exposed ones (canSurvive light < 13)
+        if (block.compare(Block.RED_MUSHROOM) || block.compare(Block.BROWN_MUSHROOM)) {
+            rocks.minestom.worldgen.structure.StructureWrites.markPostProcess(this.terrainLookup, position);
         }
 
         var bufferIndex = this.bufferIndex(position);
@@ -191,15 +264,114 @@ public final class GenerationUnitAdapter implements Block.Getter, Block.Setter {
     }
 
     /**
+     * Vanilla only persists the FINAL heightmaps for pre-FEATURES chunks, so
+     * a chunk that unloads after receiving writes lazily RE-PRIMES its WG
+     * heightmaps from live blocks at the first read after reload. The only
+     * chunks that unload mid-pregen are the startup spawn area (decorated
+     * before the empty-server pause; nothing holds them once spawn
+     * preparation ends) and the chunks their decorations spilled into (the
+     * 3x3 halo). Ladder chunks never unload (forceloads are never removed),
+     * so the frozen post-carver model stays correct everywhere else.
+     *
+     * <p>The startup set comes from the compare harness (pre-PAUSE DECO
+     * events, {@code worldgen.startupChunks}). During the startup chunks' OWN
+     * decoration the maps are still fresh (the unload happens afterward), so
+     * repriming only applies once a non-startup chunk is being decorated.
+     */
+    private static java.util.Set<Long> startupChunks;
+    private static java.util.Set<Long> reprimedChunks;
+
+    private static void loadStartupChunks() {
+        if (startupChunks != null) {
+            return;
+        }
+        var startup = new java.util.HashSet<Long>();
+        var halo = new java.util.HashSet<Long>();
+        var property = System.getProperty("worldgen.startupChunks", "");
+        if (!property.isEmpty()) {
+            for (var entry : property.split(";")) {
+                var parts = entry.split(",");
+                if (parts.length != 2) {
+                    continue;
+                }
+                var chunkX = Integer.parseInt(parts[0].trim());
+                var chunkZ = Integer.parseInt(parts[1].trim());
+                startup.add((long) chunkX << 32 | (chunkZ & 0xFFFFFFFFL));
+                for (var offsetX = -1; offsetX <= 1; offsetX++) {
+                    for (var offsetZ = -1; offsetZ <= 1; offsetZ++) {
+                        halo.add((long) (chunkX + offsetX) << 32 | ((chunkZ + offsetZ) & 0xFFFFFFFFL));
+                    }
+                }
+            }
+        }
+        reprimedChunks = halo;
+        startupChunks = startup;
+    }
+
+    private boolean isReprimed(int chunkX, int chunkZ) {
+        loadStartupChunks();
+        if (reprimedChunks.isEmpty()
+                || !reprimedChunks.contains((long) chunkX << 32 | (chunkZ & 0xFFFFFFFFL))) {
+            return false;
+        }
+        // Still inside the startup phase: the decorated chunk is itself a
+        // startup chunk, whose WG maps are fresh and frozen.
+        return !startupChunks.contains(
+                (long) (this.terrainStartX >> 4) << 32 | ((this.terrainStartZ >> 4) & 0xFFFFFFFFL));
+    }
+
+    /**
+     * Per-chunk re-primed WG heightmap snapshots: vanilla's lazy re-prime
+     * happens ONCE (the first {@code getHeight} after reload primes all 256
+     * columns from live blocks) and the map is frozen again from then on, so
+     * later writes into the chunk must not show up in later reads.
+     */
+    private static final java.util.Map<TerrainLookup, java.util.Map<Long, int[]>> REPRIMED_WORLD_SURFACE =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+    private static final java.util.Map<TerrainLookup, java.util.Map<Long, int[]>> REPRIMED_OCEAN_FLOOR =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+
+    private int reprimedHeight(java.util.Map<TerrainLookup, java.util.Map<Long, int[]>> cache,
+            HeightmapType type, int x, int z) {
+        var chunkX = x >> 4;
+        var chunkZ = z >> 4;
+        var perChunk = cache.computeIfAbsent(this.terrainLookup,
+                unused -> java.util.Collections.synchronizedMap(new java.util.HashMap<>()));
+        var heights = perChunk.computeIfAbsent((long) chunkX << 32 | (chunkZ & 0xFFFFFFFFL), unused -> {
+            var blocks = this.terrainLookup.terrain(chunkX, chunkZ).blocks();
+            var snapshot = new int[256];
+            for (var index = 0; index < 256; index++) {
+                var columnBase = index * this.terrainHeight;
+                var height = this.terrainMinY;
+                for (var yIndex = this.terrainHeight - 1; yIndex >= 0; yIndex--) {
+                    var block = blocks[columnBase + yIndex];
+                    if (block != null && type.isOpaque(block)) {
+                        height = this.terrainMinY + yIndex + 1;
+                        break;
+                    }
+                }
+                snapshot[index] = height;
+            }
+            return snapshot;
+        });
+        return heights[(x & 15) * 16 + (z & 15)];
+    }
+
+    /**
      * Vanilla's {@code OCEAN_FLOOR_WG} heightmap: one above the highest solid
      * block of the post-carver terrain. Vanilla stops updating the WG
      * heightmaps once a chunk passes the carvers stage
      * ({@code ChunkStatus.CARVERS} switches {@code heightmapsAfter} to the
-     * final set), so structure and feature writes never show up in them.
+     * final set), so structure and feature writes never show up in them -
+     * except for re-primed chunks (see {@link #isReprimed}), which read the
+     * live blocks.
      */
     public int frozenOceanFloor(int x, int z) {
         if (this.terrainLookup == null) {
             return Integer.MAX_VALUE;
+        }
+        if (this.isReprimed(x >> 4, z >> 4)) {
+            return this.reprimedHeight(REPRIMED_OCEAN_FLOOR, HeightmapType.OCEAN_FLOOR, x, z);
         }
         var terrain = this.terrainLookup.terrain(x >> 4, z >> 4);
         var solidTop = terrain.surfaceHeights()[(x & 15) * 16 + (z & 15)];
@@ -214,6 +386,9 @@ public final class GenerationUnitAdapter implements Block.Getter, Block.Setter {
     public int frozenWorldSurface(int x, int z) {
         if (this.terrainLookup == null) {
             return Integer.MAX_VALUE;
+        }
+        if (this.isReprimed(x >> 4, z >> 4)) {
+            return this.reprimedHeight(REPRIMED_WORLD_SURFACE, HeightmapType.WORLD_SURFACE, x, z);
         }
         var terrain = this.terrainLookup.terrain(x >> 4, z >> 4);
         var index = (x & 15) * 16 + (z & 15);

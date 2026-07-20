@@ -72,6 +72,7 @@ public final class VanillaComparison {
         // so the decoration ORDER (which neighbors already wrote canopies)
         // must match vanilla's or a chunk-to-chunk cascade seeds at the edges.
         var pregenRadius = Integer.getInteger("compare.pregenRadius", 16);
+        configureReprimedChunks();
         for (var key : decorationOrder(pregenRadius)) {
             var chunkX = (int) (key >> 32);
             var chunkZ = key.intValue();
@@ -126,6 +127,48 @@ public final class VanillaComparison {
         stats.generatedChunks = loadFutures.size();
         stats.print(generationNanos / 1_000_000.0, totalSeconds);
         System.exit(0);
+    }
+
+    /**
+     * Chunks decorated during vanilla's startup spawn preparation (DECO
+     * lines before a PAUSE marker in the event file) unload once the spawn
+     * ticket lapses; since only the final heightmaps are persisted for
+     * pre-FEATURES chunks, those chunks and every chunk their decorations
+     * spilled into (the 3x3 halo) re-prime their WG heightmaps from live
+     * blocks when the ladder reaches them. Publishes the halo to the
+     * generator via {@code worldgen.reprimedChunks}.
+     */
+    private static void configureReprimedChunks() {
+        var orderFile = System.getProperty("compare.decoOrderFile", "");
+        if (orderFile.isEmpty()) {
+            return;
+        }
+        try {
+            var lines = java.nio.file.Files.readAllLines(java.nio.file.Path.of(orderFile));
+            // No PAUSE marker means the whole file is the ladder: nothing to mark.
+            if (lines.stream().noneMatch(line -> line.trim().equals("PAUSE"))) {
+                return;
+            }
+            var startup = new java.util.LinkedHashSet<String>();
+            for (var line : lines) {
+                var trimmed = line.trim();
+                if (trimmed.equals("PAUSE")) {
+                    break;
+                }
+                if (!trimmed.startsWith("DECO ")) {
+                    continue;
+                }
+                var parts = trimmed.substring("DECO ".length()).split(",");
+                if (parts.length == 2) {
+                    startup.add(parts[0].trim() + "," + parts[1].trim());
+                }
+            }
+            if (!startup.isEmpty()) {
+                System.setProperty("worldgen.startupChunks", String.join(";", startup));
+            }
+        } catch (java.io.IOException exception) {
+            throw new java.io.UncheckedIOException(exception);
+        }
     }
 
     /**

@@ -203,6 +203,12 @@ public final class MineshaftPieces {
             var wx = this.worldX(x, z);
             var wy = this.worldY(y);
             var wz = this.worldZ(x, z);
+            var writeTrace = System.getProperty("worldgen.writeTrace");
+            if (writeTrace != null && writeTrace.equals(wx + "," + wy + "," + wz)) {
+                System.out.println("MINEPLACE " + wx + "," + wy + "," + wz + " block=" + block.name()
+                        + " inside=" + isInside(chunkBB, wx, wy, wz)
+                        + " replaceable=" + this.canBeReplaced(level, wx, wy, wz));
+            }
             if (!isInside(chunkBB, wx, wy, wz)) {
                 return;
             }

@@ -61,6 +61,21 @@ public final class MonumentPlacer {
 
     public void place(GenerationUnit unit, BiomeZoomer biomeZoomer,
             NoiseGeneratorSettingsRuntime settings, StructureSet structureSet, int[] surfaceHeights) {
+        this.place(unit, biomeZoomer, settings, structureSet, surfaceHeights, null);
+    }
+
+    /**
+     * When a {@code featureAdapter} is given (the interleaved structure step
+     * inside feature decoration), writes go through the SAME fork as the
+     * chunk's feature placement, so structure and feature writes land in
+     * true chronological order - a monument water box no longer erases the
+     * kelp and seagrass a later step plants inside it, which is what
+     * happened with a separate fork (Minestom applies forks in creation
+     * order, and the feature fork is created first).
+     */
+    public void place(GenerationUnit unit, BiomeZoomer biomeZoomer,
+            NoiseGeneratorSettingsRuntime settings, StructureSet structureSet, int[] surfaceHeights,
+            GenerationUnitAdapter featureAdapter) {
         var startX = unit.absoluteStart().blockX();
         var startZ = unit.absoluteStart().blockZ();
         var chunkX = Math.floorDiv(startX, 16);
@@ -70,6 +85,12 @@ public final class MonumentPlacer {
         for (var sourceX = chunkX - REFERENCE_RADIUS; sourceX <= chunkX + REFERENCE_RADIUS; sourceX++) {
             for (var sourceZ = chunkZ - REFERENCE_RADIUS; sourceZ <= chunkZ + REFERENCE_RADIUS; sourceZ++) {
                 var start = this.startAt(sourceX, sourceZ, structureSet, settings, biomeZoomer);
+                if (System.getProperty("worldgen.monumentDebug") != null && start != null) {
+                    System.out.println("MSTART source=" + sourceX + "," + sourceZ
+                            + " box=" + start.building().boundingBox()
+                            + " forChunk=" + chunkX + "," + chunkZ
+                            + " intersects=" + intersectsColumn(start.building().boundingBox(), startX, startZ));
+                }
                 if (start != null && intersectsColumn(start.building().boundingBox(), startX, startZ)) {
                     intersecting.add(new Reference(start, packChunk(sourceX, sourceZ)));
                 }
@@ -86,10 +107,15 @@ public final class MonumentPlacer {
             chunkBlocks = new TerrainGenerator(settings).generate(chunkX, chunkZ).blocks();
         }
 
-        var forkUnit = unit.fork(
-                new BlockVec(startX, settings.minY(), startZ),
-                new BlockVec(startX + 16, settings.maxYInclusive() + 1, startZ + 16));
-        var forkAdapter = new GenerationUnitAdapter(forkUnit);
+        GenerationUnitAdapter forkAdapter;
+        if (featureAdapter != null && usingLiveBuffer) {
+            forkAdapter = featureAdapter;
+        } else {
+            var forkUnit = unit.fork(
+                    new BlockVec(startX, settings.minY(), startZ),
+                    new BlockVec(startX + 16, settings.maxYInclusive() + 1, startZ + 16));
+            forkAdapter = new GenerationUnitAdapter(forkUnit);
+        }
 
         var replayHandle = usingLiveBuffer ? null : surfaceHeights;
         var level = new MonumentLevel(forkAdapter, chunkBlocks, startX, startZ,

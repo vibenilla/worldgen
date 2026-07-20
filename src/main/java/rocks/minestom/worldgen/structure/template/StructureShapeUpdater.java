@@ -130,25 +130,27 @@ public final class StructureShapeUpdater {
 
     public static void update(GenerationUnitAdapter level, BlockTagManager blockTags, List<BlockVec> placedPositions) {
         var walls = new ArrayList<BlockVec>();
-        var stairs = new ArrayList<BlockVec>();
+        var crossCollisions = new ArrayList<BlockVec>();
 
+        // Stairs first: a fence's or wall's connection to a neighboring stair
+        // depends on that stair's actual (rotated, mirrored) collision shape,
+        // which in turn depends on its shape property - so the raw placed
+        // shape has to be corrected before anything queries its faces.
         for (var position : placedPositions) {
             var block = level.getBlock(position.blockX(), position.blockY(), position.blockZ());
             switch (classify(block)) {
-                case FENCE, PANE -> updateCrossCollisionSides(level, blockTags, position, block);
+                case FENCE, PANE -> crossCollisions.add(position);
                 case WALL -> walls.add(position);
-                case STAIRS -> stairs.add(position);
+                case STAIRS -> updateStairShape(level, position);
+                case DOOR -> syncDoorHalf(level, position, block);
                 case LEAVES, NONE -> {
                 }
             }
         }
 
-        // Stairs first: a wall's connection to a neighboring stair depends on
-        // that stair's actual (rotated, mirrored) collision shape, which in
-        // turn depends on its shape property - so the raw placed shape has to
-        // be corrected before any wall queries it.
-        for (var position : stairs) {
-            updateStairShape(level, position);
+        for (var position : crossCollisions) {
+            var block = level.getBlock(position.blockX(), position.blockY(), position.blockZ());
+            updateCrossCollisionSides(level, blockTags, position, block);
         }
 
         // A wall's side (none/low/tall) and post (up) both depend on whatever
@@ -219,7 +221,30 @@ public final class StructureShapeUpdater {
         return new ArrayList<>(seen);
     }
 
-    private enum Family { FENCE, PANE, WALL, STAIRS, LEAVES, NONE }
+    private enum Family { FENCE, PANE, WALL, STAIRS, DOOR, LEAVES, NONE }
+
+    /**
+     * Vanilla {@code DoorBlock.updateShape}: a door half updated along the Y
+     * axis copies the OTHER half's full state (facing, hinge, open, powered)
+     * with only the half property kept. Mojang's structure templates store
+     * mismatched door halves; processed in placement order (bottom half
+     * first), both halves end up with the upper half's stored state.
+     */
+    private static void syncDoorHalf(GenerationUnitAdapter level, BlockVec position, Block door) {
+        var half = door.getProperty("half");
+        if (half == null) {
+            return;
+        }
+        var partnerPos = "lower".equals(half) ? position.add(0, 1, 0) : position.add(0, -1, 0);
+        var partner = neighbor(level, partnerPos, null);
+        if (!partner.key().equals(door.key()) || half.equals(partner.getProperty("half"))) {
+            return;
+        }
+        var synced = partner.withProperty("half", half);
+        if (!synced.equals(door)) {
+            level.setBlock(position, synced);
+        }
+    }
 
     private static Family classify(Block block) {
         var key = block.key().value();
@@ -234,6 +259,9 @@ public final class StructureShapeUpdater {
         }
         if (key.endsWith("_stairs")) {
             return Family.STAIRS;
+        }
+        if (key.endsWith("_door")) {
+            return Family.DOOR;
         }
         if (block.getProperty("distance") != null && block.getProperty("persistent") != null) {
             return Family.LEAVES;
@@ -259,10 +287,10 @@ public final class StructureShapeUpdater {
         return blockTags.blocks(TAG_SHULKER_BOXES).contains(block.key());
     }
 
-    /** Vanilla {@code BlockState.isFaceSturdy}, approximated with the precomputed collision shape. */
+    /** Vanilla {@code BlockState.isFaceSturdy} toward the asking block. */
     private static boolean neighborFaceFull(Block neighbor, Direction towardNeighbor) {
-        var shape = neighbor.registry().collisionShape();
-        return shape != null && shape.isFaceFull(BlockFace.fromDirection(towardNeighbor.opposite()));
+        return rocks.minestom.worldgen.feature.SturdyFaces.isFaceSturdy(
+                neighbor, BlockFace.fromDirection(towardNeighbor.opposite()));
     }
 
     private static boolean isSameFenceFamily(BlockTagManager blockTags, Block fence, Block neighbor) {
@@ -332,6 +360,14 @@ public final class StructureShapeUpdater {
                 ? fenceConnects(blockTags, block, west, Direction.WEST)
                 : paneConnects(blockTags, west, Direction.WEST);
 
+        var writeTrace = System.getProperty("worldgen.writeTrace");
+        if (writeTrace != null
+                && writeTrace.equals(position.blockX() + "," + position.blockY() + "," + position.blockZ())) {
+            System.out.println("XCONN " + position + " n=" + north.name() + ":" + northConnects
+                    + " e=" + east + ":" + eastConnects
+                    + " s=" + south.name() + ":" + southConnects
+                    + " w=" + west.name() + ":" + westConnects);
+        }
         block = block.withProperties(Map.of(
                 "north", Boolean.toString(northConnects),
                 "east", Boolean.toString(eastConnects),

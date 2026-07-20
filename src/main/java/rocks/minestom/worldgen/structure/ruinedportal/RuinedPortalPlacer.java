@@ -132,7 +132,9 @@ public final class RuinedPortalPlacer {
                 continue;
             }
             if (System.getProperty("worldgen.portalDebug") != null) {
-                System.out.println("PINDEX " + start.structureKey() + " index=" + index);
+                System.out.println("PINDEX " + start.structureKey() + " index=" + index
+                        + " center=" + start.center() + " bounds=" + start.bounds()
+                        + " runChunk=" + chunkX + "," + chunkZ);
             }
             random.setFeatureSeed(decorationSeed, index, SURFACE_STRUCTURES_STEP);
             this.placeStart(start, unit, chunkX, chunkZ, chunkBlocks, lookup, settings, random);

@@ -25,6 +25,7 @@ import rocks.minestom.worldgen.terrain.Beardifier;
 import rocks.minestom.worldgen.terrain.TerrainData;
 import rocks.minestom.worldgen.terrain.TerrainGenerator;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -82,6 +83,11 @@ public final class WorldGenerator implements Generator {
                     .computeIfAbsent(key, mapKey -> new java.util.concurrent.ConcurrentHashMap<>())
                     .put(bufferIndex, block);
             return true;
+        }
+
+        @Override
+        public Boolean decorated(int chunkX, int chunkZ) {
+            return WorldGenerator.this.fullyDecorated.contains((long) chunkX << 32 | (chunkZ & 0xFFFFFFFFL));
         }
     };
     // LRU: decoration probes neighbors, so evicting wholesale caused recompute
@@ -162,6 +168,15 @@ public final class WorldGenerator implements Generator {
         // would
         this.fullyDecorated.add(chunkKey);
         this.applyLateSpillWrites(unit, chunkKey, height);
+        // Spills delivered through the blit may carry block-entity blocks
+        // (a dungeon chest) that this chunk's own decoration then overwrote
+        // through a FORK - the fork palette write cannot clear the root
+        // unit's cached special, so the stale block entity would win at
+        // application time. Re-writing the final buffer value through the
+        // ROOT modifier both fixes the palette and removes the special.
+        if (pending != null) {
+            this.replaySpills(unit, chunkKey, height, pending);
+        }
         this.flushFluidTicks(unit, terrainData);
     }
 
@@ -311,15 +326,25 @@ public final class WorldGenerator implements Generator {
      */
     private void applyLateSpillWrites(GenerationUnit unit, long chunkKey, int height) {
         var lateWrites = this.pendingCrossWrites.remove(chunkKey);
-        if (lateWrites == null) {
-            return;
+        if (lateWrites != null) {
+            this.replaySpills(unit, chunkKey, height, lateWrites);
         }
+    }
 
+    /**
+     * Re-writes spilled positions through the ROOT modifier with the current
+     * buffer content. The buffer holds the chronological truth (the chunk's
+     * own decoration may have overwritten a spill - a mineshaft corridor
+     * digging through a neighbor-planted dungeon chest), and a root-modifier
+     * write also clears any stale block-entity special the blit cached.
+     */
+    private void replaySpills(GenerationUnit unit, long chunkKey, int height, Map<Integer, Block> spills) {
         var minY = this.settings.minY();
         var unitStartY = unit.absoluteStart().blockY();
         var unitSizeY = unit.size().blockY();
         var lateModifier = unit.modifier();
-        for (var entry : lateWrites.entrySet()) {
+        var buffer = this.terrainData((int) (chunkKey >> 32), (int) chunkKey).blocks();
+        for (var entry : spills.entrySet()) {
             var bufferIndex = entry.getKey();
             var yIndex = bufferIndex % height;
             var remainder = bufferIndex / height;
@@ -329,7 +354,8 @@ public final class WorldGenerator implements Generator {
             if (localY < 0 || localY >= unitSizeY) {
                 continue;
             }
-            lateModifier.setRelative(localX, localY, localZ, entry.getValue());
+            var current = buffer[bufferIndex];
+            lateModifier.setRelative(localX, localY, localZ, current != null ? current : entry.getValue());
         }
     }
 
@@ -625,7 +651,8 @@ public final class WorldGenerator implements Generator {
 
                 placementContext.currentFeature(placedFeatureKey);
                 var debugChunk = System.getProperty("worldgen.debugchunk");
-                var debugThis = debugChunk != null && debugChunk.equals((startX >> 4) + "," + (startZ >> 4));
+                var debugThis = debugChunk != null
+                        && Arrays.asList(debugChunk.split(";")).contains((startX >> 4) + "," + (startZ >> 4));
                 var debugStep = stepIndex;
                 if (debugThis) {
                     System.out.println("FEATSTART idx=" + featureIndex + " step=" + stepIndex

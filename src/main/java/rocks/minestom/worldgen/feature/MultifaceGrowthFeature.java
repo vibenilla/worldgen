@@ -131,7 +131,10 @@ public final class MultifaceGrowthFeature implements Feature<MultifaceGrowthConf
                 return null;
             }
             base = currentState;
-        } else if (currentState.compare(Block.WATER)) {
+        } else if (currentState.compare(Block.WATER) && "0".equals(currentState.getProperty("level"))) {
+            // Vanilla MultifaceBlock.getStateForPlacement waterlogs only over
+            // a SOURCE (isSourceOfType); a growth placed into flowing water
+            // stays dry and replaces the flow.
             base = waterlogged(config.placeBlock());
         } else {
             base = config.placeBlock();

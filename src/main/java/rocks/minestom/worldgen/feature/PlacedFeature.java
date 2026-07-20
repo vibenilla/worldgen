@@ -66,19 +66,29 @@ public record PlacedFeature(Key feature, ConfiguredFeature<?> inlineFeature, Lis
      * placing the feature at each surviving position.
      */
     public void place(PlacementContext context, RandomSource random, BlockVec origin, PositionConsumer placer) {
-        this.placeRecursive(context, random, origin, 0, placer);
+        var pmodChunks = System.getProperty("worldgen.pmodChunks", "");
+        var pmodGated = !pmodChunks.isEmpty()
+                && java.util.Arrays.asList(pmodChunks.split(";"))
+                        .contains((origin.blockX() >> 4) + "," + (origin.blockZ() >> 4));
+        this.placeRecursive(context, random, origin, 0, pmodGated, placer);
     }
 
     private void placeRecursive(PlacementContext context, RandomSource random, BlockVec position, int modifierIndex,
-            PositionConsumer placer) {
+            boolean pmodGated, PositionConsumer placer) {
         if (modifierIndex >= this.placement.size()) {
             placer.accept(position, random);
             return;
         }
 
-        var positions = this.placement.get(modifierIndex).apply(context, random, position);
+        var modifier = this.placement.get(modifierIndex);
+        var positions = modifier.apply(context, random, position);
         for (var next : positions) {
-            this.placeRecursive(context, random, next, modifierIndex + 1, placer);
+            if (pmodGated) {
+                System.out.println("PMOD " + context.currentFeature() + " stage=" + modifierIndex
+                        + " " + modifier.getClass().getSimpleName()
+                        + " pos=" + next.blockX() + "," + next.blockY() + "," + next.blockZ());
+            }
+            this.placeRecursive(context, random, next, modifierIndex + 1, pmodGated, placer);
         }
     }
 

@@ -156,7 +156,24 @@ abstract class ScatteredFeaturePiece {
         if (!chunkBB.isInside(new net.minestom.server.coordinate.BlockVec(wx, wy, wz))) {
             return;
         }
-        level.setBlock(wx, wy, wz, this.transform(block));
+        var transformed = this.transform(block);
+        level.setBlock(wx, wy, wz, transformed);
+        // Vanilla StructurePiece.placeBlock marks shape-sensitive blocks
+        // (fences, iron bars, ladders, torches) for the FULL post-process
+        // pass, where updateFromNeighbourShapes computes their connections
+        if (isShapeCheckBlock(transformed)) {
+            level.markPostProcess(wx, wy, wz);
+        }
+    }
+
+    private static boolean isShapeCheckBlock(Block block) {
+        var key = block.key().value();
+        return switch (key) {
+            case "nether_brick_fence", "oak_fence", "spruce_fence", "dark_oak_fence", "pale_oak_fence",
+                    "acacia_fence", "birch_fence", "jungle_fence", "iron_bars", "ladder",
+                    "torch", "wall_torch" -> true;
+            default -> false;
+        };
     }
 
     protected Block getBlock(ScatteredFeatureLevel level, int x, int y, int z, BoundingBox chunkBB) {

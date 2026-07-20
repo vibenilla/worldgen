@@ -67,6 +67,10 @@ final class ScatteredFeatureLevel {
         StructureWrites.record(this.chunkHandle, x, y, z, block);
     }
 
+    void markPostProcess(int x, int y, int z) {
+        this.adapter.markPostProcess(new net.minestom.server.coordinate.BlockVec(x, y, z));
+    }
+
     /**
      * Vanilla {@code MOTION_BLOCKING_NO_LEAVES} heightmap: one above the
      * highest motion-blocking, non-leaf block, live over the structure's

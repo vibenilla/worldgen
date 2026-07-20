@@ -177,8 +177,11 @@ tasks.register<JavaExec>("compareVanilla") {
     systemProperty("compare.pregenRadius", providers.gradleProperty("pregenRadius").getOrElse("16"))
     providers.gradleProperty("debugchunk").orNull?.let { systemProperty("worldgen.debugchunk", it) }
     providers.gradleProperty("debugFilter").orNull?.let { systemProperty("worldgen.debugFilter", it) }
+    providers.gradleProperty("pmodChunks").orNull?.let { systemProperty("worldgen.pmodChunks", it) }
+    providers.gradleProperty("monumentDebug").orNull?.let { systemProperty("worldgen.monumentDebug", it) }
     providers.gradleProperty("writeTrace").orNull?.let { systemProperty("worldgen.writeTrace", it) }
     providers.gradleProperty("waterDebug").orNull?.let { systemProperty("worldgen.waterDebug", it) }
+    providers.gradleProperty("kelpDebug").orNull?.let { systemProperty("worldgen.kelpDebug", it) }
     providers.gradleProperty("decoOrderFile").orNull?.let { systemProperty("compare.decoOrderFile", it) }
     providers.gradleProperty("eventScript").orNull?.let { systemProperty("worldgen.eventScript", it) }
     providers.gradleProperty("mfgBox").orNull?.let { systemProperty("worldgen.mfgBox", it) }
@@ -278,7 +281,8 @@ tasks.register<JavaExec>("structureStartScan") {
     mainClass = "rocks.minestom.worldgen.verify.StructureStartScan"
     args(
         providers.gradleProperty("vanillaWorld").getOrElse("data/vanilla-world/world/dimensions/minecraft/overworld"),
-        providers.gradleProperty("radius").getOrElse("10")
+        providers.gradleProperty("radius").getOrElse("10"),
+        providers.gradleProperty("startDetail").getOrElse("")
     )
 }
 
@@ -338,6 +342,7 @@ tasks.register<JavaExec>("terrainBlockPeek") {
     jvmArgs("-Xmx4G")
     providers.gradleProperty("densityProbe").orNull?.let { systemProperty("worldgen.densityProbe", it) }
     providers.gradleProperty("beardDebug").orNull?.let { systemProperty("worldgen.beardDebug", it) }
+    providers.gradleProperty("dumpFluidTicks").orNull?.let { systemProperty("worldgen.dumpFluidTicks", it) }
     args((providers.gradleProperty("peekArgs").getOrElse("")).split(" "))
 }
 

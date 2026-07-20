@@ -38,6 +38,18 @@ public final class PlacementModifiers {
     private PlacementModifiers() {
     }
 
+    private static boolean debugFilterAt(BlockVec position) {
+        var gate = System.getProperty("worldgen.debugFilter");
+        if (gate == null) {
+            return false;
+        }
+        if (gate.equals("1")) {
+            return true;
+        }
+        return java.util.Arrays.asList(gate.split(";"))
+                .contains((position.blockX() >> 4) + "," + (position.blockZ() >> 4));
+    }
+
     public static BlockTagManager currentBlockTags() {
         return CURRENT_BLOCK_TAGS.get();
     }
@@ -290,7 +302,7 @@ public final class PlacementModifiers {
             if (context.currentFeatureInBiomeAt(position)) {
                 return List.of(position);
             }
-            if (System.getProperty("worldgen.debugFilter") != null) {
+            if (debugFilterAt(position)) {
                 System.out.println("BIOMEREJ " + context.currentFeature() + " at " + position);
             }
             return List.of();
@@ -453,6 +465,11 @@ public final class PlacementModifiers {
             public List<BlockVec> apply(PlacementContext context, RandomSource random, BlockVec position) {
                 var mutablePosition = position;
                 if (!this.allowedSearchCondition.test(context, mutablePosition)) {
+                    if (debugFilterAt(position)) {
+                        System.out.println("ESCANORIGIN " + context.currentFeature() + " origin=" + position
+                                + " block=" + context.accessor().getBlock(position.blockX(), position.blockY(),
+                                        position.blockZ()).name());
+                    }
                     return List.of();
                 }
 
@@ -463,6 +480,9 @@ public final class PlacementModifiers {
 
                     mutablePosition = mutablePosition.add(this.direction.stepX, this.direction.stepY, this.direction.stepZ);
                     if (!context.inWorldBounds(mutablePosition)) {
+                        if (debugFilterAt(position)) {
+                            System.out.println("ESCANBOUNDS " + context.currentFeature() + " origin=" + position);
+                        }
                         return List.of();
                     }
 
@@ -474,7 +494,7 @@ public final class PlacementModifiers {
                 if (this.targetCondition.test(context, mutablePosition)) {
                     return List.of(mutablePosition);
                 }
-                if (System.getProperty("worldgen.debugFilter") != null) {
+                if (debugFilterAt(position)) {
                     System.out.println("ESCANREJ " + context.currentFeature() + " origin=" + position
                             + " stopped=" + mutablePosition + " block="
                             + context.accessor().getBlock(mutablePosition.blockX(), mutablePosition.blockY(),
@@ -497,7 +517,7 @@ public final class PlacementModifiers {
                     return List.of(position);
                 }
 
-                if (System.getProperty("worldgen.debugFilter") != null) {
+                if (debugFilterAt(position)) {
                     System.out.println("THRESHREJ " + context.currentFeature() + " at " + position
                             + " surface=" + surfaceY + " type=" + this.heightmapType);
                 }
@@ -520,7 +540,7 @@ public final class PlacementModifiers {
         @Override
             public List<BlockVec> apply(PlacementContext context, RandomSource random, BlockVec position) {
                 var pass = this.predicate.test(context, position);
-                if (!pass && System.getProperty("worldgen.debugFilter") != null) {
+                if (!pass && debugFilterAt(position)) {
                     System.out.println("FILTERREJ " + context.currentFeature() + " at " + position
                             + " block=" + context.accessor().getBlock(position.blockX(), position.blockY(), position.blockZ()).name());
                 }
@@ -588,6 +608,19 @@ public final class PlacementModifiers {
                     "minecraft:grass_block", "minecraft:podzol", "minecraft:mycelium",
                     "minecraft:farmland");
 
+            private static boolean isVegetationFamily(String key) {
+                return switch (key) {
+                    case "minecraft:short_grass", "minecraft:fern", "minecraft:tall_grass", "minecraft:large_fern",
+                            "minecraft:firefly_bush", "minecraft:bush", "minecraft:dandelion", "minecraft:poppy",
+                            "minecraft:blue_orchid", "minecraft:allium", "minecraft:azure_bluet",
+                            "minecraft:red_tulip", "minecraft:orange_tulip", "minecraft:white_tulip",
+                            "minecraft:pink_tulip", "minecraft:oxeye_daisy", "minecraft:cornflower",
+                            "minecraft:lily_of_the_valley", "minecraft:pink_petals", "minecraft:wildflowers",
+                            "minecraft:closed_eyeblossom", "minecraft:open_eyeblossom" -> true;
+                    default -> false;
+                };
+            }
+
             private WouldSurvivePredicate(JsonObject state, BlockVec offset) {
                 this(state == null ? Block.AIR : BlockCodec.CODEC.decode(Transcoder.JSON, state).orElse(Block.AIR),
                         offset);
@@ -611,12 +644,43 @@ public final class PlacementModifiers {
                     return below.compare(Block.SAND) || below.compare(Block.RED_SAND) || below.compare(Block.CACTUS);
                 }
 
+                // Vanilla MushroomBlock.canSurvive: overriding floor or raw
+                // brightness below 13 - during generation only a
+                // not-yet-generated chunk reads bright (15 everywhere)
+                if (this.state.compare(Block.RED_MUSHROOM) || this.state.compare(Block.BROWN_MUSHROOM)) {
+                    if (rocks.minestom.worldgen.feature.BlockSupports.isInTag(
+                            "minecraft:overrides_mushroom_light_requirement", below)) {
+                        return true;
+                    }
+                    if (context.accessor() instanceof rocks.minestom.worldgen.feature.GenerationUnitAdapter adapter
+                            && adapter.fullBrightAtGeneration(targetPosition.blockX(), targetPosition.blockZ())) {
+                        return false;
+                    }
+                    return below.registry().isSolid();
+                }
+
                 if (this.state.compare(Block.MANGROVE_PROPAGULE)) {
                     return SUPPORTS_VEGETATION.contains(below.name()) || below.compare(Block.CLAY);
                 }
 
                 if (this.state.name().endsWith("_sapling") || this.state.compare(Block.BAMBOO)) {
                     return SUPPORTS_VEGETATION.contains(below.name());
+                }
+
+                // VegetationBlock family (grasses, flowers, firefly bush):
+                // vanilla mayPlaceOn is the supports_vegetation tag, so a
+                // firefly bush anchor over a sandy river bank must fail here
+                if (isVegetationFamily(this.state.name())) {
+                    return SUPPORTS_VEGETATION.contains(below.name());
+                }
+
+                // DryVegetationBlock family: supports_dry_vegetation (sand,
+                // terracotta plus the vegetation substrates)
+                var stateKey = this.state.name();
+                if (stateKey.equals("minecraft:dead_bush") || stateKey.equals("minecraft:short_dry_grass")
+                        || stateKey.equals("minecraft:tall_dry_grass")) {
+                    return rocks.minestom.worldgen.feature.BlockSupports.isInTag(
+                            "minecraft:supports_dry_vegetation", below);
                 }
 
                 return below.registry().isSolid();

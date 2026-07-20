@@ -40,6 +40,32 @@ public final class SimpleBlockFeature implements Feature<SimpleBlockConfiguratio
             return this.isPlantGround(accessor.getBlock(position.sub(0, 1, 0)));
         }
 
+        // Vanilla DryVegetationBlock.mayPlaceOn: supports_dry_vegetation
+        // (sand, terracotta plus the vegetation substrates)
+        if (key.equals("minecraft:dead_bush") || key.equals("minecraft:short_dry_grass")
+                || key.equals("minecraft:tall_dry_grass")) {
+            return BlockSupports.isInTag("minecraft:supports_dry_vegetation",
+                    accessor.getBlock(position.sub(0, 1, 0)));
+        }
+
+        // Vanilla MushroomBlock.canSurvive: an overriding floor (mycelium,
+        // podzol, nylium) or raw brightness below 13 - during generation only
+        // a not-yet-generated chunk reads bright (15 everywhere), so the
+        // placement fails exactly when the target chunk generates later than
+        // the decorated one; the FULL post-process mark re-checks survivors
+        // against the real light
+        if (key.equals("minecraft:red_mushroom") || key.equals("minecraft:brown_mushroom")) {
+            var below = accessor.getBlock(position.sub(0, 1, 0));
+            if (BlockSupports.isInTag("minecraft:overrides_mushroom_light_requirement", below)) {
+                return true;
+            }
+            if (accessor instanceof GenerationUnitAdapter adapter
+                    && adapter.fullBrightAtGeneration(position.blockX(), position.blockZ())) {
+                return false;
+            }
+            return below.registry().isSolid();
+        }
+
         // 26.x per-block supports_<name> tags carry most plant survival rules
         var supported = BlockSupports.supportsOf(toPlace);
         if (supported != null) {
@@ -48,9 +74,11 @@ public final class SimpleBlockFeature implements Feature<SimpleBlockConfiguratio
 
         // Ceiling-hanging blocks survive on support ABOVE (vanilla
         // SporeBlossomBlock/HangingRootsBlock canSurvive checks
-        // canSupportCenter of the block above, not below)
+        // canSupportCenter of the block above, not below - a mineshaft
+        // cobweb ceiling is NOT support, and Minestom's isSolid says it is)
         if (key.equals("minecraft:spore_blossom") || key.equals("minecraft:hanging_roots")) {
-            return accessor.getBlock(position.add(0, 1, 0)).registry().isSolid();
+            return SturdyFaces.isFaceSturdy(accessor.getBlock(position.add(0, 1, 0)),
+                    net.minestom.server.instance.block.BlockFace.BOTTOM);
         }
 
         if (toPlace.registry().isSolid()) {
@@ -83,7 +111,11 @@ public final class SimpleBlockFeature implements Feature<SimpleBlockConfiguratio
                 || blockKey.equals("minecraft:closed_eyeblossom")
                 || blockKey.equals("minecraft:open_eyeblossom")
                 || blockKey.equals("minecraft:short_grass")
-                || blockKey.equals("minecraft:tall_grass");
+                || blockKey.equals("minecraft:tall_grass")
+                || blockKey.equals("minecraft:fern")
+                || blockKey.equals("minecraft:large_fern")
+                || blockKey.equals("minecraft:firefly_bush")
+                || blockKey.equals("minecraft:bush");
     }
 
     private boolean isPlantGround(Block blockBelow) {

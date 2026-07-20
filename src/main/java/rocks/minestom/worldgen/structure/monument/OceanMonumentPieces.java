@@ -849,7 +849,8 @@ public final class OceanMonumentPieces {
         }
 
         private static boolean isReplaceableByStructures(Block block) {
-            return block.isAir() || block.isLiquid();
+            return block.isAir() || block.isLiquid() || block.compare(Block.GLOW_LICHEN)
+                    || block.compare(Block.SEAGRASS) || block.compare(Block.TALL_SEAGRASS);
         }
 
         void generateWaterBox(MonumentLevel level, BoundingBox chunkBB, int x0, int y0, int z0, int x1, int y1, int z1) {
