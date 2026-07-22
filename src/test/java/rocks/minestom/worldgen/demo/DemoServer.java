@@ -54,6 +54,7 @@ public final class DemoServer {
     private static final int BIOME_SEARCH_RADIUS = 6400;
     private static final int BIOME_SAMPLE_RESOLUTION_HORIZONTAL = 32;
     private static final int BIOME_SAMPLE_RESOLUTION_VERTICAL = 64;
+    private static final long FROZEN_TIME = 6000;
     private static final String MATCH_SPLIT_CHARACTERS = "._-/";
 
     public static void main(String[] args) {
@@ -74,6 +75,10 @@ public final class DemoServer {
         nether.setGenerator(new PrioritizedGenerator(netherGenerator, nether));
         var end = manager.createInstanceContainer(DimensionType.THE_END);
         end.setGenerator(new PrioritizedGenerator(endGenerator, end));
+
+        freezeTime(overworld);
+        freezeTime(nether);
+        freezeTime(end);
 
         var dimensions = new LinkedHashMap<String, Dimension>();
         dimensions.put("overworld", new Dimension(overworld, surfaceSpawn(overworld, 0, 0)));
@@ -109,6 +114,15 @@ public final class DemoServer {
 
         server.start("0.0.0.0", port);
         MinecraftServer.LOGGER.info("Demo server listening on port {}, seed {}, spawn at {}", port, seed, spawn);
+    }
+
+    private static void freezeTime(Instance instance) {
+        var clock = instance.defaultClock();
+        if (clock == null) {
+            return;
+        }
+        clock.time(FROZEN_TIME);
+        clock.pause();
     }
 
     private static Pos surfaceSpawn(Instance instance, int x, int z) {
