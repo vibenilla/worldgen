@@ -1,6 +1,6 @@
 plugins {
     `java-library`
-    id("com.vanniktech.maven.publish") version "0.36.0"
+    `maven-publish`
 }
 
 description = "A library for Minestom worldgen"
@@ -9,39 +9,51 @@ version = "0.2.0"
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(25)
 
-mavenPublishing {
-    coordinates(group.toString(), project.name, version.toString())
-    publishToMavenCentral()
+java {
+    withSourcesJar()
+    withJavadocJar()
+}
 
-    if (!gradle.startParameter.taskNames.any { it.contains("publishToMavenLocal") }) {
-        signAllPublications()
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["java"])
+
+            pom {
+                name = project.name
+                description = project.description
+                url = "https://github.com/vibenilla/worldgen"
+
+                licenses {
+                    license {
+                        name = "Apache-2.0"
+                        url = "https://www.apache.org/licenses/LICENSE-2.0.txt"
+                    }
+                }
+
+                developers {
+                    developer {
+                        name = "mudkip"
+                        id = "mudkipdev"
+                        email = "mudkip@mudkip.dev"
+                        url = "https://mudkip.dev"
+                    }
+                }
+
+                scm {
+                    url = "https://github.com/vibenilla/worldgen"
+                    connection = "scm:git:git://github.com/vibenilla/worldgen.git"
+                    developerConnection = "scm:git:ssh://git@github.com/vibenilla/worldgen.git"
+                }
+            }
+        }
     }
 
-    pom {
-        name = project.name
-        description = project.description
-        url = "https://github.com/vibenilla/worldgen"
-
-        licenses {
-            license {
-                name = "Apache-2.0"
-                url = "https://www.apache.org/licenses/LICENSE-2.0.txt"
-            }
-        }
-
-        developers {
-            developer {
-                name = "mudkip"
-                id = "mudkipdev"
-                email = "mudkip@mudkip.dev"
-                url = "https://mudkip.dev"
-            }
-        }
-
-        scm {
-            url = "https://github.com/vibenilla/worldgen"
-            connection = "scm:git:git://github.com/vibenilla/worldgen.git"
-            developerConnection = "scm:git:ssh://git@github.com/vibenilla/worldgen.git"
+    repositories {
+        maven {
+            name = "skylite"
+            url = uri("https://maven.skylite.gg/releases")
+            credentials(PasswordCredentials::class)
         }
     }
 }
