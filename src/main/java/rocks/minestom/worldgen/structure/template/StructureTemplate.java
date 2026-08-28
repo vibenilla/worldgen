@@ -823,7 +823,7 @@ public final class StructureTemplate {
             // Bounds alone are not enough - a stair spans the full 0..1 bounds
             // without being a cube, and its category decides the palette list
             // order the capped processors index into.
-            var shape = state.registry().collisionShape();
+            var shape = state.collisionShape();
             var start = shape.relativeStart();
             var end = shape.relativeEnd();
             if (start.x() != 0.0 || start.y() != 0.0 || start.z() != 0.0

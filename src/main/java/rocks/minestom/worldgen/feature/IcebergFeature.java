@@ -157,7 +157,7 @@ public final class IcebergFeature implements Feature<IcebergConfiguration> {
             BlockVec pos, T level, RandomSource random, int heightDifference, int height, boolean isEllipse,
             boolean snowOnTop, Block mainBlockState) {
         var state = level.getBlock(pos);
-        if (state.isAir() || state.compare(Block.SNOW_BLOCK) || state.compare(Block.ICE) || state.compare(Block.WATER)) {
+        if (state.air() || state.compare(Block.SNOW_BLOCK) || state.compare(Block.ICE) || state.compare(Block.WATER)) {
             var randomness = !isEllipse || random.nextDouble() > 0.05;
             var divisor = isEllipse ? 3 : 2;
             if (snowOnTop && !state.compare(Block.WATER)
@@ -221,7 +221,7 @@ public final class IcebergFeature implements Feature<IcebergConfiguration> {
     }
 
     private static <T extends Block.Getter & Block.Setter> boolean belowIsAir(T level, BlockVec pos) {
-        return level.getBlock(pos.add(0, -1, 0)).isAir();
+        return level.getBlock(pos.add(0, -1, 0)).air();
     }
 
     private static <T extends Block.Getter & Block.Setter> void smooth(

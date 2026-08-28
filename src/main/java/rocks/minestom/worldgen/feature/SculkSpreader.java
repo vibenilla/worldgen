@@ -140,11 +140,11 @@ public final class SculkSpreader {
      * every face.
      */
     private static boolean hasFullFace(Block block, Direction direction) {
-        return block.registry().collisionShape().isFaceFull(BLOCK_FACES[direction.ordinal()]);
+        return block.collisionShape().isFaceFull(BLOCK_FACES[direction.ordinal()]);
     }
 
     private static boolean isReplaceable(Block block) {
-        return block.registry().isReplaceable();
+        return block.replaceable();
     }
 
     private static boolean isFire(Block block) {
@@ -156,7 +156,7 @@ public final class SculkSpreader {
     }
 
     private static boolean hasNonWaterFluid(Block block) {
-        return block.isLiquid() && !block.compare(Block.WATER);
+        return block.liquid() && !block.compare(Block.WATER);
     }
 
     private static boolean hasFace(Block state, Direction face) {
@@ -170,7 +170,7 @@ public final class SculkSpreader {
      * is a fluid block (e.g. always false for a waterlogged sculk vein).
      */
     private static boolean hasFluid(Block block) {
-        return block.isLiquid() || "true".equals(block.getProperty("waterlogged"));
+        return block.liquid() || "true".equals(block.getProperty("waterlogged"));
     }
 
     private static Set<Direction> availableFaces(Block state) {
@@ -239,7 +239,7 @@ public final class SculkSpreader {
             return false;
         }
 
-        return isReplaceable(existingState) || existingState.isAir() || existingState.compare(Block.SCULK_VEIN) || isWaterSource(existingState);
+        return isReplaceable(existingState) || existingState.air() || existingState.compare(Block.SCULK_VEIN) || isWaterSource(existingState);
     }
 
     private static <T extends Block.Getter & Block.Setter> boolean canSpreadInto(T level, BlockVec sourcePos, SpreadPos spreadPos) {
@@ -346,7 +346,7 @@ public final class SculkSpreader {
         if (facings == null) {
             return spreadAll(level, pos, currentState, SAME_POSITION_ONLY) > 0;
         } else if (!facings.isEmpty()) {
-            if (!currentState.isAir() && !isWaterSource(currentState)) {
+            if (!currentState.air() && !isWaterSource(currentState)) {
                 return false;
             }
             return regrow(level, pos, currentState, facings);
@@ -588,7 +588,7 @@ public final class SculkSpreader {
     private static boolean canPlaceGrowth(Block.Getter level, BlockVec pos) {
         var above = pos.add(0, 1, 0);
         var aboveState = level.getBlock(above);
-        if (!(aboveState.isAir() || isWaterSource(aboveState))) {
+        if (!(aboveState.air() || isWaterSource(aboveState))) {
             return false;
         }
 

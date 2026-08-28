@@ -51,7 +51,7 @@ public final class BlockPileFeature implements Feature<BlockPileConfiguration> {
             return random.nextBoolean();
         }
 
-        return belowBlock.registry().isSolid();
+        return belowBlock.solid();
     }
 
     private <T extends Block.Getter & Block.Setter> void tryPlaceBlock(
@@ -61,7 +61,7 @@ public final class BlockPileFeature implements Feature<BlockPileConfiguration> {
             BlockPileConfiguration config
     ) {
         var currentBlock = accessor.getBlock(position);
-        if (!currentBlock.isAir()) {
+        if (!currentBlock.air()) {
             return;
         }
 

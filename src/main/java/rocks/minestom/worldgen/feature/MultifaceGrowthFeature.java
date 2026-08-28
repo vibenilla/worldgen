@@ -209,7 +209,7 @@ public final class MultifaceGrowthFeature implements Feature<MultifaceGrowthConf
 
     private static boolean canSpreadInto(Block.Getter level, BlockVec position, Direction face, MultifaceGrowthConfiguration config) {
         var state = level.getBlock(position);
-        if (!state.isAir() && !state.compare(config.placeBlock()) && !state.compare(Block.WATER)) {
+        if (!state.air() && !state.compare(config.placeBlock()) && !state.compare(Block.WATER)) {
             return false;
         }
 
@@ -246,6 +246,6 @@ public final class MultifaceGrowthFeature implements Feature<MultifaceGrowthConf
     }
 
     private static boolean isAirOrWater(Block state) {
-        return state.isAir() || state.compare(Block.WATER);
+        return state.air() || state.compare(Block.WATER);
     }
 }

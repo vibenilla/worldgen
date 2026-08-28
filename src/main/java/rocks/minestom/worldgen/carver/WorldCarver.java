@@ -116,7 +116,7 @@ public abstract class WorldCarver<C> {
         if (hasGrass.value) {
             var below = context.getBlock(blockX, blockY - 1, blockZ);
             if (below.compare(Block.DIRT)) {
-                var topMaterial = context.topMaterial(blockX, blockY - 1, blockZ, !state.isAir());
+                var topMaterial = context.topMaterial(blockX, blockY - 1, blockZ, !state.air());
                 if (topMaterial != null) {
                     context.setSolid(blockX, blockY - 1, blockZ, topMaterial);
                 }

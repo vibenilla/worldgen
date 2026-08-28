@@ -55,6 +55,6 @@ public final class SeaPickleFeature implements Feature<CountConfiguration> {
 
     private static <T extends Block.Getter> boolean canSurvive(T level, BlockVec position) {
         var below = level.getBlock(position.sub(0, 1, 0));
-        return below.isSolid();
+        return below.solid();
     }
 }

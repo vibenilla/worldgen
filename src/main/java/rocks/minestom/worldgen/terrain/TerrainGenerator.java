@@ -176,11 +176,11 @@ public final class TerrainGenerator {
                                     if (surfaceHeights[surfaceIndex] == Integer.MIN_VALUE) {
                                         surfaceHeights[surfaceIndex] = blockY;
                                     }
-                                } else if (!state.isAir()) {
+                                } else if (!state.air()) {
                                     // Ocean/Aquifer Liquid
                                     stoneMask[maskIndex + yIndex] = TerrainData.FLUID;
                                     blocks[maskIndex + yIndex] = state;
-                                    if (aquifer.shouldScheduleFluidUpdate() && !state.isAir()) {
+                                    if (aquifer.shouldScheduleFluidUpdate() && !state.air()) {
                                         data.fluidTicks().add(new net.minestom.server.coordinate.BlockVec(blockX, blockY, blockZ));
                                     }
 

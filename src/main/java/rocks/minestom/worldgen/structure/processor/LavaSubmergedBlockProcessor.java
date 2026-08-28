@@ -28,7 +28,7 @@ public final class LavaSubmergedBlockProcessor implements StructureProcessor {
     }
 
     private static boolean isFullCube(Block state) {
-        var shape = state.registry().collisionShape();
+        var shape = state.collisionShape();
         var start = shape.relativeStart();
         var end = shape.relativeEnd();
         return start.x() == 0.0 && start.y() == 0.0 && start.z() == 0.0

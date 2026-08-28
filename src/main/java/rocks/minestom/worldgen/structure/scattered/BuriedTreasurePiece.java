@@ -37,16 +37,16 @@ final class BuriedTreasurePiece {
             var below = level.getBlock(x, y - 1, z);
             if (isSupportBlock(below)) {
                 var current = level.getBlock(x, y, z);
-                var softState = !current.isAir() && !isLiquid(current) ? current : Block.SAND;
+                var softState = !current.air() && !isLiquid(current) ? current : Block.SAND;
 
                 for (var direction : Direction.values()) {
                     var relativeX = x + direction.stepX();
                     var relativeY = y + direction.stepY();
                     var relativeZ = z + direction.stepZ();
                     var relative = level.getBlock(relativeX, relativeY, relativeZ);
-                    if (relative.isAir() || isLiquid(relative)) {
+                    if (relative.air() || isLiquid(relative)) {
                         var belowRelative = level.getBlock(relativeX, relativeY - 1, relativeZ);
-                        if ((belowRelative.isAir() || isLiquid(belowRelative)) && direction != Direction.UP) {
+                        if ((belowRelative.air() || isLiquid(belowRelative)) && direction != Direction.UP) {
                             level.setBlock(relativeX, relativeY, relativeZ, below);
                         } else {
                             level.setBlock(relativeX, relativeY, relativeZ, softState);

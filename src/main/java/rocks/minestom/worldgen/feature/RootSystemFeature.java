@@ -16,7 +16,7 @@ public final class RootSystemFeature implements Feature<RootSystemConfiguration>
     public <T extends Block.Getter & Block.Setter> boolean place(FeaturePlaceContext<RootSystemConfiguration, T> context) {
         var level = context.accessor();
         var origin = context.origin();
-        if (!level.getBlock(origin).isAir()) {
+        if (!level.getBlock(origin).air()) {
             return false;
         }
 
@@ -44,7 +44,7 @@ public final class RootSystemFeature implements Feature<RootSystemConfiguration>
                         direction.stepX() * config.levelTestDistance(), 0, direction.stepZ() * config.levelTestDistance());
                 var below = level.getBlock(cornerPos.add(0, -config.maxLevelDeviation(), 0));
                 var above = level.getBlock(cornerPos.add(0, config.maxLevelDeviation(), 0));
-                if (below.isAir() || !above.isAir()) {
+                if (below.air() || !above.air()) {
                     return false;
                 }
             }
@@ -54,7 +54,7 @@ public final class RootSystemFeature implements Feature<RootSystemConfiguration>
     }
 
     private static boolean isAllowedTreeSpace(Block state, int blocksAboveOrigin, int allowedVerticalWaterHeight) {
-        if (state.isAir()) {
+        if (state.air()) {
             return true;
         }
 
@@ -75,7 +75,7 @@ public final class RootSystemFeature implements Feature<RootSystemConfiguration>
             if (config.allowedTreePosition().test(level, workingPos) && spaceForTree(level, config, workingPos)) {
                 var belowPos = workingPos.add(0, -1, 0);
                 var belowBlock = level.getBlock(belowPos);
-                if (belowBlock.compare(Block.LAVA) || !belowBlock.registry().isSolid()) {
+                if (belowBlock.compare(Block.LAVA) || !belowBlock.solid()) {
                     return false;
                 }
 
@@ -121,7 +121,7 @@ public final class RootSystemFeature implements Feature<RootSystemConfiguration>
                     random.nextInt(rootRadius) - random.nextInt(rootRadius),
                     random.nextInt(verticalSpan) - random.nextInt(verticalSpan),
                     random.nextInt(rootRadius) - random.nextInt(rootRadius));
-            if (level.getBlock(candidate).isAir()) {
+            if (level.getBlock(candidate).air()) {
                 var targetState = config.hangingRootStateProvider().getState(level, random, candidate);
                 var abovePos = candidate.add(0, 1, 0);
                 if (hasFullFace(level.getBlock(abovePos), BlockFace.BOTTOM)) {
@@ -133,6 +133,6 @@ public final class RootSystemFeature implements Feature<RootSystemConfiguration>
 
     /** Vanilla's {@code BlockState.isFaceSturdy} (default {@code SupportType.FULL}), approximated with the collision shape. */
     private static boolean hasFullFace(Block block, BlockFace face) {
-        return block.registry().collisionShape().isFaceFull(face);
+        return block.collisionShape().isFaceFull(face);
     }
 }

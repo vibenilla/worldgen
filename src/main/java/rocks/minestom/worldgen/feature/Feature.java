@@ -53,7 +53,7 @@ public interface Feature<C extends FeatureConfiguration> {
 
     static boolean isValidTreePosition(Block.Getter getter, BlockVec position) {
         var block = getter.getBlock(position);
-        return block.isAir() || REPLACEABLE_BY_TREES.contains(block.name());
+        return block.air() || REPLACEABLE_BY_TREES.contains(block.name());
     }
 
     static boolean isDirt(Block block) {

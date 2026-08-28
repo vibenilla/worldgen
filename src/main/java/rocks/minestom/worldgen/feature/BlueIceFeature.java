@@ -49,7 +49,7 @@ public final class BlueIceFeature implements Feature<NoneFeatureConfiguration> {
                         yOff,
                         random.nextInt(xzDiff) - random.nextInt(xzDiff));
                 var placeState = level.getBlock(placePos);
-                if (placeState.isAir() || placeState.compare(Block.WATER) || placeState.compare(Block.PACKED_ICE)
+                if (placeState.air() || placeState.compare(Block.WATER) || placeState.compare(Block.PACKED_ICE)
                         || placeState.compare(Block.ICE)) {
                     for (var direction : Direction.values()) {
                         if (level.getBlock(direction.relative(placePos)).compare(Block.BLUE_ICE)) {

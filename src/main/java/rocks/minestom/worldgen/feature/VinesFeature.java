@@ -14,7 +14,7 @@ public final class VinesFeature implements Feature<NoneFeatureConfiguration> {
         var level = context.accessor();
         var origin = context.origin();
 
-        if (!level.getBlock(origin).isAir()) {
+        if (!level.getBlock(origin).air()) {
             return false;
         }
 

@@ -16,7 +16,7 @@ public final class BasaltPillarFeature implements Feature<NoneFeatureConfigurati
         var origin = context.origin();
         var level = context.accessor();
         var random = context.random();
-        if (!level.getBlock(origin).isAir() || level.getBlock(origin.add(0, 1, 0)).isAir()) {
+        if (!level.getBlock(origin).air() || level.getBlock(origin.add(0, 1, 0)).air()) {
             return false;
         }
 
@@ -26,7 +26,7 @@ public final class BasaltPillarFeature implements Feature<NoneFeatureConfigurati
         var placeWestHangoff = true;
         var placeEastHangoff = true;
 
-        while (level.getBlock(pos).isAir()) {
+        while (level.getBlock(pos).air()) {
             if (pos.blockY() < context.minY() || pos.blockY() > context.maxY()) {
                 return true;
             }
@@ -66,14 +66,14 @@ public final class BasaltPillarFeature implements Feature<NoneFeatureConfigurati
                     var basePos = pos.add(dx, 0, dz);
                     var maxDrop = 3;
 
-                    while (level.getBlock(basePos.add(0, -1, 0)).isAir()) {
+                    while (level.getBlock(basePos.add(0, -1, 0)).air()) {
                         basePos = basePos.add(0, -1, 0);
                         if (--maxDrop <= 0) {
                             break;
                         }
                     }
 
-                    if (!level.getBlock(basePos.add(0, -1, 0)).isAir()) {
+                    if (!level.getBlock(basePos.add(0, -1, 0)).air()) {
                         level.setBlock(basePos, Block.BASALT);
                     }
                 }

@@ -64,7 +64,7 @@ public final class SpeleothemUtils {
     }
 
     static boolean isEmptyOrWaterOrLava(Block state) {
-        return state.isAir() || state.compare(Block.WATER) || state.compare(Block.LAVA);
+        return state.air() || state.compare(Block.WATER) || state.compare(Block.LAVA);
     }
 
     static boolean isBaseOrLava(Block state, Block baseBlock, Set<Key> replaceableBlocks) {
@@ -76,11 +76,11 @@ public final class SpeleothemUtils {
     }
 
     static boolean isEmptyOrWater(Block state) {
-        return state.isAir() || state.compare(Block.WATER);
+        return state.air() || state.compare(Block.WATER);
     }
 
     static boolean isNeitherEmptyNorWater(Block state) {
-        return !state.isAir() && !state.compare(Block.WATER);
+        return !state.air() && !state.compare(Block.WATER);
     }
 
     static boolean isBase(Block state, Block baseBlock, Set<Key> replaceableBlocks) {

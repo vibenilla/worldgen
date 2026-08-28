@@ -24,7 +24,7 @@ public final class SpringFeature implements Feature<SpringConfiguration> {
         }
 
         var currentState = level.getBlock(origin);
-        if (!currentState.isAir() && !isValid(config, currentState)) {
+        if (!currentState.air() && !isValid(config, currentState)) {
             return false;
         }
 
@@ -51,23 +51,23 @@ public final class SpringFeature implements Feature<SpringConfiguration> {
         }
 
         var holeCount = 0;
-        if (level.getBlock(origin.add(-1, 0, 0)).isAir()) {
+        if (level.getBlock(origin.add(-1, 0, 0)).air()) {
             holeCount++;
         }
 
-        if (level.getBlock(origin.add(1, 0, 0)).isAir()) {
+        if (level.getBlock(origin.add(1, 0, 0)).air()) {
             holeCount++;
         }
 
-        if (level.getBlock(origin.add(0, 0, -1)).isAir()) {
+        if (level.getBlock(origin.add(0, 0, -1)).air()) {
             holeCount++;
         }
 
-        if (level.getBlock(origin.add(0, 0, 1)).isAir()) {
+        if (level.getBlock(origin.add(0, 0, 1)).air()) {
             holeCount++;
         }
 
-        if (level.getBlock(origin.add(0, -1, 0)).isAir()) {
+        if (level.getBlock(origin.add(0, -1, 0)).air()) {
             holeCount++;
         }
 

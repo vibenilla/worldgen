@@ -59,7 +59,7 @@ public final class TwistingVinesFeature implements Feature<TwistingVinesConfig> 
             if (placePos.blockY() < minY || placePos.blockY() > maxY) {
                 return null;
             }
-        } while (level.getBlock(placePos).isAir());
+        } while (level.getBlock(placePos).air());
 
         return placePos.add(0, 1, 0);
     }
@@ -68,8 +68,8 @@ public final class TwistingVinesFeature implements Feature<TwistingVinesConfig> 
     public static <T extends Block.Getter & Block.Setter> void placeWeepingVinesColumn(
             T level, RandomSource random, BlockVec placePos, int totalHeight, int minAge, int maxAge) {
         for (var height = 1; height <= totalHeight; height++) {
-            if (level.getBlock(placePos).isAir()) {
-                if (height == totalHeight || !level.getBlock(placePos.add(0, 1, 0)).isAir()) {
+            if (level.getBlock(placePos).air()) {
+                if (height == totalHeight || !level.getBlock(placePos.add(0, 1, 0)).air()) {
                     level.setBlock(placePos, Block.TWISTING_VINES
                             .withProperty("age", String.valueOf(WeepingVinesFeature.nextIntInclusive(random, minAge, maxAge))));
                     break;
@@ -83,7 +83,7 @@ public final class TwistingVinesFeature implements Feature<TwistingVinesConfig> 
     }
 
     private static boolean isInvalidPlacementLocation(Block.Getter level, BlockVec pos) {
-        if (!level.getBlock(pos).isAir()) {
+        if (!level.getBlock(pos).air()) {
             return true;
         }
 

@@ -106,7 +106,7 @@ public final class CarvingContext {
      */
     public void setCarved(int blockX, int blockY, int blockZ, Block state) {
         var index = this.blockIndex(blockX, blockY, blockZ);
-        if (state.isAir()) {
+        if (state.air()) {
             // Cave air is still air for every mask consumer, but the block
             // itself must survive to the blit so carved cavities store
             // cave_air like vanilla's nether carver.

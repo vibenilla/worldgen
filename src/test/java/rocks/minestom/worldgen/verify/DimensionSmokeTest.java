@@ -34,7 +34,7 @@ final class DimensionSmokeTest {
                 instance.loadChunk(chunkX, 0).join();
                 for (var y = -60; y < 250; y += 3) {
                     for (var x = 0; x < 16; x += 4) {
-                        if (!instance.getBlock(chunkX * 16 + x, y, 8).isAir()) {
+                        if (!instance.getBlock(chunkX * 16 + x, y, 8).air()) {
                             nonAir++;
                         }
                     }

@@ -261,7 +261,7 @@ public final class TreeFeature implements Feature<TreeConfiguration> {
             for (var x = origin.blockX() - reach; x <= origin.blockX() + reach; x++) {
                 for (var z = origin.blockZ() - reach; z <= origin.blockZ() + reach; z++) {
                     var block = level.getBlock(x, y, z);
-                    if (!block.isAir()) {
+                    if (!block.air()) {
                         System.out.println("TRACE world " + stage + ":" + key(origin) + " " + x + " " + y + " " + z + " " + serialize(block));
                     }
                 }

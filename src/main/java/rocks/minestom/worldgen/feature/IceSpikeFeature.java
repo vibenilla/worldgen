@@ -32,7 +32,7 @@ public final class IceSpikeFeature implements Feature<NoneFeatureConfiguration> 
         var random = context.random();
         var level = context.accessor();
 
-        while (level.getBlock(origin).isAir() && origin.blockY() > context.minY() + 2) {
+        while (level.getBlock(origin).air() && origin.blockY() > context.minY() + 2) {
             origin = origin.sub(0, 1, 0);
         }
 
@@ -60,14 +60,14 @@ public final class IceSpikeFeature implements Feature<NoneFeatureConfiguration> 
                             && (xo != -newWidth && xo != newWidth && zo != -newWidth && zo != newWidth || !(random.nextFloat() > 0.75F))) {
                         var positiveOffset = origin.add(xo, yOff, zo);
                         var state = level.getBlock(positiveOffset);
-                        if (state.isAir() || isReplaceable(state)) {
+                        if (state.air() || isReplaceable(state)) {
                             level.setBlock(positiveOffset, Block.PACKED_ICE);
                         }
 
                         if (yOff != 0 && newWidth > 1) {
                             var negativeOffset = origin.add(xo, -yOff, zo);
                             state = level.getBlock(negativeOffset);
-                            if (state.isAir() || isReplaceable(state)) {
+                            if (state.air() || isReplaceable(state)) {
                                 level.setBlock(negativeOffset, Block.PACKED_ICE);
                             }
                         }
@@ -93,7 +93,7 @@ public final class IceSpikeFeature implements Feature<NoneFeatureConfiguration> 
 
                 while (cursor.blockY() > 50) {
                     var state = level.getBlock(cursor);
-                    if (!state.isAir() && !isReplaceable(state) && !state.compare(Block.PACKED_ICE, Block.Comparator.STATE)) {
+                    if (!state.air() && !isReplaceable(state) && !state.compare(Block.PACKED_ICE, Block.Comparator.STATE)) {
                         break;
                     }
 

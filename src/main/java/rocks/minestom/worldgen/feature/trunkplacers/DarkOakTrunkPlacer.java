@@ -93,7 +93,7 @@ public record DarkOakTrunkPlacer(int baseHeight, int heightRandA, int heightRand
     /** Vanilla {@code TreeFeature.isAirOrLeaves}. */
     private static boolean isAirOrLeaves(Block.Getter getter, BlockVec position) {
         var block = getter.getBlock(position);
-        return block.isAir() || rocks.minestom.worldgen.feature.Feature.LEAVES.contains(block.name());
+        return block.air() || rocks.minestom.worldgen.feature.Feature.LEAVES.contains(block.name());
     }
 }
 

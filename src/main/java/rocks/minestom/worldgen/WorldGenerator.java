@@ -406,7 +406,7 @@ public final class WorldGenerator implements Generator {
             for (var x = origin.blockX() - reachXZ; x < origin.blockX() + reachXZ; x++) {
                 for (var z = origin.blockZ() - reachXZ; z < origin.blockZ() + reachXZ; z++) {
                     var block = levelAdapter.getBlock(x, y, z);
-                    if (!block.isAir()) {
+                    if (!block.air()) {
                         System.out.println("TRACE world " + key + " " + x + " " + y + " " + z + " " + serializeBlock(block));
                     }
                 }

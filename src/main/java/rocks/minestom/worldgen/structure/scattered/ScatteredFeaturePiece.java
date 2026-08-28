@@ -202,7 +202,7 @@ abstract class ScatteredFeaturePiece {
         for (var y = y0; y <= y1; y++) {
             for (var x = x0; x <= x1; x++) {
                 for (var z = z0; z <= z1; z++) {
-                    if (skipAir && this.getBlock(level, x, y, z, chunkBB).isAir()) {
+                    if (skipAir && this.getBlock(level, x, y, z, chunkBB).air()) {
                         continue;
                     }
                     if (y != y0 && y != y1 && x != x0 && x != x1 && z != z0 && z != z1) {
@@ -220,7 +220,7 @@ abstract class ScatteredFeaturePiece {
         for (var y = y0; y <= y1; y++) {
             for (var x = x0; x <= x1; x++) {
                 for (var z = z0; z <= z1; z++) {
-                    if (skipAir && this.getBlock(level, x, y, z, chunkBB).isAir()) {
+                    if (skipAir && this.getBlock(level, x, y, z, chunkBB).air()) {
                         continue;
                     }
                     var isEdge = y == y0 || y == y1 || x == x0 || x == x1 || z == z0 || z == z1;
@@ -246,7 +246,7 @@ abstract class ScatteredFeaturePiece {
     }
 
     private static boolean isReplaceableByStructures(Block block) {
-        return block.isAir() || block.isLiquid() || block.compare(Block.GLOW_LICHEN)
+        return block.air() || block.liquid() || block.compare(Block.GLOW_LICHEN)
                 || block.compare(Block.SEAGRASS) || block.compare(Block.TALL_SEAGRASS);
     }
 
@@ -283,7 +283,7 @@ abstract class ScatteredFeaturePiece {
             if (state.compare(Block.CHEST)) {
                 return Block.CHEST;
             }
-            if (state.isSolid()) {
+            if (state.solid()) {
                 if (solidNeighbor != null) {
                     solidNeighbor = null;
                     break;
@@ -297,13 +297,13 @@ abstract class ScatteredFeaturePiece {
         }
 
         var lockDirection = Direction.NORTH;
-        if (level.getBlock(x + lockDirection.stepX(), y, z + lockDirection.stepZ()).isSolid()) {
+        if (level.getBlock(x + lockDirection.stepX(), y, z + lockDirection.stepZ()).solid()) {
             lockDirection = lockDirection.opposite();
         }
-        if (level.getBlock(x + lockDirection.stepX(), y, z + lockDirection.stepZ()).isSolid()) {
+        if (level.getBlock(x + lockDirection.stepX(), y, z + lockDirection.stepZ()).solid()) {
             lockDirection = clockwise(lockDirection);
         }
-        if (level.getBlock(x + lockDirection.stepX(), y, z + lockDirection.stepZ()).isSolid()) {
+        if (level.getBlock(x + lockDirection.stepX(), y, z + lockDirection.stepZ()).solid()) {
             lockDirection = lockDirection.opposite();
         }
         return Block.CHEST.withProperty("facing", lockDirection.serializedName());

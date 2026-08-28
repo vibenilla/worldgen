@@ -602,11 +602,11 @@ public final class WaterSpread {
      * into (and destroys) it.
      */
     private static boolean blocksMotion(Block state) {
-        return state.registry().isSolid() && !state.compare(Block.COBWEB) && !state.compare(Block.BAMBOO_SAPLING);
+        return state.solid() && !state.compare(Block.COBWEB) && !state.compare(Block.BAMBOO_SAPLING);
     }
 
     private static boolean isFullCube(Block state) {
-        var shape = state.registry().collisionShape();
+        var shape = state.collisionShape();
         if (shape == null) {
             return false;
         }
@@ -619,7 +619,7 @@ public final class WaterSpread {
     }
 
     private static boolean faceFull(Block state, Direction direction) {
-        var shape = state.registry().collisionShape();
+        var shape = state.collisionShape();
         return shape != null && shape.isFaceFull(blockFaceOf(direction));
     }
 

@@ -453,7 +453,7 @@ public final class PlacementModifiers {
             }
 
             private static boolean isEmpty(Block block) {
-                return block.isAir() || block.compare(Block.WATER) || block.compare(Block.LAVA);
+                return block.air() || block.compare(Block.WATER) || block.compare(Block.LAVA);
             }
         }
 
@@ -656,7 +656,7 @@ public final class PlacementModifiers {
                             && adapter.fullBrightAtGeneration(targetPosition.blockX(), targetPosition.blockZ())) {
                         return false;
                     }
-                    return below.registry().isSolid();
+                    return below.solid();
                 }
 
                 if (this.state.compare(Block.MANGROVE_PROPAGULE)) {
@@ -683,7 +683,7 @@ public final class PlacementModifiers {
                             "minecraft:supports_dry_vegetation", below);
                 }
 
-                return below.registry().isSolid();
+                return below.solid();
             }
         }
 
@@ -740,7 +740,7 @@ public final class PlacementModifiers {
         @Override
             public boolean test(PlacementContext context, BlockVec position) {
                 var block = context.accessor().getBlock(position.add(this.offset.blockX(), this.offset.blockY(), this.offset.blockZ()));
-                return block.registry().isSolid();
+                return block.solid();
             }
         }
 
@@ -752,7 +752,7 @@ public final class PlacementModifiers {
                 // approximated with the collision shape like the other face checks.
                 var targetPosition = position.add(this.offset.blockX(), this.offset.blockY(), this.offset.blockZ());
                 var block = context.accessor().getBlock(targetPosition);
-                return block.registry().collisionShape().isFaceFull(this.direction.blockFace());
+                return block.collisionShape().isFaceFull(this.direction.blockFace());
             }
         }
 

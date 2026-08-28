@@ -20,7 +20,7 @@ public final class DesertWellFeature implements Feature<NoneFeatureConfiguration
         var random = context.random();
         var origin = context.origin().add(0, 1, 0);
 
-        while (level.getBlock(origin).isAir() && origin.blockY() > context.minY() + 2) {
+        while (level.getBlock(origin).air() && origin.blockY() > context.minY() + 2) {
             origin = origin.sub(0, 1, 0);
         }
 
@@ -30,8 +30,8 @@ public final class DesertWellFeature implements Feature<NoneFeatureConfiguration
 
         for (var offsetX = -2; offsetX <= 2; offsetX++) {
             for (var offsetZ = -2; offsetZ <= 2; offsetZ++) {
-                if (level.getBlock(origin.add(offsetX, -1, offsetZ)).isAir()
-                        && level.getBlock(origin.add(offsetX, -2, offsetZ)).isAir()) {
+                if (level.getBlock(origin.add(offsetX, -1, offsetZ)).air()
+                        && level.getBlock(origin.add(offsetX, -2, offsetZ)).air()) {
                     return false;
                 }
             }

@@ -65,11 +65,11 @@ public final class LakeFeature implements Feature<LakeConfiguration> {
 
                     var offsetPos = origin.add(xx, yy, zz);
                     var blockState = level.getBlock(offsetPos);
-                    if (yy >= 4 && blockState.isLiquid()) {
+                    if (yy >= 4 && blockState.liquid()) {
                         return false;
                     }
 
-                    if (yy < 4 && !blockState.registry().isSolid() && !blockState.compare(fluid, Block.Comparator.STATE)) {
+                    if (yy < 4 && !blockState.solid() && !blockState.compare(fluid, Block.Comparator.STATE)) {
                         return false;
                     }
 
@@ -97,7 +97,7 @@ public final class LakeFeature implements Feature<LakeConfiguration> {
         }
 
         var barrier = config.barrier().getState(level, random, origin);
-        if (!barrier.isAir()) {
+        if (!barrier.air()) {
             for (var xx = 0; xx < 16; xx++) {
                 for (var zz = 0; zz < 16; zz++) {
                     for (var yy = 0; yy < 8; yy++) {
@@ -111,7 +111,7 @@ public final class LakeFeature implements Feature<LakeConfiguration> {
                         if (isBorder && (yy < 4 || random.nextInt(2) != 0)) {
                             var offsetPos = origin.add(xx, yy, zz);
                             var blockState = level.getBlock(offsetPos);
-                            if (blockState.registry().isSolid() && config.canReplaceWithBarrier().test(predicateContext, offsetPos)) {
+                            if (blockState.solid() && config.canReplaceWithBarrier().test(predicateContext, offsetPos)) {
                                 level.setBlock(offsetPos, barrier);
                             }
                         }

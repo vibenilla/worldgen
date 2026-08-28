@@ -33,7 +33,7 @@ final class FortressBlockConsistencyTest {
                     var second = placeAll(seed, chunkX, chunkZ);
                     assertEquals(first, second, "non-deterministic placement at seed=" + seed
                             + " chunk=" + chunkX + "," + chunkZ);
-                    assertTrue(first.values().stream().anyMatch(block -> !block.isAir()),
+                    assertTrue(first.values().stream().anyMatch(block -> !block.air()),
                             "no non-air blocks placed at seed=" + seed + " chunk=" + chunkX + "," + chunkZ);
                 }
             }

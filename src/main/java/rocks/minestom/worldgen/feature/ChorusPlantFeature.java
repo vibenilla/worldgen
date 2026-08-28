@@ -22,7 +22,7 @@ public final class ChorusPlantFeature implements Feature<NoneFeatureConfiguratio
 
         var below = origin.add(0, -1, 0);
         var belowBlock = level.getBlock(below);
-        if (!belowBlock.compare(Block.END_STONE) && !belowBlock.isAir()) {
+        if (!belowBlock.compare(Block.END_STONE) && !belowBlock.air()) {
             return false;
         }
 
@@ -93,7 +93,7 @@ public final class ChorusPlantFeature implements Feature<NoneFeatureConfiguratio
     }
 
     private static boolean isEmpty(Block.Getter getter, BlockVec position) {
-        return getter.getBlock(position).isAir();
+        return getter.getBlock(position).air();
     }
 
     private static boolean allNeighborsEmpty(Block.Getter getter, BlockVec position, Direction skipDirection) {
@@ -103,7 +103,7 @@ public final class ChorusPlantFeature implements Feature<NoneFeatureConfiguratio
             }
 
             var neighbor = position.add(direction.stepX(), 0, direction.stepZ());
-            if (!getter.getBlock(neighbor).isAir()) {
+            if (!getter.getBlock(neighbor).air()) {
                 return false;
             }
         }
@@ -124,7 +124,7 @@ public final class ChorusPlantFeature implements Feature<NoneFeatureConfiguratio
         var south = getter.getBlock(position.add(0, 0, 1));
         var west = getter.getBlock(position.add(-1, 0, 0));
 
-        var downConnected = isChorusPlantOrFlower(below) || below.compare(Block.END_STONE) || below.isAir();
+        var downConnected = isChorusPlantOrFlower(below) || below.compare(Block.END_STONE) || below.air();
         var upConnected = isChorusPlantOrFlower(above);
         var northConnected = isChorusPlantOrFlower(north);
         var eastConnected = isChorusPlantOrFlower(east);

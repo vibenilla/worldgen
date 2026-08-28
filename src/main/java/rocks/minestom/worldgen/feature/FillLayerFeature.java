@@ -19,7 +19,7 @@ public final class FillLayerFeature implements Feature<LayerConfiguration> {
             for (var offsetZ = 0; offsetZ < 16; offsetZ++) {
                 var x = origin.blockX() + offsetX;
                 var z = origin.blockZ() + offsetZ;
-                if (level.getBlock(x, y, z).isAir()) {
+                if (level.getBlock(x, y, z).air()) {
                     level.setBlock(x, y, z, config.state());
                 }
             }

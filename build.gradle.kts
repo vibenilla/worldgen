@@ -63,10 +63,10 @@ repositories {
 }
 
 dependencies {
-    compileOnly("net.minestom:minestom:2026.07.12-26.2")
+    compileOnly("net.minestom:minestom:2026.08.28-26.2")
     compileOnly("org.slf4j:slf4j-api:2.0.17")
 
-    testImplementation("net.minestom:minestom:2026.07.12-26.2")
+    testImplementation("net.minestom:minestom:2026.08.28-26.2")
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testRuntimeOnly("org.slf4j:slf4j-simple:2.0.17")

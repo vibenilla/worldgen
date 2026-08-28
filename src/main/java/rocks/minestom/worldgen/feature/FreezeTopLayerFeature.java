@@ -104,7 +104,7 @@ public final class FreezeTopLayerFeature implements Feature<NoneFeatureConfigura
         }
 
         var state = level.getBlock(position);
-        if (!state.isAir() && !state.compare(Block.SNOW)) {
+        if (!state.air() && !state.compare(Block.SNOW)) {
             return false;
         }
 
@@ -125,6 +125,6 @@ public final class FreezeTopLayerFeature implements Feature<NoneFeatureConfigura
             return true;
         }
 
-        return below.registry().isSolid();
+        return below.solid();
     }
 }

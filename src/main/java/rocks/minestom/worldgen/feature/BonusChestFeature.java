@@ -38,7 +38,7 @@ public final class BonusChestFeature implements Feature<NoneFeatureConfiguration
                 var height = motionBlockingNoLeavesHeight(level, x, z);
                 var chestPosition = new BlockVec(x, height, z);
                 var chestBlock = level.getBlock(chestPosition);
-                if (chestBlock.isAir() || !chestBlock.isSolid()) {
+                if (chestBlock.air() || !chestBlock.solid()) {
                     level.setBlock(chestPosition, Block.CHEST);
 
                     for (var direction : Direction.HORIZONTAL) {
@@ -70,7 +70,7 @@ public final class BonusChestFeature implements Feature<NoneFeatureConfiguration
 
     private static <T extends Block.Getter> boolean canSurviveTorch(T level, BlockVec position) {
         var below = level.getBlock(position.sub(0, 1, 0));
-        return below.isSolid();
+        return below.solid();
     }
 
     private static ArrayList<Integer> shuffledRange(int minInclusive, int maxInclusive, RandomSource random) {

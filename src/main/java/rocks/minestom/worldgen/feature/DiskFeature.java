@@ -60,7 +60,7 @@ public final class DiskFeature implements Feature<DiskConfiguration> {
                     if (!placedAbove && level instanceof GenerationUnitAdapter adapter) {
                         for (var above = 1; above <= 2; above++) {
                             var abovePosition = position.add(0, above, 0);
-                            if (level.getBlock(abovePosition).isAir()) {
+                            if (level.getBlock(abovePosition).air()) {
                                 break;
                             }
                             adapter.markPostProcess(abovePosition);

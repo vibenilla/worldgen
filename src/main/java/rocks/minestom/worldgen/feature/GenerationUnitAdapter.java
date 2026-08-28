@@ -431,25 +431,25 @@ public final class GenerationUnitAdapter implements Block.Getter, Block.Setter {
         WORLD_SURFACE {
             @Override
             boolean isOpaque(Block block) {
-                return !block.isAir();
+                return !block.air();
             }
         },
         OCEAN_FLOOR {
             @Override
             boolean isOpaque(Block block) {
-                return block.isSolid();
+                return block.solid();
             }
         },
         MOTION_BLOCKING {
             @Override
             boolean isOpaque(Block block) {
-                return block.isSolid() || isFluid(block);
+                return block.solid() || isFluid(block);
             }
         },
         MOTION_BLOCKING_NO_LEAVES {
             @Override
             boolean isOpaque(Block block) {
-                return (block.isSolid() && !block.key().value().endsWith("leaves")) || isFluid(block);
+                return (block.solid() && !block.key().value().endsWith("leaves")) || isFluid(block);
             }
         };
 

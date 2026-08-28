@@ -130,7 +130,7 @@ public final class DemoServer {
         var maxY = instance.getCachedDimensionType().maxY();
         var minY = instance.getCachedDimensionType().minY();
         for (var y = maxY - 1; y > minY; y--) {
-            if (!instance.getBlock(x, y, z).isAir()) {
+            if (!instance.getBlock(x, y, z).air()) {
                 return new Pos(x + 0.5, y + 1, z + 0.5);
             }
         }
@@ -140,9 +140,9 @@ public final class DemoServer {
     private static Pos roofedSpawn(Instance instance, int x, int z) {
         instance.loadChunk(x >> 4, z >> 4).join();
         for (var y = 32; y < 120; y++) {
-            if (instance.getBlock(x, y - 1, z).isSolid()
-                    && instance.getBlock(x, y, z).isAir()
-                    && instance.getBlock(x, y + 1, z).isAir()) {
+            if (instance.getBlock(x, y - 1, z).solid()
+                    && instance.getBlock(x, y, z).air()
+                    && instance.getBlock(x, y + 1, z).air()) {
                 return new Pos(x + 0.5, y, z + 0.5);
             }
         }

@@ -52,7 +52,7 @@ public final class GeodeFeature implements Feature<GeodeConfiguration> {
             var z = config.outerWallDistance().sample(random);
             var pos = origin.add(x, y, z);
             var state = level.getBlock(pos);
-            if (state.isAir() || blockSettings.invalidBlocks().contains(state.key())) {
+            if (state.air() || blockSettings.invalidBlocks().contains(state.key())) {
                 if (++numInvalidPoints > config.invalidBlocksThreshold()) {
                     return false;
                 }
@@ -172,7 +172,7 @@ public final class GeodeFeature implements Feature<GeodeConfiguration> {
 
     /** Vanilla {@code BuddingAmethystBlock.canClusterGrowAtState}. */
     private static boolean canClusterGrowAtState(Block state) {
-        return state.isAir() || (state.compare(Block.WATER) && isFullWater(state));
+        return state.air() || (state.compare(Block.WATER) && isFullWater(state));
     }
 
     private static boolean isFullWater(Block state) {

@@ -82,7 +82,7 @@ public final class UnderwaterMagmaFeature implements Feature<UnderwaterMagmaConf
 
     private static <T extends Block.Getter & Block.Setter> boolean isValidPlacement(T level, int x, int y, int z) {
         var block = level.getBlock(x, y, z);
-        if (block.isAir() || block.compare(Block.WATER)) {
+        if (block.air() || block.compare(Block.WATER)) {
             return false;
         }
 
@@ -100,7 +100,7 @@ public final class UnderwaterMagmaFeature implements Feature<UnderwaterMagmaConf
     }
 
     private static boolean isVisibleFromOutside(Block.Getter level, int x, int y, int z) {
-        return !level.getBlock(x, y, z).registry().isSolid();
+        return !level.getBlock(x, y, z).solid();
     }
 
     /**

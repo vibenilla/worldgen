@@ -46,7 +46,7 @@ public final class SculkPatchFeature implements Feature<SculkPatchConfiguration>
         for (var i = 0; i < extraGrowths; i++) {
             var candidate = origin.add(random.nextInt(5) - 2, 0, random.nextInt(5) - 2);
             var candidateBelow = candidate.add(0, -1, 0);
-            if (level.getBlock(candidate).isAir() && hasFullFace(level.getBlock(candidateBelow), BlockFace.TOP)) {
+            if (level.getBlock(candidate).air() && hasFullFace(level.getBlock(candidateBelow), BlockFace.TOP)) {
                 level.setBlock(candidate.blockX(), candidate.blockY(), candidate.blockZ(),
                         Block.SCULK_SHRIEKER.withProperty("can_summon", "true"));
             }
@@ -61,7 +61,7 @@ public final class SculkPatchFeature implements Feature<SculkPatchConfiguration>
             return true;
         }
 
-        if (!start.isAir() && !start.compare(Block.WATER)) {
+        if (!start.air() && !start.compare(Block.WATER)) {
             return false;
         }
 
@@ -77,7 +77,7 @@ public final class SculkPatchFeature implements Feature<SculkPatchConfiguration>
 
     /** Vanilla's {@code BlockState.isCollisionShapeFullBlock}: the collision shape spans the whole block. */
     private static boolean isFullCollisionBlock(Block block) {
-        var shape = block.registry().collisionShape();
+        var shape = block.collisionShape();
         var start = shape.relativeStart();
         var end = shape.relativeEnd();
         return start.x() == 0.0 && start.y() == 0.0 && start.z() == 0.0
@@ -86,6 +86,6 @@ public final class SculkPatchFeature implements Feature<SculkPatchConfiguration>
 
     /** Vanilla's {@code BlockState.isFaceSturdy} (default {@code SupportType.FULL}), approximated with the collision shape. */
     private static boolean hasFullFace(Block block, BlockFace face) {
-        return block.registry().collisionShape().isFaceFull(face);
+        return block.collisionShape().isFaceFull(face);
     }
 }

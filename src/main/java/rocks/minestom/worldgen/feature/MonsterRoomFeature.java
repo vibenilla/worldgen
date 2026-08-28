@@ -39,7 +39,7 @@ public final class MonsterRoomFeature implements Feature<NoneFeatureConfiguratio
             for (var dy = -1; dy <= 4; dy++) {
                 for (var dz = minZ; dz <= maxZ; dz++) {
                     var pos = origin.add(dx, dy, dz);
-                    var solid = level.getBlock(pos).isSolid();
+                    var solid = level.getBlock(pos).solid();
                     if (dy == -1 && !solid) {
                         return false;
                     }
@@ -49,7 +49,7 @@ public final class MonsterRoomFeature implements Feature<NoneFeatureConfiguratio
                     }
 
                     if ((dx == minX || dx == maxX || dz == minZ || dz == maxZ) && dy == 0
-                            && level.getBlock(pos).isAir() && level.getBlock(pos.add(0, 1, 0)).isAir()) {
+                            && level.getBlock(pos).air() && level.getBlock(pos.add(0, 1, 0)).air()) {
                         holeCount++;
                     }
                 }
@@ -66,9 +66,9 @@ public final class MonsterRoomFeature implements Feature<NoneFeatureConfiguratio
                     var pos = origin.add(dx, dy, dz);
                     var state = level.getBlock(pos);
                     if (dx == minX || dy == -1 || dz == minZ || dx == maxX || dy == 4 || dz == maxZ) {
-                        if (pos.blockY() >= context.minY() && !level.getBlock(pos.add(0, -1, 0)).isSolid()) {
+                        if (pos.blockY() >= context.minY() && !level.getBlock(pos.add(0, -1, 0)).solid()) {
                             level.setBlock(pos, AIR);
-                        } else if (state.isSolid() && !state.compare(Block.CHEST)) {
+                        } else if (state.solid() && !state.compare(Block.CHEST)) {
                             if (dy == -1 && random.nextInt(4) != 0) {
                                 this.safeSetBlock(level, pos, Block.MOSSY_COBBLESTONE);
                             } else {
@@ -88,11 +88,11 @@ public final class MonsterRoomFeature implements Feature<NoneFeatureConfiguratio
                 var chestY = origin.blockY();
                 var chestZ = origin.blockZ() + random.nextInt(zRadius * 2 + 1) - zRadius;
                 var chestPos = new BlockVec(chestX, chestY, chestZ);
-                if (level.getBlock(chestPos).isAir()) {
+                if (level.getBlock(chestPos).air()) {
                     var wallCount = 0;
 
                     for (var direction : Direction.HORIZONTAL) {
-                        if (level.getBlock(direction.relative(chestPos)).isSolid()) {
+                        if (level.getBlock(direction.relative(chestPos)).solid()) {
                             wallCount++;
                         }
                     }
@@ -172,7 +172,7 @@ public final class MonsterRoomFeature implements Feature<NoneFeatureConfiguratio
      * a dungeon: any solid full block except spawners and chests.
      */
     private static boolean isSolidRender(Block block) {
-        return block.isSolid() && !block.compare(Block.SPAWNER) && !block.compare(Block.CHEST);
+        return block.solid() && !block.compare(Block.SPAWNER) && !block.compare(Block.CHEST);
     }
 
     private <T extends Block.Getter & Block.Setter> void safeSetBlock(T level, BlockVec pos, Block block) {

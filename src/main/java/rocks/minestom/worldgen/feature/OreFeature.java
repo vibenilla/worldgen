@@ -196,12 +196,12 @@ public final class OreFeature implements Feature<OreConfiguration> {
 
     private static boolean isAdjacentToAir(Block.Getter blockGetter, BlockVec pos) {
         // Vanilla Direction order: DOWN, UP, NORTH, SOUTH, WEST, EAST.
-        return blockGetter.getBlock(pos.blockX(), pos.blockY() - 1, pos.blockZ()).isAir()
-                || blockGetter.getBlock(pos.blockX(), pos.blockY() + 1, pos.blockZ()).isAir()
-                || blockGetter.getBlock(pos.blockX(), pos.blockY(), pos.blockZ() - 1).isAir()
-                || blockGetter.getBlock(pos.blockX(), pos.blockY(), pos.blockZ() + 1).isAir()
-                || blockGetter.getBlock(pos.blockX() - 1, pos.blockY(), pos.blockZ()).isAir()
-                || blockGetter.getBlock(pos.blockX() + 1, pos.blockY(), pos.blockZ()).isAir();
+        return blockGetter.getBlock(pos.blockX(), pos.blockY() - 1, pos.blockZ()).air()
+                || blockGetter.getBlock(pos.blockX(), pos.blockY() + 1, pos.blockZ()).air()
+                || blockGetter.getBlock(pos.blockX(), pos.blockY(), pos.blockZ() - 1).air()
+                || blockGetter.getBlock(pos.blockX(), pos.blockY(), pos.blockZ() + 1).air()
+                || blockGetter.getBlock(pos.blockX() - 1, pos.blockY(), pos.blockZ()).air()
+                || blockGetter.getBlock(pos.blockX() + 1, pos.blockY(), pos.blockZ()).air();
     }
 
     private static int getHeight(Block.Getter level, FeaturePlaceContext<?, ?> context, int x, int z) {

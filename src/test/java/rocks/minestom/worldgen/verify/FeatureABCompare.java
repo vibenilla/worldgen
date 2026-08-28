@@ -279,7 +279,7 @@ public final class FeatureABCompare {
         @Override
         public int worldSurfaceHeight(int x, int z) {
             for (var y = 45; y >= -64; y--) {
-                if (!this.getBlock(x, y, z).isAir()) {
+                if (!this.getBlock(x, y, z).air()) {
                     return y + 1;
                 }
             }

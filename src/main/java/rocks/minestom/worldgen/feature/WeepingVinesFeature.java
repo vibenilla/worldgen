@@ -17,7 +17,7 @@ public final class WeepingVinesFeature implements Feature<NoneFeatureConfigurati
         var level = context.accessor();
         var origin = context.origin();
         var random = context.random();
-        if (!level.getBlock(origin).isAir()) {
+        if (!level.getBlock(origin).air()) {
             return false;
         }
 
@@ -39,7 +39,7 @@ public final class WeepingVinesFeature implements Feature<NoneFeatureConfigurati
                     random.nextInt(6) - random.nextInt(6),
                     random.nextInt(2) - random.nextInt(5),
                     random.nextInt(6) - random.nextInt(6));
-            if (level.getBlock(placePos).isAir()) {
+            if (level.getBlock(placePos).air()) {
                 var neighbours = 0;
 
                 for (var direction : DIRECTIONS) {
@@ -66,7 +66,7 @@ public final class WeepingVinesFeature implements Feature<NoneFeatureConfigurati
                     random.nextInt(8) - random.nextInt(8),
                     random.nextInt(2) - random.nextInt(7),
                     random.nextInt(8) - random.nextInt(8));
-            if (level.getBlock(placePos).isAir()) {
+            if (level.getBlock(placePos).air()) {
                 var stateAbove = level.getBlock(placePos.add(0, 1, 0));
                 if (stateAbove.compare(Block.NETHERRACK) || stateAbove.compare(Block.NETHER_WART_BLOCK)) {
                     var vineHeight = nextIntInclusive(random, 1, 8);
@@ -92,8 +92,8 @@ public final class WeepingVinesFeature implements Feature<NoneFeatureConfigurati
     public static <T extends Block.Getter & Block.Setter> void placeWeepingVinesColumn(
             T level, RandomSource random, BlockVec placePos, int totalHeight, int minAge, int maxAge) {
         for (var height = 0; height <= totalHeight; height++) {
-            if (level.getBlock(placePos).isAir()) {
-                if (height == totalHeight || !level.getBlock(placePos.sub(0, 1, 0)).isAir()) {
+            if (level.getBlock(placePos).air()) {
+                if (height == totalHeight || !level.getBlock(placePos.sub(0, 1, 0)).air()) {
                     level.setBlock(placePos, Block.WEEPING_VINES
                             .withProperty("age", String.valueOf(nextIntInclusive(random, minAge, maxAge))));
                     break;

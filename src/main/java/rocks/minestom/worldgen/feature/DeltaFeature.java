@@ -66,7 +66,7 @@ public final class DeltaFeature implements Feature<DeltaFeatureConfiguration> {
         }
 
         for (var direction : Direction.values()) {
-            var isAir = level.getBlock(direction.relative(pos)).isAir();
+            var isAir = level.getBlock(direction.relative(pos)).air();
             if (isAir && direction != Direction.UP || !isAir && direction == Direction.UP) {
                 return false;
             }

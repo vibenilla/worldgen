@@ -84,11 +84,11 @@ public class VegetationPatchFeature implements Feature<VegetationPatchConfigurat
                 var x = origin.blockX() + dx;
                 var y = origin.blockY();
                 var z = origin.blockZ() + dz;
-                for (var offset = 0; level.getBlock(x, y, z).isAir() && offset < config.verticalRange(); offset++) {
+                for (var offset = 0; level.getBlock(x, y, z).air() && offset < config.verticalRange(); offset++) {
                     y += inwards;
                 }
 
-                for (var offset = 0; !level.getBlock(x, y, z).isAir() && offset < config.verticalRange(); offset++) {
+                for (var offset = 0; !level.getBlock(x, y, z).air() && offset < config.verticalRange(); offset++) {
                     y += outwards;
                 }
 
@@ -102,7 +102,7 @@ public class VegetationPatchFeature implements Feature<VegetationPatchConfigurat
                             + " block=" + level.getBlock(x, y, z).name() + " below=" + belowBlock.name()
                             + " s=" + rngState(random));
                 }
-                if (level.getBlock(x, y, z).isAir() && hasFullFace(belowBlock, sturdyFace)) {
+                if (level.getBlock(x, y, z).air() && hasFullFace(belowBlock, sturdyFace)) {
                     var depth = config.depth().sample(random)
                             + (config.extraBottomBlockChance() > 0.0F && random.nextFloat() < config.extraBottomBlockChance() ? 1 : 0);
                     var groundPos = new VanillaPos(x, belowY, z);

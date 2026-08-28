@@ -116,7 +116,7 @@ final class MineshaftLevel {
         var base = (localX * 16 + localZ) * this.height;
         for (var yIndex = this.height - 1; yIndex >= 0; yIndex--) {
             var block = this.blocks[base + yIndex];
-            if (block != null && block.isSolid()) {
+            if (block != null && block.solid()) {
                 return this.minY + yIndex + 1;
             }
         }

@@ -94,7 +94,7 @@ public final class MineshaftPieces {
      * Approximation of vanilla {@code isSolidRender()} for the same block set.
      */
     private static boolean isSolidRender(Block block) {
-        return block.isSolid() && !isFence(block) && !block.compare(Block.IRON_CHAIN)
+        return block.solid() && !isFence(block) && !block.compare(Block.IRON_CHAIN)
                 && !block.compare(Block.COBWEB) && !block.compare(Block.SPAWNER);
     }
 
@@ -103,7 +103,7 @@ public final class MineshaftPieces {
     }
 
     private static boolean isReplaceableByStructures(Block block) {
-        return block.isAir() || block.isLiquid() || block.compare(Block.GLOW_LICHEN)
+        return block.air() || block.liquid() || block.compare(Block.GLOW_LICHEN)
                 || block.compare(Block.SEAGRASS) || block.compare(Block.TALL_SEAGRASS);
     }
 
@@ -255,7 +255,7 @@ public final class MineshaftPieces {
             for (var y = y0; y <= y1; y++) {
                 for (var x = x0; x <= x1; x++) {
                     for (var z = z0; z <= z1; z++) {
-                        if (skipAir && this.getBlock(level, x, y, z, chunkBB).isAir()) {
+                        if (skipAir && this.getBlock(level, x, y, z, chunkBB).air()) {
                             continue;
                         }
                         if (y != y0 && y != y1 && x != x0 && x != x1 && z != z0 && z != z1) {
@@ -284,7 +284,7 @@ public final class MineshaftPieces {
                                     && wz >= Integer.parseInt(parts[1]) && wz <= Integer.parseInt(parts[3])) {
                                 System.out.println("MWEB pos=" + wx + "," + this.worldY(y) + "," + wz
                                         + " roll=" + roll
-                                        + " skipAirHit=" + (skipAir && this.getBlock(level, x, y, z, chunkBB).isAir())
+                                        + " skipAirHit=" + (skipAir && this.getBlock(level, x, y, z, chunkBB).air())
                                         + " interior=" + (!hasToBeInside || this.isInterior(level, x, y, z, chunkBB))
                                         + " edge=" + edgeBlock.name());
                             }
@@ -292,7 +292,7 @@ public final class MineshaftPieces {
                         if (roll > probability) {
                             continue;
                         }
-                        if (skipAir && this.getBlock(level, x, y, z, chunkBB).isAir()) {
+                        if (skipAir && this.getBlock(level, x, y, z, chunkBB).air()) {
                             continue;
                         }
                         if (hasToBeInside && !this.isInterior(level, x, y, z, chunkBB)) {
@@ -331,7 +331,7 @@ public final class MineshaftPieces {
 
                     for (var z = z0; z <= z1; z++) {
                         var normalizedZ = (z - cz) / (diagZ * 0.5F);
-                        if (skipAir && this.getBlock(level, x, y, z, chunkBB).isAir()) {
+                        if (skipAir && this.getBlock(level, x, y, z, chunkBB).air()) {
                             continue;
                         }
                         var distance = normalizedX * normalizedX + normalizedY * normalizedY + normalizedZ * normalizedZ;
@@ -345,7 +345,7 @@ public final class MineshaftPieces {
 
         protected boolean isSupportingBox(MineshaftLevel level, BoundingBox chunkBB, int x0, int x1, int y1, int z0) {
             for (var x = x0; x <= x1; x++) {
-                if (this.getBlock(level, x, y1 + 1, z0, chunkBB).isAir()) {
+                if (this.getBlock(level, x, y1 + 1, z0, chunkBB).air()) {
                     return false;
                 }
             }
@@ -365,10 +365,10 @@ public final class MineshaftPieces {
 
             for (var x = x0; x <= x1; x++) {
                 for (var z = z0; z <= z1; z++) {
-                    if (level.getBlock(x, y0, z).isLiquid()) {
+                    if (level.getBlock(x, y0, z).liquid()) {
                         return true;
                     }
-                    if (level.getBlock(x, y1, z).isLiquid()) {
+                    if (level.getBlock(x, y1, z).liquid()) {
                         return true;
                     }
                 }
@@ -376,10 +376,10 @@ public final class MineshaftPieces {
 
             for (var x = x0; x <= x1; x++) {
                 for (var y = y0; y <= y1; y++) {
-                    if (level.getBlock(x, y, z0).isLiquid()) {
+                    if (level.getBlock(x, y, z0).liquid()) {
                         return true;
                     }
-                    if (level.getBlock(x, y, z1).isLiquid()) {
+                    if (level.getBlock(x, y, z1).liquid()) {
                         return true;
                     }
                 }
@@ -387,10 +387,10 @@ public final class MineshaftPieces {
 
             for (var z = z0; z <= z1; z++) {
                 for (var y = y0; y <= y1; y++) {
-                    if (level.getBlock(x0, y, z).isLiquid()) {
+                    if (level.getBlock(x0, y, z).liquid()) {
                         return true;
                     }
-                    if (level.getBlock(x1, y, z).isLiquid()) {
+                    if (level.getBlock(x1, y, z).liquid()) {
                         return true;
                     }
                 }
@@ -813,7 +813,7 @@ public final class MineshaftPieces {
 
                 for (var z = 0; z <= length; z++) {
                     var floor = this.getBlock(level, 1, -1, z, chunkBB);
-                    if (!floor.isAir() && isSolidRender(floor)) {
+                    if (!floor.air() && isSolidRender(floor)) {
                         var probability = this.isInterior(level, 1, 0, z, chunkBB) ? 0.7F : 0.9F;
                         this.maybeGenerateBlock(level, chunkBB, random, probability, 1, 0, z, rail);
                     }
@@ -829,8 +829,8 @@ public final class MineshaftPieces {
             var wx = this.worldX(x, z);
             var wy = this.worldY(y);
             var wz = this.worldZ(x, z);
-            if (isInside(chunkBB, wx, wy, wz) && level.getBlock(wx, wy, wz).isAir()
-                    && !level.getBlock(wx, wy - 1, wz).isAir()) {
+            if (isInside(chunkBB, wx, wy, wz) && level.getBlock(wx, wy, wz).air()
+                    && !level.getBlock(wx, wy - 1, wz).air()) {
                 var rail = Block.RAIL.withProperty("shape", random.nextBoolean() ? "north_south" : "east_west");
                 this.placeBlock(level, rail, x, y, z, chunkBB);
                 random.nextLong(); // minecart chest loot table seed
@@ -906,7 +906,7 @@ public final class MineshaftPieces {
          * hang below one (the fence anchor would overwrite a spider web).
          */
         private static boolean canHangChainBelow(Block block) {
-            return block.isSolid() && !isFallingBlock(block) && !block.compare(Block.COBWEB);
+            return block.solid() && !isFallingBlock(block) && !block.compare(Block.COBWEB);
         }
 
         private void placeSupport(MineshaftLevel level, BoundingBox chunkBB, int x0, int y0, int z, int y1, int x1,
@@ -1127,7 +1127,7 @@ public final class MineshaftPieces {
         }
 
         private void placeSupportPillar(MineshaftLevel level, BoundingBox chunkBB, int x, int y0, int z, int y1) {
-            if (!this.getBlock(level, x, y1 + 1, z, chunkBB).isAir()) {
+            if (!this.getBlock(level, x, y1 + 1, z, chunkBB).air()) {
                 this.generateBox(level, chunkBB, x, y0, z, x, y1, z, this.type.planksState(), CAVE_AIR, false);
             }
         }

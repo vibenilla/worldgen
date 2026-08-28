@@ -410,7 +410,7 @@ public final class OceanRuinPlacer {
     }
 
     private static boolean isPassableFloor(Block state, Key iceTag, StructureLoader structureLoader) {
-        return state.isAir() || state.key().equals(Key.key("minecraft:water"))
+        return state.air() || state.key().equals(Key.key("minecraft:water"))
                 || structureLoader.blockTags().blocks(iceTag).contains(state.key());
     }
 

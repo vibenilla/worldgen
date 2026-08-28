@@ -15,7 +15,7 @@ public final class SimpleBlockFeature implements Feature<SimpleBlockConfiguratio
 
         if (this.isDoublePlant(toPlace)) {
             var upperPosition = targetPosition.add(0, 1, 0);
-            if (!context.accessor().getBlock(upperPosition).isAir()) {
+            if (!context.accessor().getBlock(upperPosition).air()) {
                 return false;
             }
 
@@ -63,7 +63,7 @@ public final class SimpleBlockFeature implements Feature<SimpleBlockConfiguratio
                     && adapter.fullBrightAtGeneration(position.blockX(), position.blockZ())) {
                 return false;
             }
-            return below.registry().isSolid();
+            return below.solid();
         }
 
         // 26.x per-block supports_<name> tags carry most plant survival rules
@@ -81,11 +81,11 @@ public final class SimpleBlockFeature implements Feature<SimpleBlockConfiguratio
                     net.minestom.server.instance.block.BlockFace.BOTTOM);
         }
 
-        if (toPlace.registry().isSolid()) {
+        if (toPlace.solid()) {
             return true;
         }
 
-        return accessor.getBlock(position.sub(0, 1, 0)).registry().isSolid();
+        return accessor.getBlock(position.sub(0, 1, 0)).solid();
     }
 
     private boolean isDoublePlant(Block block) {

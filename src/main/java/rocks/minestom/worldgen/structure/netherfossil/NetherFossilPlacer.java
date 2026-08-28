@@ -164,7 +164,7 @@ public final class NetherFossilPlacer {
         var x = bounds.minX() + positionalRandom.nextInt(bounds.getXSpan());
         var y = bounds.minY();
         var z = bounds.minZ() + positionalRandom.nextInt(bounds.getZSpan());
-        if (!adapter.getBlock(x, y, z).isAir()) {
+        if (!adapter.getBlock(x, y, z).air()) {
             return;
         }
 

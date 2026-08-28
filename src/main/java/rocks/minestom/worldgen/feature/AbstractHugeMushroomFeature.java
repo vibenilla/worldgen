@@ -54,7 +54,7 @@ public abstract class AbstractHugeMushroomFeature implements Feature<HugeMushroo
 
     protected <T extends Block.Getter & Block.Setter> void placeMushroomBlock(T level, BlockVec position, Block newState) {
         var current = level.getBlock(position);
-        if (current.isAir() || REPLACEABLE_BY_MUSHROOMS.contains(current.name())) {
+        if (current.air() || REPLACEABLE_BY_MUSHROOMS.contains(current.name())) {
             level.setBlock(position, newState);
         }
     }
@@ -91,7 +91,7 @@ public abstract class AbstractHugeMushroomFeature implements Feature<HugeMushroo
             for (var dx = -radius; dx <= radius; dx++) {
                 for (var dz = -radius; dz <= radius; dz++) {
                     var state = level.getBlock(origin.blockX() + dx, y + dy, origin.blockZ() + dz);
-                    if (!state.isAir() && !Feature.LEAVES.contains(state.name())) {
+                    if (!state.air() && !Feature.LEAVES.contains(state.name())) {
                         return false;
                     }
                 }

@@ -64,7 +64,7 @@ public interface TreeDecorator {
         }
 
         public boolean isAir(BlockVec position) {
-            return this.level.getBlock(position).isAir();
+            return this.level.getBlock(position).air();
         }
 
         public boolean checkBlock(BlockVec position, Predicate<Block> predicate) {

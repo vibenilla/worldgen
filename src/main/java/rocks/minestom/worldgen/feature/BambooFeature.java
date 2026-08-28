@@ -50,7 +50,7 @@ public final class BambooFeature implements Feature<ProbabilityConfiguration> {
         var config = context.config();
         var bambooPosition = origin;
 
-        if (level.getBlock(bambooPosition).isAir()) {
+        if (level.getBlock(bambooPosition).air()) {
             if (canSurvive(level, bambooPosition)) {
                 var height = random.nextInt(12) + 5;
                 if (random.nextFloat() < config.probability()) {
@@ -72,7 +72,7 @@ public final class BambooFeature implements Feature<ProbabilityConfiguration> {
                 }
 
                 var placedHeight = 0;
-                while (placedHeight < height && level.getBlock(bambooPosition).isAir()) {
+                while (placedHeight < height && level.getBlock(bambooPosition).air()) {
                     level.setBlock(bambooPosition, BAMBOO_TRUNK);
                     bambooPosition = bambooPosition.add(0, 1, 0);
                     placedHeight++;

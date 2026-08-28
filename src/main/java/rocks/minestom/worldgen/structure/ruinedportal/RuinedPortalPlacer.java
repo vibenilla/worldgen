@@ -466,7 +466,7 @@ public final class RuinedPortalPlacer {
     }
 
     private static boolean isOpaque(Block block, boolean oceanFloor) {
-        return oceanFloor ? block.isSolid() : !block.isAir();
+        return oceanFloor ? block.solid() : !block.air();
     }
 
     private void spreadNetherrack(RandomSource random, GenerationUnitAdapter level, RuinedPortalStart start) {
@@ -542,7 +542,7 @@ public final class RuinedPortalPlacer {
     private boolean canBlockBeReplacedByNetherrackOrMagma(GenerationUnitAdapter level, BlockVec pos,
             VerticalPlacement placement) {
         var state = level.getBlock(pos.blockX(), pos.blockY(), pos.blockZ());
-        return !state.isAir()
+        return !state.air()
                 && !state.compare(Block.OBSIDIAN)
                 && !this.structureLoader.blockTags().blocks(FEATURES_CANNOT_REPLACE).contains(state.key())
                 && (placement == VerticalPlacement.IN_NETHER || !state.compare(Block.LAVA));
@@ -572,13 +572,13 @@ public final class RuinedPortalPlacer {
 
     private void maybeAddVines(RandomSource random, GenerationUnitAdapter level, BlockVec pos) {
         var state = level.getBlock(pos.blockX(), pos.blockY(), pos.blockZ());
-        if (state.isAir() || state.compare(Block.VINE)) {
+        if (state.air() || state.compare(Block.VINE)) {
             return;
         }
         var direction = Direction.HORIZONTAL.get(random.nextInt(Direction.HORIZONTAL.size()));
         var neighbourPos = direction.relative(pos);
         var neighbourState = level.getBlock(neighbourPos.blockX(), neighbourPos.blockY(), neighbourPos.blockZ());
-        if (neighbourState.isAir() && isFaceFull(state)) {
+        if (neighbourState.air() && isFaceFull(state)) {
             var face = direction.opposite().serializedName();
             level.setBlock(neighbourPos.blockX(), neighbourPos.blockY(), neighbourPos.blockZ(),
                     Block.VINE.withProperty(face, "true"));
@@ -589,14 +589,14 @@ public final class RuinedPortalPlacer {
             Properties properties) {
         if (random.nextFloat() < 0.5F
                 && level.getBlock(pos.blockX(), pos.blockY(), pos.blockZ()).compare(Block.NETHERRACK)
-                && level.getBlock(pos.blockX(), pos.blockY() + 1, pos.blockZ()).isAir()) {
+                && level.getBlock(pos.blockX(), pos.blockY() + 1, pos.blockZ()).air()) {
             level.setBlock(pos.blockX(), pos.blockY() + 1, pos.blockZ(),
                     Block.JUNGLE_LEAVES.withProperty("persistent", "true"));
         }
     }
 
     private static boolean isFaceFull(Block state) {
-        var shape = state.registry().collisionShape();
+        var shape = state.collisionShape();
         var startCorner = shape.relativeStart();
         var endCorner = shape.relativeEnd();
         return startCorner.x() == 0.0 && startCorner.y() == 0.0 && startCorner.z() == 0.0

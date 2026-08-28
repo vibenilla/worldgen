@@ -451,7 +451,7 @@ public interface Aquifer {
                 var topOfAquiferCellPokesAboveSurface = topOfAquiferCell > adjustedSurfaceLevel;
                 if (topOfAquiferCellPokesAboveSurface || start) {
                     var globalFluidAtSurface = this.globalFluidPicker.computeFluid(sampleX, adjustedSurfaceLevel, sampleZ);
-                    if (!globalFluidAtSurface.at(adjustedSurfaceLevel).isAir()) {
+                    if (!globalFluidAtSurface.at(adjustedSurfaceLevel).air()) {
                         if (start) {
                             surfaceAtCenterIsUnderGlobalFluidLevel = true;
                         }

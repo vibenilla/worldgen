@@ -142,7 +142,7 @@ public final class IglooPlacer {
         }
 
         var below = adapter.getBlock(trapdoorPos.blockX(), trapdoorPos.blockY() - 1, trapdoorPos.blockZ());
-        if (!below.isAir() && !below.key().equals(LADDER)) {
+        if (!below.air() && !below.key().equals(LADDER)) {
             adapter.setBlock(trapdoorPos, Block.SNOW_BLOCK);
         }
     }

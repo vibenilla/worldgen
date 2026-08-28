@@ -85,7 +85,7 @@ final class ScatteredFeatureLevel {
         var base = (localX * this.sizeZ + localZ) * this.height;
         for (var yIndex = this.height - 1; yIndex >= 0; yIndex--) {
             var block = this.blocks[base + yIndex];
-            if (block != null && block.isSolid() && !isLeaves(block)) {
+            if (block != null && block.solid() && !isLeaves(block)) {
                 return this.minY + yIndex + 1;
             }
         }
@@ -105,7 +105,7 @@ final class ScatteredFeatureLevel {
         var base = (localX * this.sizeZ + localZ) * this.height;
         for (var yIndex = this.height - 1; yIndex >= 0; yIndex--) {
             var block = this.blocks[base + yIndex];
-            if (block != null && block.isSolid()) {
+            if (block != null && block.solid()) {
                 return this.minY + yIndex + 1;
             }
         }

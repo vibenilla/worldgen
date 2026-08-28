@@ -33,7 +33,7 @@ public final class HugeFungusFeature implements Feature<HugeFungusConfiguration>
 
     /** Vanilla {@code BlockStateBase.canBeReplaced()}. */
     static boolean canBeReplaced(Block block) {
-        return block.isAir() || REPLACEABLE.contains(block.name());
+        return block.air() || REPLACEABLE.contains(block.name());
     }
 
     @Override
@@ -100,7 +100,7 @@ public final class HugeFungusFeature implements Feature<HugeFungusConfiguration>
                     var blockPos = surfaceOrigin.add(dx, dy, dz);
                     if (isReplaceable(level, predicateContext, blockPos, config, true)) {
                         if (config.planted()) {
-                            if (!level.getBlock(blockPos.sub(0, 1, 0)).isAir()) {
+                            if (!level.getBlock(blockPos.sub(0, 1, 0)).air()) {
                                 // Vanilla destroyBlock: clear before replacing
                                 level.setBlock(blockPos, Block.AIR);
                             }
@@ -151,7 +151,7 @@ public final class HugeFungusFeature implements Feature<HugeFungusConfiguration>
                     var isHatBottom = dy < hatStartY + 3;
                     var blockPos = surfaceOrigin.add(dx, dy, dz);
                     if (isReplaceable(level, predicateContext, blockPos, config, false)) {
-                        if (config.planted() && !level.getBlock(blockPos.sub(0, 1, 0)).isAir()) {
+                        if (config.planted() && !level.getBlock(blockPos.sub(0, 1, 0)).air()) {
                             // Vanilla destroyBlock: clear before replacing
                             level.setBlock(blockPos, Block.AIR);
                         }
@@ -207,7 +207,7 @@ public final class HugeFungusFeature implements Feature<HugeFungusConfiguration>
     private static <T extends Block.Getter & Block.Setter> void tryPlaceWeepingVines(
             BlockVec hatBlockPos, T level, RandomSource random) {
         var placePos = hatBlockPos.sub(0, 1, 0);
-        if (level.getBlock(placePos).isAir()) {
+        if (level.getBlock(placePos).air()) {
             var goalVineHeight = WeepingVinesFeature.nextIntInclusive(random, 1, 5);
             if (random.nextInt(7) == 0) {
                 goalVineHeight *= 2;

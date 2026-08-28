@@ -96,7 +96,7 @@ public final class FossilFeature implements Feature<FossilFeatureConfiguration> 
             for (var y : new int[]{box.minY(), box.maxY()}) {
                 for (var z : new int[]{box.minZ(), box.maxZ()}) {
                     var state = level.getBlock(x, y, z);
-                    if (state.isAir() || state.compare(Block.LAVA) || state.compare(Block.WATER)) {
+                    if (state.air() || state.compare(Block.LAVA) || state.compare(Block.WATER)) {
                         count++;
                     }
                 }

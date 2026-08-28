@@ -821,7 +821,7 @@ public final class OceanMonumentPieces {
             for (var y = y0; y <= y1; y++) {
                 for (var x = x0; x <= x1; x++) {
                     for (var z = z0; z <= z1; z++) {
-                        if (!skipAir || !this.getBlock(level, x, y, z, chunkBB).isAir()) {
+                        if (!skipAir || !this.getBlock(level, x, y, z, chunkBB).air()) {
                             if (y != y0 && y != y1 && x != x0 && x != x1 && z != z0 && z != z1) {
                                 this.placeBlock(level, fillBlock, x, y, z, chunkBB);
                             } else {
@@ -849,7 +849,7 @@ public final class OceanMonumentPieces {
         }
 
         private static boolean isReplaceableByStructures(Block block) {
-            return block.isAir() || block.isLiquid() || block.compare(Block.GLOW_LICHEN)
+            return block.air() || block.liquid() || block.compare(Block.GLOW_LICHEN)
                     || block.compare(Block.SEAGRASS) || block.compare(Block.TALL_SEAGRASS);
         }
 

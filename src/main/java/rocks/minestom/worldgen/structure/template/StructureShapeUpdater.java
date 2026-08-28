@@ -556,7 +556,7 @@ public final class StructureShapeUpdater {
     }
 
     private static boolean isFaceFullDown(Block block) {
-        var shape = block.registry().collisionShape();
+        var shape = block.collisionShape();
         return shape != null && shape.isFaceFull(BlockFace.BOTTOM);
     }
 

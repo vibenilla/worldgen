@@ -300,7 +300,7 @@ public final class NetherFortressPieces {
             for (var y = y0; y <= y1; y++) {
                 for (var x = x0; x <= x1; x++) {
                     for (var z = z0; z <= z1; z++) {
-                        if (skipAir && this.getBlock(level, x, y, z, chunkBB).isAir()) {
+                        if (skipAir && this.getBlock(level, x, y, z, chunkBB).air()) {
                             continue;
                         }
                         if (y != y0 && y != y1 && x != x0 && x != x1 && z != z0 && z != z1) {
@@ -328,7 +328,7 @@ public final class NetherFortressPieces {
         }
 
         private static boolean isReplaceableByStructures(Block block) {
-            return block.isAir() || block.isLiquid() || block.compare(Block.GLOW_LICHEN)
+            return block.air() || block.liquid() || block.compare(Block.GLOW_LICHEN)
                     || block.compare(Block.SEAGRASS) || block.compare(Block.TALL_SEAGRASS);
         }
 
@@ -368,7 +368,7 @@ public final class NetherFortressPieces {
         }
 
         private static boolean isSolidRender(Block block) {
-            return block.isSolid() && !block.compare(Block.NETHER_BRICK_FENCE);
+            return block.solid() && !block.compare(Block.NETHER_BRICK_FENCE);
         }
 
         private Block transform(Block block) {

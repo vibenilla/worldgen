@@ -110,7 +110,7 @@ public final class FallenTreeFeature implements Feature<FallenTreeConfiguration>
     private boolean isOverSolidGround(Block.Getter level, BlockVec position) {
         // Vanilla checks isFaceSturdy(UP); leaves have no sturdy faces
         var below = level.getBlock(position.add(0, -1, 0));
-        return below.registry().isSolid() && !below.name().endsWith("_leaves");
+        return below.solid() && !below.name().endsWith("_leaves");
     }
 
     private <T extends Block.Getter & Block.Setter> void placeLogBlock(

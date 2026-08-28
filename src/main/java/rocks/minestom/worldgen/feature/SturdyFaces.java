@@ -58,7 +58,7 @@ public final class SturdyFaces {
         if (block.compare(Block.SNOW) && "8".equals(block.getProperty("layers"))) {
             return true;
         }
-        return block.registry().collisionShape().isFaceFull(face);
+        return block.collisionShape().isFaceFull(face);
     }
 
     private static String clockwise(String facing) {
@@ -94,6 +94,6 @@ public final class SturdyFaces {
         if (isFaceSturdy(neighbor, attachmentFace)) {
             return true;
         }
-        return neighbor.registry().collisionShape().isFaceFull(attachmentFace);
+        return neighbor.collisionShape().isFaceFull(attachmentFace);
     }
 }

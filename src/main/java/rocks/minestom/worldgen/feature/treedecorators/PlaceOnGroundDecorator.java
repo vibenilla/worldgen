@@ -89,7 +89,7 @@ public record PlaceOnGroundDecorator(int tries, int radius, int height, BlockSta
         // Vanilla: above must be air or vine, the block itself must be a solid
         // renderer, and the position must be at the MOTION_BLOCKING_NO_LEAVES
         // heightmap surface
-        if (!blockAbove.isAir() && !blockAbove.compare(Block.VINE)) {
+        if (!blockAbove.air() && !blockAbove.compare(Block.VINE)) {
             if (trace) {
                 System.out.println("TRACE litter " + position + " reject above=" + blockAbove.name());
             }
@@ -125,7 +125,7 @@ public record PlaceOnGroundDecorator(int tries, int radius, int height, BlockSta
      * solid blocks except leaves, which are solid but not opaque.
      */
     private static boolean isSolidRender(Block block) {
-        return block.registry().isSolid() && !block.name().endsWith("_leaves");
+        return block.solid() && !block.name().endsWith("_leaves");
     }
 
     static List<BlockVec> getLowestTrunkOrRootOfTree(TreeDecorator.Context context) {

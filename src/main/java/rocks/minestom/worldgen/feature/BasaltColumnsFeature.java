@@ -108,7 +108,7 @@ public final class BasaltColumnsFeature implements Feature<ColumnFeatureConfigur
         }
 
         var blockState = level.getBlock(pos.add(0, -1, 0));
-        return !blockState.isAir() && !CANNOT_PLACE_ON.contains(blockState.name());
+        return !blockState.air() && !CANNOT_PLACE_ON.contains(blockState.name());
     }
 
     private static BlockVec findAir(Block.Getter level, BlockVec cursor, int limit, int maxY) {
@@ -119,7 +119,7 @@ public final class BasaltColumnsFeature implements Feature<ColumnFeatureConfigur
                 return null;
             }
 
-            if (blockState.isAir()) {
+            if (blockState.air()) {
                 return cursor;
             }
 
@@ -131,6 +131,6 @@ public final class BasaltColumnsFeature implements Feature<ColumnFeatureConfigur
 
     private static boolean isAirOrLavaOcean(Block.Getter level, int lavaSeaLevel, BlockVec pos) {
         var blockState = level.getBlock(pos);
-        return blockState.isAir() || blockState.compare(Block.LAVA) && pos.blockY() <= lavaSeaLevel;
+        return blockState.air() || blockState.compare(Block.LAVA) && pos.blockY() <= lavaSeaLevel;
     }
 }

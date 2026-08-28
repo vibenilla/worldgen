@@ -60,7 +60,7 @@ public final class WaterloggedVegetationPatchFeature extends VegetationPatchFeat
 
     /** Vanilla's {@code BlockState.isFaceSturdy} (default {@code SupportType.FULL}), approximated with the collision shape. */
     private static <T extends Block.Getter & Block.Setter> boolean isExposedDirection(T level, int x, int y, int z, BlockFace faceTowardOrigin) {
-        return !level.getBlock(x, y, z).registry().collisionShape().isFaceFull(faceTowardOrigin);
+        return !level.getBlock(x, y, z).collisionShape().isFaceFull(faceTowardOrigin);
     }
 
     @Override

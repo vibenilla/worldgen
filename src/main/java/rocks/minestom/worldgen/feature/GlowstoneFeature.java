@@ -15,7 +15,7 @@ public final class GlowstoneFeature implements Feature<NoneFeatureConfiguration>
         var level = context.accessor();
         var origin = context.origin();
         var random = context.random();
-        if (!level.getBlock(origin).isAir()) {
+        if (!level.getBlock(origin).air()) {
             return false;
         }
 
@@ -32,7 +32,7 @@ public final class GlowstoneFeature implements Feature<NoneFeatureConfiguration>
                     random.nextInt(8) - random.nextInt(8),
                     -random.nextInt(12),
                     random.nextInt(8) - random.nextInt(8));
-            if (level.getBlock(placePos).isAir()) {
+            if (level.getBlock(placePos).air()) {
                 var neighbours = 0;
 
                 for (var direction : Direction.values()) {

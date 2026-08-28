@@ -444,7 +444,7 @@ public final class StrongholdPieces {
             for (var y = y0; y <= y1; y++) {
                 for (var x = x0; x <= x1; x++) {
                     for (var z = z0; z <= z1; z++) {
-                        if (skipAir && this.getBlock(level, x, y, z, chunkBB).isAir()) {
+                        if (skipAir && this.getBlock(level, x, y, z, chunkBB).air()) {
                             continue;
                         }
                         if (y != y0 && y != y1 && x != x0 && x != x1 && z != z0 && z != z1) {
@@ -462,7 +462,7 @@ public final class StrongholdPieces {
             for (var y = y0; y <= y1; y++) {
                 for (var x = x0; x <= x1; x++) {
                     for (var z = z0; z <= z1; z++) {
-                        if (skipAir && this.getBlock(level, x, y, z, chunkBB).isAir()) {
+                        if (skipAir && this.getBlock(level, x, y, z, chunkBB).air()) {
                             continue;
                         }
                         selector.next(random, x, y, z, y == y0 || y == y1 || x == x0 || x == x1 || z == z0 || z == z1);
@@ -481,7 +481,7 @@ public final class StrongholdPieces {
                         if (random.nextFloat() > probability) {
                             continue;
                         }
-                        if (skipAir && this.getBlock(level, x, y, z, chunkBB).isAir()) {
+                        if (skipAir && this.getBlock(level, x, y, z, chunkBB).air()) {
                             continue;
                         }
                         if (hasToBeInside && !this.isInterior(level, x, y, z, chunkBB)) {
@@ -705,7 +705,7 @@ public final class StrongholdPieces {
             if (state.compare(Block.CHEST)) {
                 return Block.CHEST;
             }
-            if (state.isSolid()) {
+            if (state.solid()) {
                 if (solidNeighbor != null) {
                     solidNeighbor = null;
                     break;
@@ -719,13 +719,13 @@ public final class StrongholdPieces {
         }
 
         var lockDirection = Direction.NORTH;
-        if (level.getBlock(x + lockDirection.stepX(), y, z + lockDirection.stepZ()).isSolid()) {
+        if (level.getBlock(x + lockDirection.stepX(), y, z + lockDirection.stepZ()).solid()) {
             lockDirection = lockDirection.opposite();
         }
-        if (level.getBlock(x + lockDirection.stepX(), y, z + lockDirection.stepZ()).isSolid()) {
+        if (level.getBlock(x + lockDirection.stepX(), y, z + lockDirection.stepZ()).solid()) {
             lockDirection = clockwise(lockDirection);
         }
-        if (level.getBlock(x + lockDirection.stepX(), y, z + lockDirection.stepZ()).isSolid()) {
+        if (level.getBlock(x + lockDirection.stepX(), y, z + lockDirection.stepZ()).solid()) {
             lockDirection = lockDirection.opposite();
         }
         return Block.CHEST.withProperty("facing", lockDirection.serializedName());

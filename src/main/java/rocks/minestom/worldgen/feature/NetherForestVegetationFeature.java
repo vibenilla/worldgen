@@ -57,7 +57,7 @@ public final class NetherForestVegetationFeature implements Feature<NetherForest
                     random.nextInt(config.spreadHeight()) - random.nextInt(config.spreadHeight()),
                     random.nextInt(config.spreadWidth()) - random.nextInt(config.spreadWidth()));
             var state = config.stateProvider().getState(level, random, finalPos);
-            if (level.getBlock(finalPos).isAir() && finalPos.blockY() > context.minY()
+            if (level.getBlock(finalPos).air() && finalPos.blockY() > context.minY()
                     && canSurvive(level, finalPos)) {
                 level.setBlock(finalPos, state);
                 placed++;

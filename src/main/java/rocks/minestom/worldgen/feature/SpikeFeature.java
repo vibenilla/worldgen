@@ -15,7 +15,7 @@ public final class SpikeFeature implements Feature<SpikeConfiguration> {
         var random = context.random();
         var level = context.accessor();
 
-        while (level.getBlock(origin).isAir() && origin.blockY() > context.minY() + 2) {
+        while (level.getBlock(origin).air() && origin.blockY() > context.minY() + 2) {
             origin = origin.sub(0, 1, 0);
         }
 
@@ -45,14 +45,14 @@ public final class SpikeFeature implements Feature<SpikeConfiguration> {
                             && (xo != -newWidth && xo != newWidth && zo != -newWidth && zo != newWidth || !(random.nextFloat() > 0.75F))) {
                         var positiveOffset = origin.add(xo, yOff, zo);
                         var state = level.getBlock(positiveOffset);
-                        if (state.isAir() || config.canReplace().test(predicateContext, positiveOffset)) {
+                        if (state.air() || config.canReplace().test(predicateContext, positiveOffset)) {
                             level.setBlock(positiveOffset, config.state());
                         }
 
                         if (yOff != 0 && newWidth > 1) {
                             var negativeOffset = origin.add(xo, -yOff, zo);
                             state = level.getBlock(negativeOffset);
-                            if (state.isAir() || config.canReplace().test(predicateContext, negativeOffset)) {
+                            if (state.air() || config.canReplace().test(predicateContext, negativeOffset)) {
                                 level.setBlock(negativeOffset, config.state());
                             }
                         }
@@ -79,7 +79,7 @@ public final class SpikeFeature implements Feature<SpikeConfiguration> {
                 // Vanilla hardcodes the Y=50 cutoff for the support pillar.
                 while (cursor.blockY() > 50) {
                     var state = level.getBlock(cursor);
-                    if (!state.isAir()
+                    if (!state.air()
                             && !config.canReplace().test(predicateContext, cursor)
                             && !state.compare(config.state(), Block.Comparator.STATE)) {
                         break;
