@@ -40,8 +40,8 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Releasing $VERSION"
 
-      - name: Build
-        run: ./gradlew build --no-configuration-cache
+      - name: Compile tests and assemble
+        run: ./gradlew compileTestJava assemble --no-configuration-cache
 
       - name: Publish to Skylite Maven
         run: ./gradlew publishAllPublicationsToSkyliteRepository --no-configuration-cache
