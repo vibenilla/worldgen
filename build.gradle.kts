@@ -61,6 +61,9 @@ publishing {
             name = "skylite"
             url = uri("https://maven.skylite.gg/releases")
             credentials(PasswordCredentials::class)
+            authentication {
+                create<BasicAuthentication>("basic")
+            }
         }
     }
 }
