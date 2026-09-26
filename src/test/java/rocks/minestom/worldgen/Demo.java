@@ -43,13 +43,7 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * Runnable showcase server exposing all three dimensions with vanilla-style
- * /gamemode, /teleport, /locate and /dimension commands.
- *
- * <p>Run with {@code ./gradlew demoServer [-Pport=25565] [-Pseed=123456789]}.
- */
-public final class DemoServer {
+public final class Demo {
     private static final int STRUCTURE_SEARCH_RADIUS_CHUNKS = 100;
     private static final int BIOME_SEARCH_RADIUS = 6400;
     private static final int BIOME_SAMPLE_RESOLUTION_HORIZONTAL = 32;
