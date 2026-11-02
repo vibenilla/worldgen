@@ -163,11 +163,13 @@ public final class StructurePlacer {
         // through the feature fork would otherwise re-assert its corridor
         // cave_air over a trial chamber placed later through a direct write.
         var lookup = validatedLookup(chunkX, chunkZ, surfaceHeights);
+        var currentTerrain = lookup != null ? lookup.terrain(chunkX, chunkZ) : null;
         var adapter = featureAdapter != null
                 ? featureAdapter
-                : lookup != null
+                : currentTerrain != null
                         ? new GenerationUnitAdapter(unit, startX, startZ, unit.size().blockX(), unit.size().blockZ(),
-                                settings.minY(), lookup.terrain(chunkX, chunkZ).blocks(), settings.height(), null)
+                                settings.minY(), currentTerrain.blocks(), settings.height(), null)
+                                .withCenterTerrain(currentTerrain)
                         : new GenerationUnitAdapter(unit);
 
         StructureSet fortressStructureSet = null;
@@ -304,6 +306,14 @@ public final class StructurePlacer {
             // on top of anything already placed this chunk.
             this.fortressPlacer.place(unit, biomeZoomer, settings, fortressStructureSet, surfaceHeights);
         }
+    }
+
+    public boolean hasPendingShapeUpdates() {
+        return this.mineshaftPlacer.hasPendingShapeUpdates();
+    }
+
+    public void markDecorated(int chunkX, int chunkZ) {
+        this.mineshaftPlacer.markDecorated(chunkX, chunkZ);
     }
 
     /**

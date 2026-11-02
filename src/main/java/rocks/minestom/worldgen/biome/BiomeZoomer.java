@@ -95,13 +95,8 @@ public final class BiomeZoomer {
     }
 
     private static double fiddle(long value) {
-        var fraction = (double) floorMod(value >> 24, 1024L) / 1024.0D;
+        var fraction = (double) ((value >> 24) & 1023L) / 1024.0D;
         return (fraction - 0.5D) * 0.9D;
-    }
-
-    private static long floorMod(long value, long mod) {
-        var result = value % mod;
-        return result >= 0L ? result : result + mod;
     }
 
     private static double square(double value) {

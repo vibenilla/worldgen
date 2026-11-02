@@ -12,6 +12,7 @@ import java.util.BitSet;
  * exactly, which is required for block-for-block parity.
  */
 public final class OreFeature implements Feature<OreConfiguration> {
+    private static final boolean ORE_PROBE_DEBUG = System.getProperty("worldgen.oreProbeDebug") != null;
     /**
      * Vanilla {@code Mth.SIN} lookup table, required because vanilla uses the
      * quantized sine for the strand radius computation.
@@ -45,11 +46,10 @@ public final class OreFeature implements Feature<OreConfiguration> {
         var sizeXZ = 2 * (ceil(spreadXY) + maxRadius);
         var sizeY = 2 * (2 + maxRadius);
 
-        var debugProbe = System.getProperty("worldgen.oreProbeDebug") != null;
         for (var xprobe = xStart; xprobe <= xStart + sizeXZ; xprobe++) {
             for (var zprobe = zStart; zprobe <= zStart + sizeXZ; zprobe++) {
                 if (yStart <= getHeight(level, context, xprobe, zprobe)) {
-                    if (debugProbe) {
+                    if (ORE_PROBE_DEBUG) {
                         System.out.println("OREPROBE origin=" + origin + " yStart=" + yStart
                                 + " pass=" + xprobe + "," + zprobe
                                 + " height=" + getHeight(level, context, xprobe, zprobe));
@@ -61,7 +61,7 @@ public final class OreFeature implements Feature<OreConfiguration> {
             }
         }
 
-        if (debugProbe) {
+        if (ORE_PROBE_DEBUG) {
             System.out.println("OREPROBE origin=" + origin + " yStart=" + yStart + " SKIP");
         }
         return false;
@@ -148,11 +148,10 @@ public final class OreFeature implements Feature<OreConfiguration> {
                                         var bitSetIndex = x - xStart + (y - yStart) * sizeXZ + (z - zStart) * sizeXZ * sizeY;
                                         if (!tested.get(bitSetIndex)) {
                                             tested.set(bitSetIndex);
-                                            var orePos = new BlockVec(x, y, z);
                                             var blockState = level.getBlock(x, y, z);
 
                                             for (var targetState : config.targetStates()) {
-                                                if (canPlaceOre(blockState, level, random, config, targetState, orePos)) {
+                                                if (canPlaceOre(blockState, level, random, config, targetState, x, y, z)) {
                                                     level.setBlock(x, y, z, targetState.state());
                                                     placed++;
                                                     break;
@@ -179,11 +178,25 @@ public final class OreFeature implements Feature<OreConfiguration> {
             OreConfiguration.TargetBlockState targetState,
             BlockVec orePos
     ) {
+        return canPlaceOre(blockState, blockGetter, random, config, targetState,
+                orePos.blockX(), orePos.blockY(), orePos.blockZ());
+    }
+
+    public static boolean canPlaceOre(
+            Block blockState,
+            Block.Getter blockGetter,
+            RandomSource random,
+            OreConfiguration config,
+            OreConfiguration.TargetBlockState targetState,
+            int x,
+            int y,
+            int z
+    ) {
         if (!targetState.target().test(blockState, random)) {
             return false;
         }
 
-        return shouldSkipAirCheck(random, config.discardChanceOnAirExposure()) || !isAdjacentToAir(blockGetter, orePos);
+        return shouldSkipAirCheck(random, config.discardChanceOnAirExposure()) || !isAdjacentToAir(blockGetter, x, y, z);
     }
 
     private static boolean shouldSkipAirCheck(RandomSource random, float discardChanceOnAirExposure) {
@@ -194,14 +207,14 @@ public final class OreFeature implements Feature<OreConfiguration> {
         return !(discardChanceOnAirExposure >= 1.0F) && random.nextFloat() >= discardChanceOnAirExposure;
     }
 
-    private static boolean isAdjacentToAir(Block.Getter blockGetter, BlockVec pos) {
+    private static boolean isAdjacentToAir(Block.Getter blockGetter, int x, int y, int z) {
         // Vanilla Direction order: DOWN, UP, NORTH, SOUTH, WEST, EAST.
-        return blockGetter.getBlock(pos.blockX(), pos.blockY() - 1, pos.blockZ()).air()
-                || blockGetter.getBlock(pos.blockX(), pos.blockY() + 1, pos.blockZ()).air()
-                || blockGetter.getBlock(pos.blockX(), pos.blockY(), pos.blockZ() - 1).air()
-                || blockGetter.getBlock(pos.blockX(), pos.blockY(), pos.blockZ() + 1).air()
-                || blockGetter.getBlock(pos.blockX() - 1, pos.blockY(), pos.blockZ()).air()
-                || blockGetter.getBlock(pos.blockX() + 1, pos.blockY(), pos.blockZ()).air();
+        return blockGetter.getBlock(x, y - 1, z).air()
+                || blockGetter.getBlock(x, y + 1, z).air()
+                || blockGetter.getBlock(x, y, z - 1).air()
+                || blockGetter.getBlock(x, y, z + 1).air()
+                || blockGetter.getBlock(x - 1, y, z).air()
+                || blockGetter.getBlock(x + 1, y, z).air();
     }
 
     private static int getHeight(Block.Getter level, FeaturePlaceContext<?, ?> context, int x, int z) {

@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class GenerationUnitAdapter implements Block.Getter, Block.Setter {
+    private static final String WRITE_TRACE = System.getProperty("worldgen.writeTrace");
     private final GenerationUnit unit;
     private final int startX;
     private final int startY;
@@ -22,6 +23,8 @@ public final class GenerationUnitAdapter implements Block.Getter, Block.Setter {
     private final int terrainHeight;
     private final TerrainLookup terrainLookup;
     private final Map<BlockVec, Block> blockCache;
+    private final TerrainData[] neighborTerrain = new TerrainData[9];
+    private TerrainData centerTerrain;
 
     /**
      * Supplies the memoized terrain of any chunk so features can read real
@@ -93,9 +96,55 @@ public final class GenerationUnitAdapter implements Block.Getter, Block.Setter {
         this.blockCache = new ConcurrentHashMap<>();
     }
 
+    public GenerationUnitAdapter withCenterTerrain(TerrainData terrainData) {
+        this.centerTerrain = terrainData;
+        return this;
+    }
+
+    private TerrainData terrainAt(int chunkX, int chunkZ) {
+        if (this.terrainStartX >> 4 == chunkX && this.terrainStartZ >> 4 == chunkZ && this.centerTerrain != null) {
+            return this.centerTerrain;
+        }
+        if (this.terrainLookup == null) {
+            return null;
+        }
+
+        var offsetX = chunkX - (this.terrainStartX >> 4);
+        var offsetZ = chunkZ - (this.terrainStartZ >> 4);
+        if (offsetX >= -1 && offsetX <= 1 && offsetZ >= -1 && offsetZ <= 1) {
+            var index = (offsetX + 1) * 3 + offsetZ + 1;
+            var cached = this.neighborTerrain[index];
+            if (cached == null) {
+                cached = this.terrainLookup.terrain(chunkX, chunkZ);
+                this.neighborTerrain[index] = cached;
+            }
+            return cached;
+        }
+
+        return this.terrainLookup.terrain(chunkX, chunkZ);
+    }
+
     @Override
     public Block getBlock(int x, int y, int z) {
-        return this.getBlock(new BlockVec(x, y, z));
+        var bufferIndex = this.bufferIndex(x, y, z);
+        if (bufferIndex >= 0) {
+            var block = this.terrainBlocks[bufferIndex];
+            return block != null ? block : Block.AIR;
+        }
+
+        var cached = this.blockCache.get(new BlockVec(x, y, z));
+        if (cached != null) {
+            return cached;
+        }
+
+        var yIndex = y - this.terrainMinY;
+        if (this.terrainLookup != null && yIndex >= 0 && yIndex < this.terrainHeight) {
+            var neighbor = this.terrainAt(x >> 4, z >> 4);
+            var block = neighbor.blocks()[((x & 15) * 16 + (z & 15)) * this.terrainHeight + yIndex];
+            return block != null ? block : Block.AIR;
+        }
+
+        return Block.AIR;
     }
 
     @Override
@@ -104,33 +153,27 @@ public final class GenerationUnitAdapter implements Block.Getter, Block.Setter {
     }
 
     public Block getBlock(BlockVec position) {
-        // Real generated blocks for the center chunk: terrain + surface + earlier features
-        var bufferIndex = this.bufferIndex(position);
-        if (bufferIndex >= 0) {
-            var block = this.terrainBlocks[bufferIndex];
-            return block != null ? block : Block.AIR;
-        }
-
-        var cached = this.blockCache.get(position);
-        if (cached != null) {
-            return cached;
-        }
-
-        // Neighbor chunks: read their memoized terrain like vanilla reads the
-        // neighboring proto-chunks
-        var yIndex = position.blockY() - this.terrainMinY;
-        if (this.terrainLookup != null && yIndex >= 0 && yIndex < this.terrainHeight) {
-            var neighbor = this.terrainLookup.terrain(position.blockX() >> 4, position.blockZ() >> 4);
-            var block = neighbor.blocks()[((position.blockX() & 15) * 16 + (position.blockZ() & 15)) * this.terrainHeight + yIndex];
-            return block != null ? block : Block.AIR;
-        }
-
-        return Block.AIR;
+        return this.getBlock(position.blockX(), position.blockY(), position.blockZ());
     }
 
     @Override
     public void setBlock(int x, int y, int z, Block block) {
-        this.setBlock(new BlockVec(x, y, z), block);
+        this.setBlock(x, y, z, block, null);
+    }
+
+    private int bufferIndex(int x, int y, int z) {
+        if (this.terrainBlocks == null) {
+            return -1;
+        }
+
+        var localX = x - this.terrainStartX;
+        var localZ = z - this.terrainStartZ;
+        var yIndex = y - this.terrainMinY;
+        if (localX < 0 || localX >= this.terrainSizeX || localZ < 0 || localZ >= this.terrainSizeZ
+                || yIndex < 0 || yIndex >= this.terrainHeight) {
+            return -1;
+        }
+        return (localX * this.terrainSizeZ + localZ) * this.terrainHeight + yIndex;
     }
 
     /**
@@ -201,39 +244,43 @@ public final class GenerationUnitAdapter implements Block.Getter, Block.Setter {
     }
 
     public void setBlock(BlockVec position, Block block) {
-        var writeTrace = System.getProperty("worldgen.writeTrace");
-        if (writeTrace != null && writeTrace.equals(position.blockX() + "," + position.blockY() + "," + position.blockZ())) {
-            System.out.println("WRITETRACE " + position + " " + block.name());
+        this.setBlock(position.blockX(), position.blockY(), position.blockZ(), block, position);
+    }
+
+    private void setBlock(int x, int y, int z, Block block, BlockVec position) {
+        if (WRITE_TRACE != null && WRITE_TRACE.equals(x + "," + y + "," + z)) {
+            System.out.println("WRITETRACE " + x + "," + y + "," + z + " " + block.name());
             Thread.dumpStack();
         }
-        if (!this.isInBounds(position)) {
+        if (!this.isInBounds(x, y, z)) {
             return;
         }
 
         if (block.compare(Block.MAGMA_BLOCK) || block.compare(Block.SOUL_SAND)) {
             rocks.minestom.worldgen.structure.StructureWrites.markPostProcess(
-                    this.terrainLookup, position.add(0, 1, 0));
+                    this.terrainLookup, new BlockVec(x, y + 1, z));
         }
         // Vanilla registers hasPostProcess on the mushroom blocks themselves:
         // every placed mushroom is re-checked at FULL, where the real light
         // level breaks sky-exposed ones (canSurvive light < 13)
         if (block.compare(Block.RED_MUSHROOM) || block.compare(Block.BROWN_MUSHROOM)) {
-            rocks.minestom.worldgen.structure.StructureWrites.markPostProcess(this.terrainLookup, position);
+            rocks.minestom.worldgen.structure.StructureWrites.markPostProcess(
+                    this.terrainLookup, position != null ? position : new BlockVec(x, y, z));
         }
 
-        var bufferIndex = this.bufferIndex(position);
+        var bufferIndex = this.bufferIndex(x, y, z);
         if (bufferIndex >= 0) {
             this.terrainBlocks[bufferIndex] = block;
         } else {
-            this.blockCache.put(position, block);
+            this.blockCache.put(position != null ? position : new BlockVec(x, y, z), block);
             // Mirror into the neighbor's cached terrain so its later decoration
             // reads our writes, like vanilla proto-chunks do
-            var yIndex = position.blockY() - this.terrainMinY;
+            var yIndex = y - this.terrainMinY;
             if (this.terrainLookup != null && yIndex >= 0 && yIndex < this.terrainHeight) {
-                var neighborChunkX = position.blockX() >> 4;
-                var neighborChunkZ = position.blockZ() >> 4;
-                var neighborIndex = ((position.blockX() & 15) * 16 + (position.blockZ() & 15)) * this.terrainHeight + yIndex;
-                var neighbor = this.terrainLookup.terrain(neighborChunkX, neighborChunkZ);
+                var neighborChunkX = x >> 4;
+                var neighborChunkZ = z >> 4;
+                var neighborIndex = ((x & 15) * 16 + (z & 15)) * this.terrainHeight + yIndex;
+                var neighbor = this.terrainAt(neighborChunkX, neighborChunkZ);
                 var previousBlock = neighbor.blocks()[neighborIndex];
                 neighbor.blocks()[neighborIndex] = block;
                 if (this.terrainLookup.writePending(neighborChunkX, neighborChunkZ, neighborIndex, block, previousBlock)) {
@@ -244,11 +291,10 @@ public final class GenerationUnitAdapter implements Block.Getter, Block.Setter {
             }
         }
 
-        var localX = position.blockX() - this.startX;
-        var localY = position.blockY() - this.startY;
-        var localZ = position.blockZ() - this.startZ;
-        var writeTraceProperty = System.getProperty("worldgen.writeTrace");
-        if (writeTraceProperty != null && writeTraceProperty.equals(position.blockX() + "," + position.blockY() + "," + position.blockZ())) {
+        var localX = x - this.startX;
+        var localY = y - this.startY;
+        var localZ = z - this.startZ;
+        if (WRITE_TRACE != null && WRITE_TRACE.equals(x + "," + y + "," + z)) {
             System.out.println("WRITETRACE-FORK local=" + localX + "," + localY + "," + localZ
                     + " unitStart=" + this.unit.absoluteStart() + " unitSize=" + this.unit.size());
         }
@@ -373,7 +419,7 @@ public final class GenerationUnitAdapter implements Block.Getter, Block.Setter {
         if (this.isReprimed(x >> 4, z >> 4)) {
             return this.reprimedHeight(REPRIMED_OCEAN_FLOOR, HeightmapType.OCEAN_FLOOR, x, z);
         }
-        var terrain = this.terrainLookup.terrain(x >> 4, z >> 4);
+        var terrain = this.terrainAt(x >> 4, z >> 4);
         var solidTop = terrain.surfaceHeights()[(x & 15) * 16 + (z & 15)];
         return solidTop == Integer.MIN_VALUE ? this.terrainMinY : solidTop + 1;
     }
@@ -390,7 +436,7 @@ public final class GenerationUnitAdapter implements Block.Getter, Block.Setter {
         if (this.isReprimed(x >> 4, z >> 4)) {
             return this.reprimedHeight(REPRIMED_WORLD_SURFACE, HeightmapType.WORLD_SURFACE, x, z);
         }
-        var terrain = this.terrainLookup.terrain(x >> 4, z >> 4);
+        var terrain = this.terrainAt(x >> 4, z >> 4);
         var index = (x & 15) * 16 + (z & 15);
         var solidTop = terrain.surfaceHeights()[index];
         var fluidTop = terrain.waterHeights()[index];
@@ -412,7 +458,7 @@ public final class GenerationUnitAdapter implements Block.Getter, Block.Setter {
             column = this.terrainBlocks;
             columnBase = (localX * this.terrainSizeZ + localZ) * this.terrainHeight;
         } else if (this.terrainLookup != null) {
-            column = this.terrainLookup.terrain(x >> 4, z >> 4).blocks();
+            column = this.terrainAt(x >> 4, z >> 4).blocks();
             columnBase = ((x & 15) * 16 + (z & 15)) * this.terrainHeight;
         } else {
             return Integer.MAX_VALUE;
@@ -460,29 +506,10 @@ public final class GenerationUnitAdapter implements Block.Getter, Block.Setter {
         }
     }
 
-    /**
-     * Index into the center chunk's block buffer, or -1 when the position is
-     * outside the buffered chunk column.
-     */
-    private int bufferIndex(BlockVec position) {
-        if (this.terrainBlocks == null) {
-            return -1;
-        }
-
-        var localX = position.blockX() - this.terrainStartX;
-        var localZ = position.blockZ() - this.terrainStartZ;
-        var yIndex = position.blockY() - this.terrainMinY;
-        if (localX < 0 || localX >= this.terrainSizeX || localZ < 0 || localZ >= this.terrainSizeZ
-                || yIndex < 0 || yIndex >= this.terrainHeight) {
-            return -1;
-        }
-        return (localX * this.terrainSizeZ + localZ) * this.terrainHeight + yIndex;
-    }
-
-    private boolean isInBounds(BlockVec position) {
-        var localX = position.blockX() - this.startX;
-        var localY = position.blockY() - this.startY;
-        var localZ = position.blockZ() - this.startZ;
+    private boolean isInBounds(int x, int y, int z) {
+        var localX = x - this.startX;
+        var localY = y - this.startY;
+        var localZ = z - this.startZ;
 
         return localX >= 0 && localX < this.unit.size().blockX()
                 && localY >= 0 && localY < this.unit.size().blockY()

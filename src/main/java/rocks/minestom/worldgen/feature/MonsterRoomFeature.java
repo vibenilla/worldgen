@@ -1,5 +1,6 @@
 package rocks.minestom.worldgen.feature;
 
+import net.kyori.adventure.key.Key;
 import net.minestom.server.coordinate.BlockVec;
 import net.minestom.server.instance.block.Block;
 import rocks.minestom.worldgen.feature.configurations.NoneFeatureConfiguration;
@@ -18,9 +19,10 @@ public final class MonsterRoomFeature implements Feature<NoneFeatureConfiguratio
     /** Number of entries in vanilla's MOBS array (skeleton, zombie, zombie, spider). */
     private static final int MOB_COUNT = 4;
     /** #minecraft:features_cannot_replace */
-    private static final Set<String> CANNOT_REPLACE = Set.of(
-            "minecraft:bedrock", "minecraft:spawner", "minecraft:chest", "minecraft:end_portal_frame",
-            "minecraft:reinforced_deepslate", "minecraft:trial_spawner", "minecraft:vault");
+    private static final Set<Key> CANNOT_REPLACE = Set.of(
+            Key.key("minecraft:bedrock"), Key.key("minecraft:spawner"), Key.key("minecraft:chest"),
+            Key.key("minecraft:end_portal_frame"), Key.key("minecraft:reinforced_deepslate"),
+            Key.key("minecraft:trial_spawner"), Key.key("minecraft:vault"));
 
     @Override
     public <T extends Block.Getter & Block.Setter> boolean place(FeaturePlaceContext<NoneFeatureConfiguration, T> context) {
@@ -38,18 +40,16 @@ public final class MonsterRoomFeature implements Feature<NoneFeatureConfiguratio
         for (var dx = minX; dx <= maxX; dx++) {
             for (var dy = -1; dy <= 4; dy++) {
                 for (var dz = minZ; dz <= maxZ; dz++) {
-                    var pos = origin.add(dx, dy, dz);
-                    var solid = level.getBlock(pos).solid();
-                    if (dy == -1 && !solid) {
-                        return false;
-                    }
-
-                    if (dy == 4 && !solid) {
+                    var blockX = origin.blockX() + dx;
+                    var blockY = origin.blockY() + dy;
+                    var blockZ = origin.blockZ() + dz;
+                    var block = level.getBlock(blockX, blockY, blockZ);
+                    if ((dy == -1 || dy == 4) && !block.solid()) {
                         return false;
                     }
 
                     if ((dx == minX || dx == maxX || dz == minZ || dz == maxZ) && dy == 0
-                            && level.getBlock(pos).air() && level.getBlock(pos.add(0, 1, 0)).air()) {
+                            && block.air() && level.getBlock(blockX, blockY + 1, blockZ).air()) {
                         holeCount++;
                     }
                 }
@@ -63,20 +63,22 @@ public final class MonsterRoomFeature implements Feature<NoneFeatureConfiguratio
         for (var dx = minX; dx <= maxX; dx++) {
             for (var dy = 3; dy >= -1; dy--) {
                 for (var dz = minZ; dz <= maxZ; dz++) {
-                    var pos = origin.add(dx, dy, dz);
-                    var state = level.getBlock(pos);
+                    var blockX = origin.blockX() + dx;
+                    var blockY = origin.blockY() + dy;
+                    var blockZ = origin.blockZ() + dz;
+                    var state = level.getBlock(blockX, blockY, blockZ);
                     if (dx == minX || dy == -1 || dz == minZ || dx == maxX || dy == 4 || dz == maxZ) {
-                        if (pos.blockY() >= context.minY() && !level.getBlock(pos.add(0, -1, 0)).solid()) {
-                            level.setBlock(pos, AIR);
+                        if (blockY >= context.minY() && !level.getBlock(blockX, blockY - 1, blockZ).solid()) {
+                            level.setBlock(blockX, blockY, blockZ, AIR);
                         } else if (state.solid() && !state.compare(Block.CHEST)) {
                             if (dy == -1 && random.nextInt(4) != 0) {
-                                this.safeSetBlock(level, pos, Block.MOSSY_COBBLESTONE);
+                                this.safeSetBlock(level, blockX, blockY, blockZ, Block.MOSSY_COBBLESTONE);
                             } else {
-                                this.safeSetBlock(level, pos, Block.COBBLESTONE);
+                                this.safeSetBlock(level, blockX, blockY, blockZ, Block.COBBLESTONE);
                             }
                         }
                     } else if (!state.compare(Block.CHEST) && !state.compare(Block.SPAWNER)) {
-                        this.safeSetBlock(level, pos, AIR);
+                        this.safeSetBlock(level, blockX, blockY, blockZ, AIR);
                     }
                 }
             }
@@ -98,7 +100,7 @@ public final class MonsterRoomFeature implements Feature<NoneFeatureConfiguratio
                     }
 
                     if (wallCount == 1) {
-                        this.safeSetBlock(level, chestPos, reorient(level, chestPos, Block.CHEST));
+                        this.safeSetBlock(level, chestX, chestY, chestZ, reorient(level, chestPos, Block.CHEST));
                         random.nextLong(); // chest loot table seed
                         break;
                     }
@@ -106,7 +108,7 @@ public final class MonsterRoomFeature implements Feature<NoneFeatureConfiguratio
             }
         }
 
-        this.safeSetBlock(level, origin, Block.SPAWNER);
+        this.safeSetBlock(level, origin.blockX(), origin.blockY(), origin.blockZ(), Block.SPAWNER);
         if (level.getBlock(origin).compare(Block.SPAWNER)) {
             random.nextInt(MOB_COUNT); // Util.getRandom over the spawner mob types
         }
@@ -175,9 +177,9 @@ public final class MonsterRoomFeature implements Feature<NoneFeatureConfiguratio
         return block.solid() && !block.compare(Block.SPAWNER) && !block.compare(Block.CHEST);
     }
 
-    private <T extends Block.Getter & Block.Setter> void safeSetBlock(T level, BlockVec pos, Block block) {
-        if (!CANNOT_REPLACE.contains(level.getBlock(pos).key().asString())) {
-            level.setBlock(pos, block);
+    private <T extends Block.Getter & Block.Setter> void safeSetBlock(T level, int x, int y, int z, Block block) {
+        if (!CANNOT_REPLACE.contains(level.getBlock(x, y, z).key())) {
+            level.setBlock(x, y, z, block);
         }
     }
 }

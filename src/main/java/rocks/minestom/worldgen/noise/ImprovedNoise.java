@@ -5,8 +5,18 @@ import rocks.minestom.worldgen.random.RandomSource;
 
 public final class ImprovedNoise {
     private static final float SHIFT_UP_EPSILON = 1.0E-7F;
+    private static final double[] GRADIENT = new double[16 * 3];
 
-    private final byte[] permutations;
+    static {
+        for (var index = 0; index < 16; index++) {
+            var gradient = SimplexNoise.GRADIENT[index];
+            GRADIENT[index * 3] = gradient[0];
+            GRADIENT[index * 3 + 1] = gradient[1];
+            GRADIENT[index * 3 + 2] = gradient[2];
+        }
+    }
+
+    private final int[] permutations;
     public final double xo;
     public final double yo;
     public final double zo;
@@ -15,10 +25,10 @@ public final class ImprovedNoise {
         this.xo = randomSource.nextDouble() * 256.0;
         this.yo = randomSource.nextDouble() * 256.0;
         this.zo = randomSource.nextDouble() * 256.0;
-        this.permutations = new byte[256];
+        this.permutations = new int[256];
 
         for (var index = 0; index < 256; index++) {
-            this.permutations[index] = (byte) index;
+            this.permutations[index] = index;
         }
 
         for (var index = 0; index < 256; index++) {
@@ -58,30 +68,28 @@ public final class ImprovedNoise {
     }
 
     private static double gradDot(int hash, double x, double y, double z) {
-        return SimplexNoise.dot(SimplexNoise.GRADIENT[hash & 15], x, y, z);
-    }
-
-    private int p(int value) {
-        return this.permutations[value & 0xFF] & 0xFF;
+        var index = (hash & 15) * 3;
+        return GRADIENT[index] * x + GRADIENT[index + 1] * y + GRADIENT[index + 2] * z;
     }
 
     private double sampleAndLerp(int x, int y, int z, double localX, double localY, double localZ, double smoothY) {
-        var permX0 = this.p(x);
-        var permX1 = this.p(x + 1);
-        var permX0Y0 = this.p(permX0 + y);
-        var permX0Y1 = this.p(permX0 + y + 1);
-        var permX1Y0 = this.p(permX1 + y);
-        var permX1Y1 = this.p(permX1 + y + 1);
+        var permutations = this.permutations;
+        var permX0 = permutations[x & 0xFF];
+        var permX1 = permutations[(x + 1) & 0xFF];
+        var permX0Y0 = permutations[(permX0 + y) & 0xFF];
+        var permX0Y1 = permutations[(permX0 + y + 1) & 0xFF];
+        var permX1Y0 = permutations[(permX1 + y) & 0xFF];
+        var permX1Y1 = permutations[(permX1 + y + 1) & 0xFF];
 
-        var value000 = gradDot(this.p(permX0Y0 + z), localX, localY, localZ);
-        var value100 = gradDot(this.p(permX1Y0 + z), localX - 1.0, localY, localZ);
-        var value010 = gradDot(this.p(permX0Y1 + z), localX, localY - 1.0, localZ);
-        var value110 = gradDot(this.p(permX1Y1 + z), localX - 1.0, localY - 1.0, localZ);
+        var value000 = gradDot(permutations[(permX0Y0 + z) & 0xFF], localX, localY, localZ);
+        var value100 = gradDot(permutations[(permX1Y0 + z) & 0xFF], localX - 1.0, localY, localZ);
+        var value010 = gradDot(permutations[(permX0Y1 + z) & 0xFF], localX, localY - 1.0, localZ);
+        var value110 = gradDot(permutations[(permX1Y1 + z) & 0xFF], localX - 1.0, localY - 1.0, localZ);
 
-        var value001 = gradDot(this.p(permX0Y0 + z + 1), localX, localY, localZ - 1.0);
-        var value101 = gradDot(this.p(permX1Y0 + z + 1), localX - 1.0, localY, localZ - 1.0);
-        var value011 = gradDot(this.p(permX0Y1 + z + 1), localX, localY - 1.0, localZ - 1.0);
-        var value111 = gradDot(this.p(permX1Y1 + z + 1), localX - 1.0, localY - 1.0, localZ - 1.0);
+        var value001 = gradDot(permutations[(permX0Y0 + z + 1) & 0xFF], localX, localY, localZ - 1.0);
+        var value101 = gradDot(permutations[(permX1Y0 + z + 1) & 0xFF], localX - 1.0, localY, localZ - 1.0);
+        var value011 = gradDot(permutations[(permX0Y1 + z + 1) & 0xFF], localX, localY - 1.0, localZ - 1.0);
+        var value111 = gradDot(permutations[(permX1Y1 + z + 1) & 0xFF], localX - 1.0, localY - 1.0, localZ - 1.0);
 
         var smoothX = VMath.smoothstep(localX);
         var smoothZ = VMath.smoothstep(smoothY);

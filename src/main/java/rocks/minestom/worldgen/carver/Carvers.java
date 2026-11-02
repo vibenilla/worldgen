@@ -52,7 +52,7 @@ public final class Carvers {
             for (var offsetZ = -CHUNK_RANGE; offsetZ <= CHUNK_RANGE; offsetZ++) {
                 var sourceChunkX = chunkX + offsetX;
                 var sourceChunkZ = chunkZ + offsetZ;
-                var biome = this.biomeSource.biome(sourceChunkX << 2, 0, sourceChunkZ << 2);
+                var biome = this.biomeSource.biomeDirect(sourceChunkX << 2, 0, sourceChunkZ << 2);
                 var carverIds = this.carverLoader.biomeCarvers(biome);
 
                 for (var index = 0; index < carverIds.size(); index++) {

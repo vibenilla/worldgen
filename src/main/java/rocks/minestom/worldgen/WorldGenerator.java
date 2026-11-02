@@ -27,10 +27,12 @@ import rocks.minestom.worldgen.terrain.TerrainGenerator;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Orchestrates chunk generation by filling biomes, evaluating density to place
@@ -39,6 +41,9 @@ import java.util.TreeSet;
  * in a chunk.
  */
 public final class WorldGenerator implements Generator {
+    private static final String DEBUG_CHUNK = System.getProperty("worldgen.debugchunk");
+    private static final String DECOR_TRACE_CHUNK = System.getProperty("worldgen.decorTrace", "");
+    private static final String DECOR_TRACE_FEATURE = System.getProperty("worldgen.decorTraceFeature", "");
     private final NoiseGeneratorSettingsRuntime settings;
     private final CachedBiomeSource biomeSource;
     private final BiomeZoomer biomeZoomer;
@@ -90,18 +95,19 @@ public final class WorldGenerator implements Generator {
             return WorldGenerator.this.fullyDecorated.contains((long) chunkX << 32 | (chunkZ & 0xFFFFFFFFL));
         }
     };
-    // LRU: decoration probes neighbors, so evicting wholesale caused recompute
-    // storms of the full terrain+surface+carve pipeline
-    private final Map<Long, TerrainData> terrainDataCache = java.util.Collections.synchronizedMap(
-            new java.util.LinkedHashMap<>(64, 0.75f, true) {
-                @Override
-                protected boolean removeEldestEntry(Map.Entry<Long, TerrainData> eldest) {
-                    return this.size() > MAX_CACHED_TERRAIN;
-                }
-            });
+    private static final int TERRAIN_CACHE_SHARDS = 16;
+    private final LinkedHashMap<Long, TerrainData>[] terrainDataShards;
+    private final ReentrantLock[] terrainDataLocks;
 
+    @SuppressWarnings("unchecked")
     public WorldGenerator(NoiseGeneratorSettingsRuntime settings, BiomeSource biomeSource, long biomeZoomSeed,
             BiomeResolver biomeResolver, FeatureLoader featureLoader, StructurePlacer structurePlacer) {
+        this.terrainDataShards = new LinkedHashMap[TERRAIN_CACHE_SHARDS];
+        this.terrainDataLocks = new ReentrantLock[TERRAIN_CACHE_SHARDS];
+        for (var shard = 0; shard < TERRAIN_CACHE_SHARDS; shard++) {
+            this.terrainDataShards[shard] = new LinkedHashMap<>();
+            this.terrainDataLocks[shard] = new ReentrantLock();
+        }
         this.settings = settings;
         this.biomeSource = new CachedBiomeSource(biomeSource, settings.minY(), settings.height());
         this.biomeZoomer = new BiomeZoomer(this.biomeSource, biomeZoomSeed);
@@ -236,7 +242,7 @@ public final class WorldGenerator implements Generator {
                         this.settings.minY(),
                         terrainData.blocks(),
                         this.settings.height(),
-                        this.terrainAccess);
+                        this.terrainAccess).withCenterTerrain(terrainData);
             }
 
             var pending = this.pendingFluidTicks.remove(pendingKey);
@@ -583,7 +589,7 @@ public final class WorldGenerator implements Generator {
                 this.settings.minY(),
                 terrainData.blocks(),
                 this.settings.height(),
-                this.terrainAccess);
+                this.terrainAccess).withCenterTerrain(terrainData);
 
         var placementContext = new PlacementContext(
                 levelAdapter,
@@ -650,19 +656,16 @@ public final class WorldGenerator implements Generator {
                 }
 
                 placementContext.currentFeature(placedFeatureKey);
-                var debugChunk = System.getProperty("worldgen.debugchunk");
-                var debugThis = debugChunk != null
-                        && Arrays.asList(debugChunk.split(";")).contains((startX >> 4) + "," + (startZ >> 4));
+                var debugThis = DEBUG_CHUNK != null
+                        && Arrays.asList(DEBUG_CHUNK.split(";")).contains((startX >> 4) + "," + (startZ >> 4));
                 var debugStep = stepIndex;
                 if (debugThis) {
                     System.out.println("FEATSTART idx=" + featureIndex + " step=" + stepIndex
                             + " rng=" + rngState(random) + " " + placedFeatureKey.asString());
                 }
 
-                var decorTraceChunk = System.getProperty("worldgen.decorTrace", "");
-                var decorTraceFeature = System.getProperty("worldgen.decorTraceFeature", "");
-                var tracingThisFeature = decorTraceChunk.equals((startX >> 4) + "," + (startZ >> 4))
-                        && placedFeatureKey.asString().contains(decorTraceFeature);
+                var tracingThisFeature = DECOR_TRACE_CHUNK.equals((startX >> 4) + "," + (startZ >> 4))
+                        && placedFeatureKey.asString().contains(DECOR_TRACE_FEATURE);
                 if (tracingThisFeature) {
                     dumpDecorTrace(placedFeatureKey.asString() + ":" + featureIndex + ":" + stepIndex, random, levelAdapter, origin,
                             this.settings.minY(), this.settings.maxYInclusive());
@@ -710,6 +713,15 @@ public final class WorldGenerator implements Generator {
         // decoration. A wider fork than regular feature placement: a
         // structure's canopy can reach further than the usual 16-block
         // neighbor margin from whichever chunk happens to finish it off.
+        if (this.structurePlacer != null) {
+            this.structurePlacer.markDecorated(startX >> 4, startZ >> 4);
+        }
+        var pendingLeaves = StructureWrites.hasPendingLeavesUpdates();
+        var pendingShapes = this.structurePlacer != null && this.structurePlacer.hasPendingShapeUpdates();
+        if (!pendingLeaves && !pendingShapes) {
+            return;
+        }
+
         var leavesForkPadding = 128;
         var leavesForkStart = new BlockVec(startX - leavesForkPadding, this.settings.minY(), startZ - leavesForkPadding);
         var leavesForkEnd = new BlockVec(startX + sizeX + leavesForkPadding, this.settings.maxYInclusive() + 1,
@@ -724,9 +736,11 @@ public final class WorldGenerator implements Generator {
                 this.settings.minY(),
                 terrainData.blocks(),
                 this.settings.height(),
-                this.terrainAccess);
-        StructureWrites.flushLeavesUpdates(surfaceHeights, leavesAdapter);
-        if (this.structurePlacer != null) {
+                this.terrainAccess).withCenterTerrain(terrainData);
+        if (pendingLeaves) {
+            StructureWrites.flushLeavesUpdates(surfaceHeights, leavesAdapter);
+        }
+        if (pendingShapes) {
             this.structurePlacer.flushShapeUpdates(startX >> 4, startZ >> 4, leavesAdapter);
         }
     }
@@ -816,8 +830,8 @@ public final class WorldGenerator implements Generator {
      * between a chunk's own generation and its neighbors' feature passes.
      */
     private TerrainData terrainData(int chunkX, int chunkZ) {
-        var key = (long) chunkX << 32 | (chunkZ & 0xFFFFFFFFL);
-        var cached = this.terrainDataCache.get(key);
+        var key = mixChunkKey((long) chunkX << 32 | (chunkZ & 0xFFFFFFFFL));
+        var cached = this.getCachedTerrain(key);
         if (cached != null) {
             return cached;
         }
@@ -834,8 +848,47 @@ public final class WorldGenerator implements Generator {
         // Vanilla chunk status order is NOISE -> SURFACE -> CARVERS; the carvers
         // re-apply the top material where they expose the dirt under grass.
         this.carvers.applyCarvers(data, chunkX, chunkZ, generator.aquifer());
-        var existing = this.terrainDataCache.putIfAbsent(key, data);
+        var existing = this.putCachedTerrain(key, data);
         return existing != null ? existing : data;
+    }
+
+    private static long mixChunkKey(long key) {
+        key ^= key >>> 33;
+        key *= 0xFF51AFD7ED558CCDL;
+        key ^= key >>> 33;
+        key *= 0xC4CEB9FE1A85EC53L;
+        return key ^ key >>> 33;
+    }
+
+    private TerrainData getCachedTerrain(long key) {
+        var shard = (int) key & (TERRAIN_CACHE_SHARDS - 1);
+        var lock = this.terrainDataLocks[shard];
+        lock.lock();
+        try {
+            return this.terrainDataShards[shard].get(key);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private TerrainData putCachedTerrain(long key, TerrainData data) {
+        var shard = (int) key & (TERRAIN_CACHE_SHARDS - 1);
+        var lock = this.terrainDataLocks[shard];
+        lock.lock();
+        try {
+            var map = this.terrainDataShards[shard];
+            var existing = map.putIfAbsent(key, data);
+            if (existing == null && map.size() > MAX_CACHED_TERRAIN / TERRAIN_CACHE_SHARDS) {
+                var eldest = map.keySet().iterator();
+                if (eldest.hasNext()) {
+                    eldest.next();
+                    eldest.remove();
+                }
+            }
+            return existing;
+        } finally {
+            lock.unlock();
+        }
     }
 
     private int[] terrainHeights(int chunkX, int chunkZ) {
@@ -872,7 +925,7 @@ public final class WorldGenerator implements Generator {
                 || key.asString().equals("minecraft:end_spike");
     }
 
-    private static void fillBiomesFromNoise(GenerationUnit unit, BiomeSource biomes, int minY, int maxY) {
+    private static void fillBiomesFromNoise(GenerationUnit unit, CachedBiomeSource biomes, int minY, int maxY) {
         var startX = unit.absoluteStart().blockX();
         var startZ = unit.absoluteStart().blockZ();
         var endX = startX + unit.size().blockX() - 1;
@@ -890,26 +943,34 @@ public final class WorldGenerator implements Generator {
         var minSampleQuartY = Math.floorDiv(minY, 4);
         var maxSampleQuartY = Math.floorDiv(maxY, 4);
 
+        Key[] chunkColumn = null;
+        var chunkColumnX = 0;
+        var chunkColumnZ = 0;
+        if ((startX >> 4) == (endX >> 4) && (startZ >> 4) == (endZ >> 4)) {
+            chunkColumnX = startX >> 4;
+            chunkColumnZ = startZ >> 4;
+            chunkColumn = biomes.chunkColumn(chunkColumnX, chunkColumnZ);
+        }
+        var columnQuartHeight = (maxY - minY + 1) >> 2;
+        Key lastBiome = null;
+        RegistryKey<Biome> lastBiomeKey = null;
+
         for (var quartX = startQuartX; quartX <= endQuartX; quartX++) {
             for (var quartZ = startQuartZ; quartZ <= endQuartZ; quartZ++) {
                 for (var quartY = startQuartY; quartY <= endQuartY; quartY++) {
                     var sampleQuartY = Math.min(Math.max(quartY, minSampleQuartY), maxSampleQuartY);
-                    var biome = biomes.biome(quartX, sampleQuartY, quartZ);
-                    var biomeKey = RegistryKey.<Biome>of(biome);
+                    var biome = chunkColumn != null
+                            ? chunkColumn[((quartX - (chunkColumnX << 2)) * 4 + quartZ - (chunkColumnZ << 2))
+                                    * columnQuartHeight + sampleQuartY - minSampleQuartY]
+                            : biomes.biome(quartX, sampleQuartY, quartZ);
 
-                    // Fill all 4x4x4 positions in the biome palette for this quart
-                    // This matches Minecraft's fillBiomesFromNoise behavior
-                    var baseX = quartX << 2;
-                    var baseY = quartY << 2;
-                    var baseZ = quartZ << 2;
-
-                    for (var dx = 0; dx < 4; dx++) {
-                        for (var dy = 0; dy < 4; dy++) {
-                            for (var dz = 0; dz < 4; dz++) {
-                                unit.modifier().setBiome(baseX + dx, baseY + dy, baseZ + dz, biomeKey);
-                            }
-                        }
+                    if (!biome.equals(lastBiome)) {
+                        lastBiome = biome;
+                        lastBiomeKey = RegistryKey.of(biome);
                     }
+
+                    // One palette write covers the whole 4x4x4 quart cell
+                    unit.modifier().setBiome(quartX << 2, quartY << 2, quartZ << 2, lastBiomeKey);
                 }
             }
         }

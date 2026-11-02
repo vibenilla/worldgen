@@ -13,6 +13,7 @@ import rocks.minestom.worldgen.NoiseGeneratorSettingsRuntime;
  * density at cell corners and interpolating for the blocks in between.
  */
 public final class TerrainGenerator {
+    private static final String DENSITY_PROBE = System.getProperty("worldgen.densityProbe");
     private final NoiseGeneratorSettingsRuntime settings;
     private Aquifer aquifer;
 
@@ -148,8 +149,7 @@ public final class TerrainGenerator {
 
                                 var density = noiseChunk.getInterpolatedDensity()
                                         + beardifier.compute(blockX, blockY, blockZ);
-                                var densityProbe = System.getProperty("worldgen.densityProbe");
-                                if (densityProbe != null && densityProbe.equals(blockX + "," + blockZ)) {
+                                if (DENSITY_PROBE != null && DENSITY_PROBE.equals(blockX + "," + blockZ)) {
                                     System.out.println("DENSITY " + blockX + " " + blockY + " " + blockZ + " " + density);
                                 }
                                 var surfaceIndex = localX * sizeZ + localZ;

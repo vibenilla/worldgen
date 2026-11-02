@@ -21,6 +21,7 @@ public final class CachedBiomeSource implements BiomeSource {
     private final int minQuartY;
     private final int quartHeight;
     private final Map<Long, Key[]> cache = new ConcurrentHashMap<>();
+    private final ThreadLocal<LastColumn> lastColumn = ThreadLocal.withInitial(LastColumn::new);
 
     public CachedBiomeSource(BiomeSource source, int minY, int height) {
         this.source = source;
@@ -44,13 +45,25 @@ public final class CachedBiomeSource implements BiomeSource {
         return this.source.possibleBiomes();
     }
 
+    public Key biomeDirect(int quartX, int quartY, int quartZ) {
+        return this.source.biome(quartX, quartY, quartZ);
+    }
+
     /**
      * All quart biomes of the chunk, laid out as (localQuartX * 4 + localQuartZ) * quartHeight + (quartY - minQuartY).
      */
     public Key[] chunkColumn(int chunkX, int chunkZ) {
-        var key = (long) chunkX << 32 | (chunkZ & 0xFFFFFFFFL);
+        var last = this.lastColumn.get();
+        if (last.column != null && last.x == chunkX && last.z == chunkZ) {
+            return last.column;
+        }
+
+        var key = mixChunkKey((long) chunkX << 32 | (chunkZ & 0xFFFFFFFFL));
         var cached = this.cache.get(key);
         if (cached != null) {
+            last.x = chunkX;
+            last.z = chunkZ;
+            last.column = cached;
             return cached;
         }
 
@@ -91,6 +104,23 @@ public final class CachedBiomeSource implements BiomeSource {
             this.cache.clear();
         }
         this.cache.put(key, column);
+        last.x = chunkX;
+        last.z = chunkZ;
+        last.column = column;
         return column;
+    }
+
+    private static final class LastColumn {
+        private int x = Integer.MIN_VALUE;
+        private int z;
+        private Key[] column;
+    }
+
+    private static long mixChunkKey(long key) {
+        key ^= key >>> 33;
+        key *= 0xFF51AFD7ED558CCDL;
+        key ^= key >>> 33;
+        key *= 0xC4CEB9FE1A85EC53L;
+        return key ^ key >>> 33;
     }
 }

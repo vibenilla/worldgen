@@ -140,6 +140,15 @@ public final class StructureWrites {
         PENDING_LEAVES.addAll(positions);
     }
 
+    public static boolean hasPendingLeavesUpdates() {
+        if (leavesBlockTags == null) {
+            return false;
+        }
+        synchronized (PENDING_LEAVES) {
+            return !PENDING_LEAVES.isEmpty();
+        }
+    }
+
     /**
      * Re-relaxes every leaf queued so far (from this chunk and any other
      * chunk a structure's canopy has touched) against this chunk's live

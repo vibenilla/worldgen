@@ -11,6 +11,7 @@ import rocks.minestom.worldgen.random.RandomSource;
 import java.util.List;
 
 public record PlacedFeature(Key feature, ConfiguredFeature<?> inlineFeature, List<PlacementModifier> placement) {
+    private static final String PMOD_CHUNKS = System.getProperty("worldgen.pmodChunks", "");
 
     public static PlacedFeature fromJson(JsonElement json) {
         if (!json.isJsonObject()) {
@@ -66,9 +67,8 @@ public record PlacedFeature(Key feature, ConfiguredFeature<?> inlineFeature, Lis
      * placing the feature at each surviving position.
      */
     public void place(PlacementContext context, RandomSource random, BlockVec origin, PositionConsumer placer) {
-        var pmodChunks = System.getProperty("worldgen.pmodChunks", "");
-        var pmodGated = !pmodChunks.isEmpty()
-                && java.util.Arrays.asList(pmodChunks.split(";"))
+        var pmodGated = !PMOD_CHUNKS.isEmpty()
+                && java.util.Arrays.asList(PMOD_CHUNKS.split(";"))
                         .contains((origin.blockX() >> 4) + "," + (origin.blockZ() >> 4));
         this.placeRecursive(context, random, origin, 0, pmodGated, placer);
     }

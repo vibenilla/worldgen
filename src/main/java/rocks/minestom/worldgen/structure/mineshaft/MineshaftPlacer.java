@@ -201,8 +201,16 @@ public final class MineshaftPlacer {
      * chunk border sees the neighbor chunk's corridor already dug out
      * instead of raw terrain.
      */
-    public void flushShapeUpdates(int chunkX, int chunkZ, GenerationUnitAdapter level) {
+    public boolean hasPendingShapeUpdates() {
+        return !this.pendingShapeUpdates.isEmpty();
+    }
+
+    public void markDecorated(int chunkX, int chunkZ) {
         this.decoratedChunks.add(packChunk(chunkX, chunkZ));
+    }
+
+    public void flushShapeUpdates(int chunkX, int chunkZ, GenerationUnitAdapter level) {
+        this.markDecorated(chunkX, chunkZ);
         var iterator = this.pendingShapeUpdates.entrySet().iterator();
         while (iterator.hasNext()) {
             var entry = iterator.next();

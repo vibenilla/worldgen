@@ -25,7 +25,8 @@ public final class ScatteredOreFeature implements Feature<OreConfiguration> {
             var blockState = level.getBlock(targetPos.blockX(), targetPos.blockY(), targetPos.blockZ());
 
             for (var targetState : config.targetStates()) {
-                if (OreFeature.canPlaceOre(blockState, level, random, config, targetState, targetPos)) {
+                if (OreFeature.canPlaceOre(blockState, level, random, config, targetState,
+                        targetPos.blockX(), targetPos.blockY(), targetPos.blockZ())) {
                     level.setBlock(targetPos.blockX(), targetPos.blockY(), targetPos.blockZ(), targetState.state());
                     break;
                 }
